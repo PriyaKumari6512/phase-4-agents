@@ -472,7 +472,7 @@ def _other_checks(workdir: Path, use_docker: bool, want, skipped) -> list[CheckR
     if want("checkov"):
         if not _available("checkov", use_docker):
             results.append(skipped("checkov"))
-        elif r := run("checkov", "checkov -d . --framework terraform --compact --quiet -o json --soft-fail", 600):
+        elif r := run("checkov", "checkov -d . --framework terraform --download-external-modules true --compact --quiet -o json --soft-fail", 600):
             results.append(_checkov_result(r))
 
     if want("actionlint"):
