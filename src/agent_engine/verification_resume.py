@@ -15,7 +15,9 @@ def checkpoint_path(root: Path, agent: str) -> Path:
     return root / (".engine-review-" + agent.replace("/", "-") + ".json")
 
 
-def snapshot(root: Path) -> dict[str, str]:
+def snapshot(root: Path, agent: str | None = None) -> dict[str, str]:
+    if agent == "task-breakdown":
+        return _breakdown_snapshot(root)
     result = {}
     for p in sorted(root.rglob("*")):
         rel = p.relative_to(root)
@@ -48,9 +50,51 @@ def snapshot(root: Path) -> dict[str, str]:
     return result
 
 
+def _breakdown_snapshot(root: Path) -> dict[str, str]:
+    """Task Breakdown's read/write dependencies, excluding unrelated stage output.
+
+    Keep project.json byte-exact: verification must judge the current full input,
+    even though feature-generation reuse can ignore unrelated scheduling fields.
+    """
+    result = {}
+    names = {"prd.md", "architecture.md", "phase4/project.json", "phase4/history.json",
+             "requests/task-breakdown.md", "gates/P4-G1.approved.json"}
+    for p in sorted(root.rglob("*")):
+        rel = p.relative_to(root)
+        if rel.as_posix() not in names and rel.parts[0] not in {"specs", "backlog", ".specify"}:
+            continue
+        if p.is_symlink():
+            raise ValueError(f"cannot checkpoint symlink: {rel}")
+        if p.is_file() and not p.name.startswith(".engine-"):
+            result[rel.as_posix()] = file_digest(p)
+    base = Path(__file__).parent
+    common = ("agent.py", "cli.py", "config.py", "runtime.py", "backends.py", "guardrails.py", "locking.py",
+              "stage_controls.py", "model_setup.py", "subscription_models.py", "verification_resume.py")
+    domain = ("backlog.py", "contracts.py", "files.py", "tools.py", "speckit.py", "speckit_parse.py",
+              "feature_documents.py", "feature_jobs.py", "textsim.py", "skills_taxonomy.py")
+    for rel in (*common, *("phase4/" + n for n in domain)):
+        p = base / rel
+        result["code:" + rel] = file_digest(p) if p.is_file() else "missing"
+    for label, directory in (("pack", Path(config.AGENTS_DIR) / "task-breakdown"),
+                             ("assets", base / "phase4/speckit_assets"),
+                             ("taxonomy", base / "phase4/data")):
+        for p in sorted(directory.rglob("*")):
+            if p.is_file():
+                result[label + ":" + p.relative_to(directory).as_posix()] = file_digest(p)
+    for label, path in (("gates", Path(config.GATES_FILE)), ("dependencies", config.ENGINE_ROOT / "uv.lock"),
+                        ("package", config.ENGINE_ROOT / "pyproject.toml")):
+        result[label] = file_digest(path) if path.is_file() else "missing"
+    controls = {k: v for k, v in os.environ.items() if
+                (k.startswith("SDLC_AGENT_") and not any(s in k for s in ("TOKEN", "KEY", "SECRET", "AUTH", "ACCOUNT")))
+                or k.startswith("AGENT_ENGINE_BREAKDOWN_") or k == "AGENT_ENGINE_HELPER_CONCURRENCY"}
+    result["settings:effective"] = hashlib.sha256(json.dumps(controls, sort_keys=True).encode()).hexdigest()
+    return result
+
+
 def save(root: Path, agent: str, request: str, job_id: str) -> None:
-    atomic_json(checkpoint_path(root, agent), {"version": 1, "agent": agent, "request": request,
-                                             "job_id": job_id, "snapshot": snapshot(root)})
+    atomic_json(checkpoint_path(root, agent), {"version": 2 if agent == "task-breakdown" else 1,
+                                             "agent": agent, "request": request,
+                                             "job_id": job_id, "snapshot": snapshot(root, agent)})
 
 
 def validate(root: Path, agent: str, request: str) -> str:
@@ -58,7 +102,8 @@ def validate(root: Path, agent: str, request: str) -> str:
     if not path.is_file():
         raise ValueError("no failed-verifier checkpoint; run generation normally")
     data = json.loads(path.read_text(encoding="utf-8"))
-    if (data.get("version") != 1 or data.get("agent") != agent or data.get("request") != request
-            or data.get("snapshot") != snapshot(root)):
+    if (data.get("version") != (2 if agent == "task-breakdown" else 1)
+            or data.get("agent") != agent or data.get("request") != request
+            or data.get("snapshot") != snapshot(root, agent)):
         raise ValueError("verification checkpoint is stale; inputs, outputs, request or implementation changed")
     return data["job_id"]

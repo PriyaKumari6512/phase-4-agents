@@ -91,6 +91,10 @@ def _rel(rel: str, *, write: bool) -> str:
 
 
 def path(project: str, rel: str, *, write: bool = False) -> Path:
+    if write:
+        from agent_engine.stage_controls import active_stage_budget
+        if (budget := active_stage_budget.get()) is not None:
+            budget.check()
     root = project_dir(project).resolve()
     target = root / _rel(rel, write=write)
     if not target.resolve().is_relative_to(root):
@@ -139,6 +143,9 @@ def read_json(project: str, rel: str, model: type[M] | None = None):
 def write_text(project: str, rel: str, text: str) -> Path:
     p = path(project, rel, write=True)
     p.parent.mkdir(parents=True, exist_ok=True)
+    from agent_engine.stage_controls import active_stage_budget
+    if (budget := active_stage_budget.get()) is not None:
+        budget.check()
     # LF on every OS: generated repository files must not change (or change their hash) on Windows
     atomic_text(p, text)
     return p

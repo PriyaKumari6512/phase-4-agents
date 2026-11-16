@@ -51,7 +51,13 @@ def _tuning_kwargs(spec: str) -> dict:
     to the strong model only — the fast tier keeps provider defaults, since
     not every small model accepts an effort setting. Effort wins over
     temperature: reasoning/thinking modes reject a custom temperature."""
-    if spec != os.environ.get("SDLC_AGENT_STRONG_MODEL"):
+    strong = os.environ.get("SDLC_AGENT_STRONG_MODEL", "").strip()
+    if not strong:
+        try:
+            strong = resolve_model_tiers().strong
+        except RuntimeError:
+            return {}
+    if spec != strong:
         return {}
     effort = os.environ.get("SDLC_AGENT_EFFORT", "").strip().lower()
     if effort:

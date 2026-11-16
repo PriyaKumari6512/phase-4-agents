@@ -72,16 +72,25 @@ review process.
 
 
 def init(project: str) -> str:
-    """Creates or refreshes .specify/ for the project. Never touches specs/."""
+    """Initialize missing spec-kit assets; preserve project-reviewed overrides."""
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
     files.write_json(project, ".specify/init-options.json", {
         "ai": "deepagents", "ai_skills": True, "feature_numbering": "sequential", "here": True,
         "script": "phase4_speckit_script", "speckit_version": SPECKIT_VERSION})
     for name in TEMPLATE_NAMES:
         src = ASSETS / "templates" / f"{name}.md"
-        files.write_text(project, f".specify/templates/{name}.md", src.read_text(encoding="utf-8"))
-    files.write_text(project, ".specify/memory/constitution.md", CONSTITUTION.render(
-        project_name=settings.project_name, code_repos=settings.code_repos, dod=settings.definition_of_done))
+        if not files.exists(project, f".specify/templates/{name}.md"):
+            files.write_text(project, f".specify/templates/{name}.md", src.read_text(encoding="utf-8"))
+    if not files.exists(project, ".specify/memory/constitution.md"):
+        files.write_text(project, ".specify/memory/constitution.md", CONSTITUTION.render(
+            project_name=settings.project_name, code_repos=settings.code_repos, dod=settings.definition_of_done))
+    files.write_json(project, ".specify/engine-policy.json", {
+        "speckit_version": SPECKIT_VERSION,
+        "constitution_origin": "Engine defaults initialize missing constitution; project amendments are preserved.",
+        "default_principles": ["tests for business logic and independent story tests", "OpenTelemetry observability and endpoint health checks",
+                               "security review and validated inputs", "requirement traceability", "smallest sufficient design"],
+        "review_required": "These are engine policy defaults, not claims extracted from the PRD. Resolve policy/source conflicts explicitly.",
+        "template_policy": "Existing project templates are preserved; automatic migration is not performed."})
     (files.project_dir(project) / "specs").mkdir(exist_ok=True)
     existing = sorted(p.name for p in (files.project_dir(project) / "specs").iterdir() if p.is_dir())
     return json.dumps({"REPO_ROOT": files.virtual_root(project),

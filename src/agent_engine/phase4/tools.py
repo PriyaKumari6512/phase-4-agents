@@ -21,8 +21,22 @@ logger = logging.getLogger(__name__)
 
 
 def _run(name: str, fn: Callable[[], str]) -> str:
+    from agent_engine.stage_controls import active_stage_budget
+    if (budget := active_stage_budget.get()) is not None:
+        budget.check()
     with perf.span("tool_exec", name, tool=name) as sp:
         try:
+            if budget is not None and name in {"backlog_build", "backlog_set_features", "backlog_validate", "speckit_init"}:
+                budget.check_parent_mutation()
+            from agent_engine.stage_controls import helper_scope
+            scope = helper_scope.get()
+            allowed = {
+                "speckit-feature": {"speckit_script", "speckit_check_feature", "speckit_write_feature",
+                                    "speckit_feature_status", "speckit_checkpoint_feature", "source_context"},
+                "backlog-enricher": {"backlog_view", "backlog_find_similar", "backlog_update", "source_context"},
+            }
+            if scope is not None and name not in allowed.get(scope.role, set()):
+                raise files.ProjectError(f"{scope.role} may not invoke global tool {name}")
             result = fn()
         except files.ProjectError as e:
             result = f"ERROR: {e}"
@@ -51,6 +65,124 @@ def speckit_init(project: str) -> str:
     return _run("speckit_init", lambda: speckit.init(project))
 
 
+def _feature_scope(project: str, directory: str) -> None:
+    from agent_engine.stage_controls import helper_scope
+    scope = helper_scope.get()
+    if scope is not None and (scope.role != "speckit-feature" or scope.project != project
+                              or scope.feature_directory != directory):
+        raise files.ProjectError("helper may operate only on its assigned feature")
+
+
+def _epic_scope(project: str, item_ids: list[str] | None = None) -> str:
+    from agent_engine.stage_controls import helper_scope
+    from agent_engine.phase4.contracts import Backlog
+    scope = helper_scope.get()
+    if scope is None:
+        return ""
+    if scope.role != "backlog-enricher" or scope.project != project:
+        raise files.ProjectError("helper may operate only on its assigned epic")
+    if item_ids:
+        b = files.read_json(project, files.BACKLOG, Backlog)
+        children = {i.item_id for i in b.items if i.parent_id == scope.epic_id}
+        allowed = children | {scope.epic_id} | {i.item_id for i in b.items if i.parent_id in children}
+        if set(item_ids) - allowed:
+            raise files.ProjectError("item_ids include records outside the helper's assigned epic")
+    return scope.epic_id
+
+
+@tool
+def source_context(project: str, feature_directory: str = "", epic_id: str = "", source: str = "index",
+                   offset: int = 0, limit: int = 16000, expected_sha256: str = "") -> str:
+    """Read compact Task Breakdown settings/feature index or exact paged authoritative source text.
+    source is index, prd, architecture, requests, contract or constitution. Follow next_offset until null.
+    Never infer missing requirements from the index. Read applicable global constraints as well as feature requirements.
+    expected_sha256 rejects changed source pages; restart the read. Character limits are not token limits."""
+    def read():
+        from agent_engine.phase4 import feature_jobs
+        from agent_engine.phase4.contracts import FeatureList, ProjectSettings
+        from agent_engine.stage_controls import helper_scope
+        scope = helper_scope.get()
+        directory = feature_directory
+        if scope is not None:
+            if scope.project != project:
+                raise files.ProjectError("context belongs to another project")
+            if scope.role == "speckit-feature":
+                directory = directory or scope.feature_directory
+                _feature_scope(project, directory)
+            else:
+                scoped = _epic_scope(project)
+                if epic_id and epic_id != scoped:
+                    raise files.ProjectError("context belongs to another epic")
+                features = files.read_json(project, files.FEATURES, FeatureList).features
+                directory = next((f.feature_dir for f in features if "E-" + f.feature_dir.split("/")[1][:3] == scoped), "")
+                if feature_directory and feature_directory != directory:
+                    raise files.ProjectError("context belongs to another feature")
+        if not directory and epic_id:
+            features = files.read_json(project, files.FEATURES, FeatureList).features
+            directory = next((f.feature_dir for f in features if "E-" + f.feature_dir.split("/")[1][:3] == epic_id), "")
+            if not directory:
+                raise files.ProjectError("unknown epic_id")
+        selected = feature_jobs.feature(project, directory) if directory else None
+        paths = {"prd": files.PRD, "architecture": files.ARCHITECTURE,
+                 "requests": "requests/task-breakdown.md", "contract": "backlog/implementation-contract.md",
+                 "constitution": ".specify/memory/constitution.md"}
+        if source == "index":
+            settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings).model_dump(mode="json")
+            return json.dumps({"settings": {k: settings[k] for k in feature_jobs.SETTINGS_KEYS},
+                               "feature": selected.model_dump(mode="json") if selected else None,
+                               "sources": {name: {"path": files.virtual(project, rel),
+                                         "present": files.exists(project, rel)} for name, rel in paths.items()}})
+        if source not in paths or offset < 0 or not 1000 <= limit <= 32000:
+            raise files.ProjectError("source must be index/prd/architecture/requests/contract/constitution; offset>=0, limit1000..32000")
+        rel = paths[source]
+        raw = files.path(project, rel).read_bytes() if files.exists(project, rel) else b""
+        sha = hashlib.sha256(raw).hexdigest()
+        if expected_sha256 and expected_sha256 != sha:
+            raise files.ProjectError("source changed since previous page; restart")
+        text = raw.decode("utf-8")
+        end = min(len(text), offset + limit)
+        return json.dumps({"source": source, "path": files.virtual(project, rel), "sha256": sha,
+                           "total_chars": len(text), "offset": offset, "text": text[offset:end],
+                           "next_offset": end if end < len(text) else None})
+    return _run("source_context", read)
+
+
+@tool
+def speckit_write_feature(project: str, feature_directory: str, document: dict,
+                          expected_sha256: str = "") -> str:
+    """Validate one canonical feature decision record and render compatible spec/plan/tasks and supporting docs.
+    Follow the Task Breakdown workflow adapter for the document schema. Returns paths/counts, not document bodies.
+    expected_sha256 optionally protects against overwriting a changed canonical feature record."""
+    def write():
+        _feature_scope(project, feature_directory)
+        from agent_engine.phase4 import feature_documents, feature_jobs
+        feature_jobs.feature(project, feature_directory)
+        return feature_documents.write(project, feature_directory, document, expected_sha256)
+    return _run("speckit_write_feature", write)
+
+
+@tool
+def speckit_feature_status(project: str, feature_directory: str) -> str:
+    """Check exact sources/output hashes before reusing a feature. Returns input_sha256 for its completion checkpoint.
+    reusable means completed generation, never a review approval. Recheck when any source changes."""
+    def status():
+        _feature_scope(project, feature_directory)
+        from agent_engine.phase4 import feature_jobs
+        return json.dumps(feature_jobs.status(project, feature_directory))
+    return _run("speckit_feature_status", status)
+
+
+@tool
+def speckit_checkpoint_feature(project: str, feature_directory: str, expected_input_sha256: str) -> str:
+    """Record completed feature work AFTER its consistency/format checks. Pass status.input_sha256 from before work.
+    Changed inputs reject the checkpoint. This does not approve a gate or skip final backlog semantic review."""
+    def checkpoint():
+        _feature_scope(project, feature_directory)
+        from agent_engine.phase4 import feature_jobs
+        return json.dumps(feature_jobs.checkpoint(project, feature_directory, expected_input_sha256))
+    return _run("speckit_checkpoint_feature", checkpoint)
+
+
 @tool
 def speckit_script(project: str, script: str, script_args: str = "", feature_directory: str = "") -> str:
     """Run a spec-kit helper script. Use this whenever a speckit skill says to run
@@ -59,7 +191,10 @@ def speckit_script(project: str, script: str, script_args: str = "", feature_dir
     "spec-template --json") and feature_directory, the feature's folder relative to REPO_ROOT (e.g.
     "specs/001-task-board"). Returns the script's JSON output; paths in it are /outputs/... paths you can read and
     write directly."""
-    return _run("speckit_script", lambda: speckit.run_script(project, script, script_args, feature_directory))
+    def run():
+        _feature_scope(project, feature_directory)
+        return speckit.run_script(project, script, script_args, feature_directory)
+    return _run("speckit_script", run)
 
 
 # ============================================================================ backlog (Agent 1)
@@ -74,6 +209,10 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
     This avoids repeatedly reading the complete backlog JSON for one feature's work."""
     def view():
         from agent_engine.phase4.contracts import Backlog
+        scoped_epic = _epic_scope(project, item_ids)
+        selected_epic = scoped_epic or epic_id
+        if scoped_epic and epic_id and epic_id != scoped_epic:
+            raise files.ProjectError("backlog_view epic differs from assigned epic")
         # Hash exactly the bytes parsed, not a second read that may race enrichment.
         raw = files.path(project, files.BACKLOG).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
@@ -84,8 +223,8 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
             raise files.ProjectError("max_chars must be between 1000 and 200000")
         if offset < 0 or not 1 <= limit <= 200 or level not in ("", "epic", "story", "task"):
             raise files.ProjectError("offset must be >=0, limit 1..200, level epic/story/task or empty")
-        children = {i.item_id for i in b.items if i.parent_id == epic_id}
-        rows = [i for i in b.items if (not epic_id or i.item_id == epic_id or i.parent_id == epic_id or i.parent_id in children)
+        children = {i.item_id for i in b.items if i.parent_id == selected_epic}
+        rows = [i for i in b.items if (not selected_epic or i.item_id == selected_epic or i.parent_id == selected_epic or i.parent_id in children)
                 and (not level or i.level == level) and (not item_ids or i.item_id in item_ids)]
         page = rows[offset:offset + limit]
         compact = ("item_id", "level", "parent_id", "title", "priority", "moscow", "estimate", "dependencies", "source_refs", "open_questions")
@@ -108,6 +247,7 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
 def speckit_check_feature(project: str, feature_directory: str) -> str:
     """Check one feature's spec-kit spec.md/tasks.md format before joining the global backlog. Read only."""
     def check_feature():
+        _feature_scope(project, feature_directory)
         from agent_engine.phase4.speckit_parse import parse_spec_md, parse_tasks_md
         from agent_engine.phase4.speckit import FEATURE_DIR_RE
         if not FEATURE_DIR_RE.fullmatch(feature_directory):
@@ -141,7 +281,10 @@ def backlog_find_similar(project: str, story_ids: list[str]) -> str:
     """For each story, resolved tickets from phase4/history.json that look similar (TF-IDF), one per point value
     first so they span the scale, with similarity and the team median. Use them as anchors when estimating;
     analogy_valid=false means estimate with method 'llm' and confidence 'low'."""
-    return _run("backlog_find_similar", lambda: backlog.find_similar(project, story_ids))
+    def similar():
+        _epic_scope(project, story_ids)
+        return backlog.find_similar(project, story_ids)
+    return _run("backlog_find_similar", similar)
 
 
 @tool
@@ -158,7 +301,10 @@ def backlog_update(project: str, updates: list[dict]) -> str:
     add_dependencies ([{on_id, reason, confidence 0-1}], same level only), remove_dependencies ([ids]),
     split_into (tasks only: 2-5 parts [{title, description, acceptance_criteria, hours}]).
     Returns how many applied and per-item errors."""
-    return _run("backlog_update", lambda: backlog.update(project, updates))
+    def update():
+        _epic_scope(project, [str(u.get("item_id", "")) for u in updates])
+        return backlog.update(project, updates)
+    return _run("backlog_update", update)
 
 
 @tool
@@ -298,7 +444,8 @@ def infra_check(project: str) -> str:
     return _run("infra_check", lambda: infra.check(project))
 
 
-_ALL = [backlog_view, speckit_check_feature, speckit_init, speckit_script, backlog_set_features, backlog_build, backlog_find_similar, backlog_update,
+_ALL = [source_context, backlog_view, speckit_check_feature, speckit_init, speckit_script, speckit_write_feature,
+        speckit_feature_status, speckit_checkpoint_feature, backlog_set_features, backlog_build, backlog_find_similar, backlog_update,
         backlog_validate, backlog_check, sprint_capacity, sprint_solve, sprint_annotate, sprint_check,
         allocation_prepare, allocation_solve, allocation_annotate, allocation_check, infra_set_intent, infra_render,
         infra_validate, infra_registry_versions, infra_check]
@@ -312,9 +459,10 @@ for _t in _ALL:
     _t.handle_tool_error = True
 
 TOOL_FACTORIES: dict[str, Callable[[], list]] = {
-    "phase4-speckit": lambda: [speckit_init, speckit_script, speckit_check_feature],
+    "phase4-speckit": lambda: [source_context, speckit_init, speckit_script, speckit_check_feature, speckit_write_feature,
+                               speckit_feature_status, speckit_checkpoint_feature],
     "phase4-backlog": lambda: [backlog_view, backlog_set_features, backlog_build, backlog_find_similar, backlog_update, backlog_validate],
-    "phase4-backlog-check": lambda: [backlog_view, backlog_check],
+    "phase4-backlog-check": lambda: [source_context, backlog_view, backlog_check],
     "phase4-sprint": lambda: [backlog_view, sprint_capacity, sprint_solve, sprint_annotate],
     "phase4-sprint-check": lambda: [sprint_check],
     "phase4-allocation": lambda: [backlog_view, allocation_prepare, allocation_solve, allocation_annotate],

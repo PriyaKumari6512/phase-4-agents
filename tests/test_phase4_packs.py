@@ -44,7 +44,13 @@ def test_task_breakdown_gets_speckit_skills_and_safe_subagents(monkeypatch):
         kinds = {type(m) for m in specs[name]["middleware"]}
         assert {OutputsOnlyGuardMiddleware, FileLockMiddleware, SkillsMiddleware} <= kinds, name
         tool_names = {t.name for t in specs[name]["tools"]}
-        assert {"speckit_script", "backlog_update"} <= tool_names and "execute" not in tool_names, name
+        assert "execute" not in tool_names, name
+        if name == "speckit-feature":
+            assert {"speckit_write_feature", "speckit_feature_status", "speckit_checkpoint_feature"} <= tool_names
+            assert not {"backlog_update", "backlog_build", "backlog_validate"} & tool_names
+        elif name == "backlog-enricher":
+            assert {"backlog_view", "backlog_update", "backlog_find_similar"} <= tool_names
+            assert not {"speckit_script", "speckit_write_feature", "backlog_build"} & tool_names
     assert "execute" not in set(graph.get_graph().nodes["tools"].data.tools_by_name)
 
 

@@ -191,9 +191,18 @@ async def _run(request: str, agent_name: str, project_name: str, resume_verifica
 
 
 async def _owned_run(request: str, agent_name: str, project_name: str, resume_verification: bool = False) -> int:
+    from agent_engine.stage_controls import StageBudget, active_stage_budget
+    budget_token = None
+    if agent_name in ("task-breakdown", "task-breakdown/validator"):
+        budget_token = active_stage_budget.set(StageBudget.from_env())
     with perf.span("stage", agent_name, agent=agent_name, project=project_name,
                    invocation_id=os.environ.get(perf.ENV_INVOCATION)) as stage:
-        code = await _run_stage(request, agent_name, project_name, stage, resume_verification=resume_verification)
+        try:
+            code = await _run_stage(request, agent_name, project_name, stage, resume_verification=resume_verification)
+        finally:
+            if budget_token is not None:
+                active_stage_budget.get().stop("Task Breakdown execution scope closed")
+                active_stage_budget.reset(budget_token)
         stage.set(exit_code=code)
         if code:
             stage.set_status("failed", category="exit_code")
@@ -276,7 +285,11 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
     attach_job_log_handler(job_id)
     notify_job_log_path(f"{OUTPUTS_VIRTUAL_PREFIX}{project_name}/")
     with perf.span("fs", "record_request"):
-        request_number = _record_request(project_name, request, pack.requests_file)
+        if resumed_from:
+            text = (OUTPUTS_DIR / project_name / pack.requests_file).read_text(encoding="utf-8")
+            request_number = sum(line.startswith("## Request ") for line in text.splitlines())
+        else:
+            request_number = _record_request(project_name, request, pack.requests_file)
     outputs_before = fingerprint(OUTPUTS_DIR / project_name)
     logger.info("run start job_id=%s agent=%s project=%s request=%d", job_id, pack.name, project_name, request_number)
 
@@ -284,6 +297,10 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
     usage = UsageMetadataCallbackHandler()
     langfuse = build_langfuse_handler()
     callbacks = [usage, *([langfuse] if langfuse else [])]
+    from agent_engine.stage_controls import active_stage_budget, StageBudgetCallback
+    if (budget := active_stage_budget.get()) is not None:
+        budget.callback_accounting = True
+        callbacks.append(StageBudgetCallback(budget))
     tiers = _model_tiers() if perf.enabled() else {}
     started = time.perf_counter()
     report: dict = {
@@ -332,12 +349,25 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                     built = build_agent(p, level[p.name])
                     with perf.span("graph", f"{p.name}-{kind}") as gs:
                         deadline_s = float(os.environ.get("AGENT_ENGINE_PASS_TIMEOUT_SECONDS", "1800"))
-                        state = await asyncio.wait_for(_stream(built, message, pass_callbacks, f"{p.name}-{kind}"), timeout=deadline_s)
+                        budget = active_stage_budget.get()
+                        if budget is not None:
+                            deadline_s = min(deadline_s, budget.remaining())
+                        try:
+                            state = await asyncio.wait_for(_stream(built, message, pass_callbacks, f"{p.name}-{kind}"), timeout=deadline_s)
+                        except asyncio.TimeoutError as exc:
+                            if budget is not None:
+                                from agent_engine.stage_controls import StageBudgetExceeded
+                                budget.stop("Task Breakdown stage or pass deadline exhausted")
+                                raise StageBudgetExceeded(budget.stopped) from exc
+                            raise
                         gs.set(messages=len(state.get("messages", [])) if isinstance(state, dict) else None)
                     entry["ok"] = True
                     return state
                 except Exception as e:
                     entry.update(ok=False, error=str(e))
+                    from agent_engine.stage_controls import StageBudgetExceeded
+                    if isinstance(e, StageBudgetExceeded):
+                        raise
                     if handler is not None:
                         ps.set(open_model_or_tool_runs=handler.open_runs())
                     if kind == "verify" and type(e).__name__ in ("StructuredOutputValidationError", "MultipleStructuredOutputsError") and schema_retries < 1:
@@ -346,6 +376,9 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         message += "\nYour previous verdict was invalid or truncated. Return one concise Verdict; no repeated evidence or file contents. Keep the summary under 1000 characters."
                         continue
                     if level[p.name] + 1 >= len(p.models):
+                        budget = active_stage_budget.get()
+                        if budget is not None:
+                            budget.stop("Task Breakdown pass failed; further background mutations refused")
                         raise
                     ps.set_status("error", str(e), perf.classify_error(e))
                     level[p.name] += 1
@@ -422,10 +455,14 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
         exit_code = 0 if report["status"] in ("done", "success") else 1
     except Exception as e:
         logger.exception("run failed job_id=%s", job_id)
-        report.update(status="fail", error=str(e))
+        from agent_engine.stage_controls import StageBudgetExceeded
+        report.update(status="partial" if isinstance(e, StageBudgetExceeded) else "fail", error=str(e))
         print(f"\nERROR: run failed: {e}")
         exit_code = 1
     finally:
+        from agent_engine.stage_controls import active_stage_budget
+        if (budget := active_stage_budget.get()) is not None:
+            report["stage_budget"] = budget.summary()
         report["elapsed_seconds"] = round(time.perf_counter() - started, 1)
         report["tokens"] = usage.usage_metadata
         report["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")

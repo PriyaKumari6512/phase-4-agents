@@ -14,7 +14,10 @@ spec) re-applies them to every item whose title did not change, and only new or 
 from __future__ import annotations
 
 import json
+import math
+import os
 import re
+import tempfile
 import threading
 from pathlib import Path
 
@@ -125,8 +128,6 @@ def _feature_items(project: str, f: Feature, settings: ProjectSettings) -> list[
                for i, (g, w, t) in enumerate(st.scenarios, 1)]
         srcs = [SourceRef(req_id=s, source="speckit", anchor=f"{f.feature_dir}/spec.md#US{st.num}")
                 for s in st.source_ids if s in feature_ids or not feature_ids]
-        if not srcs and f.requirement_ids:     # spec-kit did not cite ids: the story inherits its feature's
-            srcs = [SourceRef(req_id=r, source="prd", anchor=f"{f.feature_dir}/spec.md#US{st.num}") for r in f.requirement_ids]
         stories[f"US{st.num}"] = WorkItem(
             item_id=sid, level="story", parent_id=epic_id, title=st.title, description_md=strip_markup(st.body)[:4000],
             type="feature", speckit_phase="user_story", priority=st.priority if st.priority in ("P1", "P2", "P3") else "P3",
@@ -190,6 +191,7 @@ def build(project: str) -> str:
     with _lock:
         settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
         features = files.read_json(project, files.FEATURES, FeatureList).features
+        source_cache: dict[str, str] = {}
         items: list[WorkItem] = []
         for f in features:
             with perf.span("compute", "backlog.parse_feature", feature=f.feature_key) as sp:
@@ -206,17 +208,14 @@ def build(project: str) -> str:
                 item = by.get(iid[:-1]) if "split_into" in parent else None
                 if item is None or not reusable(iid[:-1], parent):
                     return False
-                return e.get("_source_sha") == _item_source(project, item)
-            return item is not None and item.title == e.get("_title") and e.get("_source_sha") == _item_source(project, item)
+                return e.get("_source_sha") == _item_source(project, item, source_cache, settings, features)
+            return item is not None and item.title == e.get("_title") and e.get("_source_sha") == _item_source(project, item, source_cache, settings, features)
         stale = [iid for iid, e in enrich.items() if not reusable(iid, e)]
         for item_id in stale:
             enrich.pop(item_id)
         reapplied = len(enrich)
         backlog = Backlog(backlog_id=_backlog_id(project), version=_next_version(project), project=project,
-                          sources={rel: files.file_sha(project, rel) for rel in
-                                   [files.PRD, files.ARCHITECTURE, files.PROJECT_SETTINGS, files.FEATURES,
-                                    *(f"{f.feature_dir}/{n}" for f in features for n in ("spec.md", "tasks.md"))]
-                                   if files.exists(project, rel)},
+                          sources=_source_manifest(project, features, source_cache, settings),
                           features=features, items=items, generated_at=files.utcnow())
         with perf.span("compute", "backlog.enrichment_replay", reapplied=reapplied, dropped=len(stale)) as sp:
             replay_errors = _apply_all(backlog, enrich, settings)
@@ -257,12 +256,76 @@ def _load_enrichments(project: str) -> dict:
     return files.read_json(project, ENRICHMENTS) if files.exists(project, ENRICHMENTS) else {}
 
 
-def _item_source(project: str, item: WorkItem) -> str:
+_BREAKDOWN_SETTINGS = frozenset({"project_name", "code_repos", "infra_repo", "definition_of_done",
+                               "story_point_scale", "hours_per_story_point", "max_story_points_per_story", "deadlines"})
+_SHARED_SOURCES = (files.PRD, files.ARCHITECTURE, files.HISTORY,
+                   "requests/task-breakdown.md", "backlog/implementation-contract.md", ".specify/memory/constitution.md")
+
+
+def source_settings(settings: ProjectSettings) -> dict:
+    """Semantic settings used to generate/enrich Task Breakdown artifacts."""
+    return settings.model_dump(mode="json", include=_BREAKDOWN_SETTINGS)
+
+
+def _digest_source(project: str, rel: str, cache: dict[str, str], settings: ProjectSettings) -> str:
+    if rel not in cache:
+        if rel == files.PROJECT_SETTINGS:
+            value = source_settings(settings)
+            cache[rel] = "semantic-v1:" + files.sha256_text(json.dumps(value, sort_keys=True))
+        else:
+            cache[rel] = files.file_sha(project, rel)
+    return cache[rel]
+
+
+def _feature_source_paths(project: str, directory: str) -> list[str]:
+    root = files.path(project, directory)
+    return sorted(p.relative_to(files.project_dir(project)).as_posix() for p in root.rglob("*")
+                  if p.is_file() and not p.name.startswith(".engine-"))
+
+
+def _source_manifest(project: str, features: list[Feature], cache: dict[str, str] | None = None,
+                     settings: ProjectSettings | None = None) -> dict[str, str]:
+    cache = cache if cache is not None else {}
+    settings = settings or files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+    paths = [*_SHARED_SOURCES, files.FEATURES, files.PROJECT_SETTINGS,
+             *(p for feature in features for p in _feature_source_paths(project, feature.feature_dir))]
+    result = {}
+    for rel in dict.fromkeys(paths):
+        if not files.exists(project, rel):
+            continue
+        # Backlog.sources is a public raw-file-hash contract used by publishing.
+        # Only enrichment reuse uses a semantic settings subset.
+        if rel == files.PROJECT_SETTINGS:
+            key = "raw:" + rel
+            if key not in cache:
+                cache[key] = files.file_sha(project, rel)
+            result[rel] = cache[key]
+        else:
+            result[rel] = _digest_source(project, rel, cache, settings)
+    return result
+
+
+def _item_source(project: str, item: WorkItem, cache: dict[str, str] | None = None,
+                 settings: ProjectSettings | None = None, features: list[Feature] | None = None) -> str:
+    cache = cache if cache is not None else {}
+    settings = settings or files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+    features = features if features is not None else files.read_json(project, files.FEATURES, FeatureList).features
     feature_dir = (item.speckit_ref or "").split("#")[0].rsplit("/", 1)[0]
-    paths = [files.PRD, files.ARCHITECTURE, files.PROJECT_SETTINGS, files.FEATURES]
-    if feature_dir:
-        paths += [f"{feature_dir}/spec.md", f"{feature_dir}/tasks.md"]
-    return files.sha256_text(json.dumps({p: files.file_sha(project, p) for p in paths if files.exists(project, p)}, sort_keys=True))
+    key = "feature-digest:" + feature_dir
+    if key not in cache:
+        paths = [*_SHARED_SOURCES, files.PROJECT_SETTINGS,
+                 *(_feature_source_paths(project, feature_dir) if feature_dir else [])]
+        sources = {p: _digest_source(project, p, cache, settings) for p in paths
+                   if p != "requests/task-breakdown.md" and files.exists(project, p)}
+        request_key = "effective:requests/task-breakdown.md"
+        if request_key not in cache:
+            from agent_engine.phase4.feature_jobs import _requests
+            cache[request_key] = _requests(files.project_dir(project))
+        sources["requests/task-breakdown.md"] = cache[request_key]
+        sources["feature-definition"] = json.dumps([f.model_dump(mode="json") for f in features
+                                                   if f.feature_dir == feature_dir], sort_keys=True)
+        cache[key] = files.sha256_text(json.dumps(sources, sort_keys=True))
+    return cache[key]
 
 
 def _transaction(backlog: Backlog, item_id: str, patch: dict, settings: ProjectSettings, errors: list[str]) -> bool:
@@ -287,11 +350,47 @@ def _transaction(backlog: Backlog, item_id: str, patch: dict, settings: ProjectS
 
 
 def _save(project: str, backlog: Backlog, enrich: dict) -> None:
-    with perf.span("fs", "backlog.save") as sp:
-        p1 = files.write_json(project, ENRICHMENTS, enrich)
-        p2 = files.write_json(project, files.BACKLOG, backlog)
+    # Both files describe one version. A budget stop or ordinary I/O failure
+    # between replacements must not leave enrichment ahead of its backlog.
+    with _lock, perf.span("fs", "backlog.save") as sp:
+        previous = {rel: files.path(project, rel).read_bytes() if files.exists(project, rel) else None
+                    for rel in (ENRICHMENTS, files.BACKLOG)}
+        attempted = []
+        try:
+            attempted.append(ENRICHMENTS)
+            p1 = files.write_json(project, ENRICHMENTS, enrich)
+            attempted.append(files.BACKLOG)
+            p2 = files.write_json(project, files.BACKLOG, backlog)
+        except Exception as exc:
+            for rel in reversed(attempted):
+                try:
+                    # Recovery uses the validated read path, bypassing a budget
+                    # that is already exhausted. Restore original bytes exactly.
+                    path = files.path(project, rel)
+                    if previous[rel] is None:
+                        path.unlink(missing_ok=True)
+                    else:
+                        _restore_bytes(path, previous[rel])
+                except Exception as rollback_error:
+                    exc.add_note(f"failed to restore {rel}: {rollback_error}")
+            raise
         if perf.enabled():
             sp.set(bytes=p1.stat().st_size + p2.stat().st_size, items=len(backlog.items))
+
+
+def _restore_bytes(path: Path, content: bytes) -> None:
+    """Atomic byte-exact rollback, including BOMs/newlines from older artifacts."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".engine-backlog-rollback-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            os.chmod(temporary, path.stat().st_mode & 0o777 if path.exists() else 0o644)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 # ============================================================================ update (the agent's enrichments)
@@ -378,15 +477,46 @@ def _rollup(backlog: Backlog, story: WorkItem, shares: dict, settings: ProjectSe
     if not tasks:
         return
     w = {t.item_id: max(0.0, float(shares.get(t.item_id, 0) or 0)) for t in tasks}
-    total = sum(w.values())
-    if total <= 0:
+    if sum(w.values()) <= 0:
         w = {t.item_id: 2.0 if t.type in ("feature", "ui") else 1.0 for t in tasks}
-        total = sum(w.values())
+    largest = max(w.values())
+    if not math.isfinite(largest):
+        raise ValueError("task_shares must contain finite weights")
+    w = {key: value / largest for key, value in w.items()}
     hours_total = story.estimate.story_points * settings.hours_per_story_point
-    for t in tasks:
-        if t.estimate and t.estimate.method in ("llm", "human", "analogy"):
-            continue                                   # the agent sized this task itself
-        t.estimate = Estimate(hours=max(0.5, round(hours_total * w[t.item_id] / total, 1)),
+    explicit = [t for t in tasks if t.estimate and t.estimate.method in ("llm", "human", "analogy")]
+    automatic = [t for t in tasks if t not in explicit]
+    if not automatic:
+        return
+    budget = round((hours_total - sum(t.estimate.hours or 0 for t in explicit)) * 10)
+    if budget < 5 * len(automatic):
+        if not explicit:
+            raise ValueError(f"{story.item_id}: {hours_total:g} story hours cannot cover {len(automatic)} tasks "
+                             "at the 0.5 h minimum; reconsider task granularity or the estimate")
+        # Independently sized tasks are intentional overrides. Preserve them and
+        # expose the disagreement during validation rather than silently squeeze.
+        allocation = {t.item_id: 5 for t in automatic}
+    else:
+        remaining = list(automatic)
+        available = budget
+        allocation = {}
+        while remaining:
+            total = sum(w[t.item_id] for t in remaining)
+            raw = {t.item_id: available * (w[t.item_id] / total if total else 1 / len(remaining)) for t in remaining}
+            small = [t for t in remaining if raw[t.item_id] < 5]
+            if small:
+                for t in small:
+                    allocation[t.item_id] = 5
+                    available -= 5
+                remaining = [t for t in remaining if t not in small]
+                continue
+            allocation.update({key: math.floor(value) for key, value in raw.items()})
+            remainder = available - sum(allocation[t.item_id] for t in remaining)
+            for key in sorted(raw, key=lambda key: (-(raw[key] - math.floor(raw[key])), key))[:remainder]:
+                allocation[key] += 1
+            break
+    for t in automatic:
+        t.estimate = Estimate(hours=allocation[t.item_id] / 10,
                               complexity=story.estimate.complexity, confidence=story.estimate.confidence,
                               method="rollup",
                               rationale=f"share of {story.item_id} ({story.estimate.story_points} SP x "
@@ -440,6 +570,8 @@ def update(project: str, updates: list[dict]) -> str:
         settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
         backlog = files.read_json(project, files.BACKLOG, Backlog)
         enrich = _load_enrichments(project)
+        features = files.read_json(project, files.FEATURES, FeatureList).features
+        source_cache: dict[str, str] = {}
         errors: list[str] = []
         applied = []
         stories_first = sorted(updates, key=lambda u: 0 if str(u.get("item_id", "")).startswith("S-") else 1)
@@ -448,7 +580,7 @@ def update(project: str, updates: list[dict]) -> str:
             item_id = str(u.pop("item_id", ""))
             before = len(errors)
             item = backlog.by_id().get(item_id)
-            source_sha = _item_source(project, item) if item else None
+            source_sha = _item_source(project, item, source_cache, settings, features) if item else None
             _transaction(backlog, item_id, u, settings, errors)
             if len(errors) == before and item is not None:
                 merged = {**enrich.get(item_id, {}), **u, "_title": item.title, "_source_sha": source_sha}
@@ -581,6 +713,9 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
             items[v].dependencies = [d for d in items[v].dependencies if d.on_id != u]
             issue("dependency_cycle", f"removed low-confidence edge {v} -> {u} to break a cycle", [v], "warning")
     sec.end(iterations=cycle_iterations)
+    for level in ("story", "task"):
+        if not nx.is_directed_acyclic_graph(_graph(items, level)):
+            issue("dependency_cycle", f"{level} dependencies still contain a cycle after bounded repair", [])
     sec = perf.start_span("compute", "backlog.validate.transitive_reduction")
     g = _graph(items, "story")
     if nx.is_directed_acyclic_graph(g):
@@ -624,6 +759,18 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
         s.estimate and s.estimate.story_points in settings.story_point_scale)]
     if bad_hours or bad_points:
         issue("estimates", f"unestimated items: {', '.join((bad_points + bad_hours)[:20])}", bad_points + bad_hours)
+    for story in (i for i in items.values() if i.level == "story" and i.estimate and i.estimate.story_points):
+        tasks = backlog.tasks_of(story.item_id)
+        if not tasks or any(not t.estimate or t.estimate.hours is None for t in tasks):
+            continue
+        target = story.estimate.story_points * settings.hours_per_story_point
+        actual = sum(t.estimate.hours for t in tasks)
+        if abs(actual - target) > 0.100001:
+            explicit = any(t.estimate.method in ("llm", "human", "analogy") for t in tasks)
+            issue("effort_total", f"{story.item_id}: task hours total {actual:g}, story-derived hours {target:g}; "
+                  + ("independent task estimates override the rollup; reconcile with the reviewer" if explicit else
+                     "automatic rollup must conserve the story total; reapply story estimate or task shares"),
+                  [story.item_id], "warning" if explicit else "blocking")
     too_big = [s.item_id for s in items.values() if s.level == "story" and s.estimate and s.estimate.story_points
                and s.estimate.story_points > settings.max_story_points_per_story and s.moscow != "wont"]
     if too_big:
@@ -695,6 +842,14 @@ def validate(project: str, *, write: bool = True) -> tuple[Backlog, list[Validat
         backlog = files.read_json(project, files.BACKLOG, Backlog)
         original = {i.item_id: i.model_dump() for i in backlog.items} if not write else None
         issues = _validate(backlog, settings, _prd_ids(project))
+        features = files.read_json(project, files.FEATURES, FeatureList).features
+        current_sources = _source_manifest(project, features, settings=settings)
+        stale = sorted(rel for rel in set(current_sources) | set(backlog.sources)
+                       if current_sources.get(rel) != backlog.sources.get(rel))
+        if stale:
+            issues.append(ValidationIssue(rule="stale_sources", severity="blocking", item_ids=[],
+                                          message="backlog source inputs changed; run backlog_build before review: "
+                                          + ", ".join(stale)))
         if original is not None:
             changed = [i.item_id for i in backlog.items if original[i.item_id] != i.model_dump()]
             if changed:

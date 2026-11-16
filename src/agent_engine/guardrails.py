@@ -74,6 +74,11 @@ class OutputsOnlyGuardMiddleware(AgentMiddleware):
         file_path = request.tool_call["args"].get("file_path")
         if not file_path:
             return await handler(request)
+        from agent_engine.stage_controls import helper_write_allowed
+        path_parts = _normalize(file_path).removeprefix(OUTPUTS_VIRTUAL_PREFIX).split("/")
+        if not helper_write_allowed(path_parts[0], "/".join(path_parts[1:])):
+            return ToolMessage(content="ERROR: helper may write only its assigned feature directory; enrichment uses scoped backlog tools.",
+                               tool_call_id=request.tool_call["id"])
 
         if _has_traversal(file_path):
             logger.warning("%s rejected: %r contains '..' or a leading '~'", tool_name, file_path)

@@ -137,6 +137,13 @@ def parse_spec_md(md: str) -> RawSpec:
     close()
     if not stories:
         raise SpeckitFormatError("spec.md contains no '### User Story N - Title (Priority: Pn)' sections")
+    seen, duplicates = set(), set()
+    for story in stories:
+        if story.num in seen:
+            duplicates.add(story.num)
+        seen.add(story.num)
+    if duplicates:
+        raise SpeckitFormatError(f"duplicate user story numbers in spec.md: {sorted(duplicates)}")
     all_sources = list(dict.fromkeys(s for st in stories for s in st.source_ids) |
                        dict.fromkeys(s for _, _, ss in frs for s in ss))
     return RawSpec(title=title, stories=stories, functional_requirements=frs, source_ids=all_sources)

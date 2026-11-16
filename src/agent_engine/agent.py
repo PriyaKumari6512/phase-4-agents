@@ -245,7 +245,7 @@ def _observed_build_config(pack: AgentPack, spec: str, model, fast_spec: str, na
     for entry, (sub_name, sub) in zip(named, pack.subagents):
         helpers.append({"name": sub_name,
                         "model": model_spec(sub["model"]) if sub["model"] else f"{spec} (inherits the main model)",
-                        "summarizer": "deepagents default: the helper's own model"})
+                        "summarizer": fast_spec if pack.name == "task-breakdown" else "deepagents default: the helper's own model"})
     forced_serial = getattr(model, "_llm_type", "") == "openai-codex-chat"
     return {"model": spec, "summarizer_main": fast_spec, "helpers": helpers,
             "parallel_tool_calls": "forced off by the Codex subscription adapter" if forced_serial else "provider default",
@@ -279,6 +279,10 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
     with perf.span("model_setup", "summarization_middleware"):   # includes the model-profile lookups
         summarizer = summarization_middleware(spec, fast_model, backend)
     middleware = [*file_tools(), summarizer, *safety(), HelperLimitMiddleware()]
+    breakdown = pack.name in ("task-breakdown", "task-breakdown/validator")
+    if breakdown:
+        from agent_engine.stage_controls import StageBudgetMiddleware, BreakdownHandoffMiddleware
+        middleware += [StageBudgetMiddleware(), BreakdownHandoffMiddleware()]
     # deepagents' general-purpose helper (the `task` tool) only inherits middleware
     # that replaces one of its default slots, so it would get write tools without
     # the guard or the lock. Declaring it here hands it the same file tools and safety.
@@ -295,6 +299,16 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
                 entry["model"] = resolve_model_with_retries(model_spec(sub["model"]))
         if skill_sources:
             entry["skills"] = skill_sources
+        if breakdown:
+            # Explicit narrow capabilities and fast compaction for each role.
+            # Model/schema descriptions are repeated on every helper model turn.
+            allowed = ({"speckit_script", "speckit_check_feature", "source_context", "speckit_write_feature",
+                        "speckit_feature_status", "speckit_checkpoint_feature"}
+                       if sub_name == "speckit-feature" else
+                       {"backlog_view", "backlog_find_similar", "backlog_update", "source_context"})
+            entry["tools"] = [tool for tool in tools if tool.name in allowed]
+            entry["middleware"] += [summarization_middleware(model_spec(sub["model"]) if sub["model"] else spec,
+                                                            fast_model, backend), StageBudgetMiddleware()]
         named.append(entry)
 
     if perf.enabled():
