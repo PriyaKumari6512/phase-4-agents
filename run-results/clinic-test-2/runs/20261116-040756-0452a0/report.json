@@ -1,0 +1,19 @@
+{
+  "job_id": "20261116-040756-0452a0",
+  "agent": "task-breakdown",
+  "project": "clinic-test-2",
+  "request": 2,
+  "request_text": "Break prd.md down into a backlog.",
+  "invocation_id": "15542cec7e884419b53d4a80",
+  "passes": [],
+  "status": "fail",
+  "error": "No model provider credentials found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY (or set SDLC_AGENT_STRONG_MODEL / SDLC_AGENT_FAST_MODEL explicitly for a different provider).",
+  "elapsed_seconds": 0.0,
+  "tokens": {},
+  "finished_at": "2026-11-16T12:07:56+00:00",
+  "files": {
+    "created": [],
+    "changed": [],
+    "deleted": []
+  }
+}

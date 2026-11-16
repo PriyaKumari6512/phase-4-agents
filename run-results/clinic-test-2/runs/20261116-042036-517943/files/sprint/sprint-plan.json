@@ -1,0 +1,526 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "657b41cc-e93a-4427-a7e4-5cd70c5400f9",
+  "version": 1,
+  "project": "clinic-test-2",
+  "backlog_sha256": "694a51c4025d304a65482bb98bb2984a0e9f753b9eb73027c6d6c37a09741e69",
+  "settings_sha256": "426e04cefc30e767625bb5721ebd69090cf2bdda7da0c5493b4cb46fe0b7a10e",
+  "as_of": "2026-11-16",
+  "sprints": [
+    {
+      "sprint_index": 1,
+      "number": 1,
+      "name": "TaskFlow Sprint 1",
+      "start": "2026-11-09",
+      "end": "2026-11-22",
+      "goal": "",
+      "story_ids": [],
+      "committed_points": 0,
+      "capacity_p50": 9.4,
+      "capacity_p85": 8.7,
+      "maintenance_reserved_points": 2.3,
+      "available_person_days": 14.0
+    },
+    {
+      "sprint_index": 2,
+      "number": 2,
+      "name": "TaskFlow Sprint 2",
+      "start": "2026-11-23",
+      "end": "2026-12-06",
+      "goal": "",
+      "story_ids": [],
+      "committed_points": 0,
+      "capacity_p50": 18.8,
+      "capacity_p85": 17.4,
+      "maintenance_reserved_points": 4.7,
+      "available_person_days": 28.0
+    },
+    {
+      "sprint_index": 3,
+      "number": 3,
+      "name": "TaskFlow Sprint 3",
+      "start": "2026-12-07",
+      "end": "2026-12-20",
+      "goal": "",
+      "story_ids": [],
+      "committed_points": 0,
+      "capacity_p50": 20.2,
+      "capacity_p85": 19.6,
+      "maintenance_reserved_points": 5.0,
+      "available_person_days": 31.5
+    },
+    {
+      "sprint_index": 4,
+      "number": 4,
+      "name": "TaskFlow Sprint 4",
+      "start": "2026-12-21",
+      "end": "2027-01-03",
+      "goal": "",
+      "story_ids": [],
+      "committed_points": 0,
+      "capacity_p50": 17.9,
+      "capacity_p85": 17.4,
+      "maintenance_reserved_points": 4.5,
+      "available_person_days": 28.0
+    }
+  ],
+  "deferred": [
+    {
+      "story_id": "S-001-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "Not planned: must-have scope exceeds horizon capacity; plan is infeasible and awaiting an approver decision."
+    },
+    {
+      "story_id": "S-001-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-001-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-001-US4",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-001-US5",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-001-US6",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-001-US7",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-001",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No plan could be built: the 29 must-have stories (122 pts) do not fit the 4-sprint horizon (about 66 pts at P50). Nothing is committed until the approver decides on scope."
+    },
+    {
+      "story_id": "S-FOUND-001",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-001",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-002-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "Not planned: must-have scope exceeds horizon capacity; plan is infeasible and awaiting an approver decision."
+    },
+    {
+      "story_id": "S-002-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-002-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-002-US4",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-002-US5",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-002-US6",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-002-US7",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-002",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-002",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-002",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-003-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "Not planned: must-have scope exceeds horizon capacity; plan is infeasible and awaiting an approver decision."
+    },
+    {
+      "story_id": "S-003-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-003-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-003-US4",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-003",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-003",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-003",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-004-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-004-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-004-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-004",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-004",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-004",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-005-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "Not planned: must-have scope exceeds horizon capacity; plan is infeasible and awaiting an approver decision."
+    },
+    {
+      "story_id": "S-005-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-005-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-005",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-005",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-005",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-006-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-006-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-006-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-006",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-006",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-006",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-007-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "Not planned: must-have scope exceeds horizon capacity; plan is infeasible and awaiting an approver decision."
+    },
+    {
+      "story_id": "S-007-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-007-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-007",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-007",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-007",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-008-US1",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-008-US2",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-008-US3",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-SETUP-008",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-FOUND-008",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    },
+    {
+      "story_id": "S-POLISH-008",
+      "reason_code": "deadline_infeasible",
+      "explanation": "No feasible plan; conflicting: must:S-001-US1, must:S-001-US2, must:S-001-US3, must:S-001-US4, must:S-001-US5, must:S-001-US6, must:S-002-US1, must:S-002-US2, must:S-002-US3, must:S-002-US4, must:S-002-US5, must:S-002-US7, must:S-003-US1, must:S-003-US2, must:S-003-US3, must:S-003-US4, must:S-005-US1, must:S-005-US2, must:S-007-US1, must:S-FOUND-001, must:S-FOUND-002, must:S-FOUND-003, must:S-FOUND-005, must:S-FOUND-007, must:S-SETUP-001, must:S-SETUP-002, must:S-SETUP-003, must:S-SETUP-005, must:S-SETUP-007."
+    }
+  ],
+  "forecast": {
+    "p50_last_sprint": 14,
+    "p85_last_sprint": 14,
+    "p50_date": "2027-05-23",
+    "p85_date": "2027-05-23",
+    "samples": 2000
+  },
+  "solver": {
+    "status": "INFEASIBLE",
+    "objective": null,
+    "best_bound": null,
+    "wall_time_s": 0.009,
+    "conflicting_constraints": [
+      "must:S-001-US1",
+      "must:S-001-US2",
+      "must:S-001-US3",
+      "must:S-001-US4",
+      "must:S-001-US5",
+      "must:S-001-US6",
+      "must:S-002-US1",
+      "must:S-002-US2",
+      "must:S-002-US3",
+      "must:S-002-US4",
+      "must:S-002-US5",
+      "must:S-002-US7",
+      "must:S-003-US1",
+      "must:S-003-US2",
+      "must:S-003-US3",
+      "must:S-003-US4",
+      "must:S-005-US1",
+      "must:S-005-US2",
+      "must:S-007-US1",
+      "must:S-FOUND-001",
+      "must:S-FOUND-002",
+      "must:S-FOUND-003",
+      "must:S-FOUND-005",
+      "must:S-FOUND-007",
+      "must:S-SETUP-001",
+      "must:S-SETUP-002",
+      "must:S-SETUP-003",
+      "must:S-SETUP-005",
+      "must:S-SETUP-007"
+    ]
+  },
+  "assumptions": [
+    "Capacity from Monte Carlo over 6 past sprints (10000 samples); P85 = points finished with 85% probability.",
+    "20% of capacity reserved for maintenance work."
+  ],
+  "options_if_infeasible": [],
+  "business_values": {
+    "S-SETUP-001": 10,
+    "S-FOUND-001": 10,
+    "S-001-US1": 10,
+    "S-001-US2": 9,
+    "S-001-US3": 8,
+    "S-001-US4": 9,
+    "S-001-US5": 9,
+    "S-001-US6": 9,
+    "S-001-US7": 6,
+    "S-POLISH-001": 2,
+    "S-SETUP-002": 10,
+    "S-FOUND-002": 10,
+    "S-002-US1": 10,
+    "S-002-US2": 10,
+    "S-002-US3": 9,
+    "S-002-US4": 10,
+    "S-002-US5": 9,
+    "S-002-US6": 6,
+    "S-002-US7": 8,
+    "S-POLISH-002": 2,
+    "S-SETUP-003": 8,
+    "S-FOUND-003": 8,
+    "S-003-US1": 8,
+    "S-003-US2": 8,
+    "S-003-US3": 7,
+    "S-003-US4": 7,
+    "S-POLISH-003": 2,
+    "S-SETUP-004": 5,
+    "S-FOUND-004": 5,
+    "S-004-US1": 5,
+    "S-004-US2": 5,
+    "S-004-US3": 4,
+    "S-POLISH-004": 2,
+    "S-SETUP-005": 8,
+    "S-FOUND-005": 8,
+    "S-005-US1": 8,
+    "S-005-US2": 8,
+    "S-005-US3": 5,
+    "S-POLISH-005": 2,
+    "S-SETUP-006": 4,
+    "S-FOUND-006": 4,
+    "S-006-US1": 5,
+    "S-006-US2": 4,
+    "S-006-US3": 5,
+    "S-POLISH-006": 2,
+    "S-SETUP-007": 7,
+    "S-FOUND-007": 7,
+    "S-007-US1": 7,
+    "S-007-US2": 5,
+    "S-007-US3": 5,
+    "S-POLISH-007": 2,
+    "S-SETUP-008": 3,
+    "S-FOUND-008": 3,
+    "S-008-US1": 4,
+    "S-008-US2": 4,
+    "S-008-US3": 2,
+    "S-POLISH-008": 2
+  },
+  "wsjf": {
+    "S-001-US1": 14.29,
+    "S-001-US2": 13.69,
+    "S-001-US3": 18.1,
+    "S-001-US4": 21.9,
+    "S-001-US5": 21.9,
+    "S-001-US6": 21.9,
+    "S-001-US7": 4.76,
+    "S-SETUP-001": 57.14,
+    "S-FOUND-001": 38.1,
+    "S-POLISH-001": 4.76,
+    "S-002-US1": 29.52,
+    "S-002-US2": 29.52,
+    "S-002-US3": 28.57,
+    "S-002-US4": 29.52,
+    "S-002-US5": 11.31,
+    "S-002-US6": 14.29,
+    "S-002-US7": 41.27,
+    "S-SETUP-002": 100.0,
+    "S-FOUND-002": 20.0,
+    "S-POLISH-002": 4.76,
+    "S-003-US1": 19.05,
+    "S-003-US2": 17.46,
+    "S-003-US3": 8.57,
+    "S-003-US4": 8.57,
+    "S-SETUP-003": 71.43,
+    "S-FOUND-003": 33.33,
+    "S-POLISH-003": 7.14,
+    "S-004-US1": 10.48,
+    "S-004-US2": 8.57,
+    "S-004-US3": 9.52,
+    "S-SETUP-004": 61.9,
+    "S-FOUND-004": 28.57,
+    "S-POLISH-004": 7.14,
+    "S-005-US1": 16.19,
+    "S-005-US2": 13.33,
+    "S-005-US3": 15.87,
+    "S-SETUP-005": 90.48,
+    "S-FOUND-005": 18.1,
+    "S-POLISH-005": 28.57,
+    "S-006-US1": 9.52,
+    "S-006-US2": 9.52,
+    "S-006-US3": 6.67,
+    "S-SETUP-006": 57.14,
+    "S-FOUND-006": 26.19,
+    "S-POLISH-006": 7.14,
+    "S-007-US1": 10.48,
+    "S-007-US2": 6.67,
+    "S-007-US3": 11.11,
+    "S-SETUP-007": 61.9,
+    "S-FOUND-007": 19.05,
+    "S-POLISH-007": 7.14,
+    "S-008-US1": 7.62,
+    "S-008-US2": 4.17,
+    "S-008-US3": 6.35,
+    "S-SETUP-008": 42.86,
+    "S-FOUND-008": 19.05,
+    "S-POLISH-008": 7.14
+  },
+  "pins": {},
+  "relaxations": [],
+  "summary_md": "**No plan committed: INFEASIBLE.** The solver returned no verified options, and I did not force a plan or invent pins/relaxations (none were requested).\n- Must-have stories total 122 pts (29 stories incl. setup/foundation); the 4-sprint horizon (2026-11-09 to 2027-01-03) holds only about 66 pts at P50 (8.7/17.4/19.6/17.4 at P85 = ~63). Sprint 1 alone is 9.4 pts P50, and dependency chains (infra, then auth, then task foundation) cannot be compressed.\n- Beta DL-1 (2026-12-18, FR-1/FR-2, not hard) is at risk. Its minimum chain (001 infra/auth chain through US6 plus 002 Setup/Foundation/US1-US5) is about 70 pts, which is more than the whole horizon. The solver's forecast for all work is far past the horizon (about 2027-05).\n- Needed from the approver (not solver-verified, my suggestions): (1) accept a longer horizon (at least 6 to 8 sprints) or add capacity; (2) de-scope or move to a later release some must-haves outside the DL-1 chain: search (003), assignment email (005), notification prefs (007), 001-US3 secrets; (3) move DL-1 or treat it as a reduced beta. Tell me which and I will re-solve with the matching pins/relax.\n- Estimates for Agent 1: all 57 stories are low confidence with no valid analogies; the 8-pt infra stories (001-US1/US2) drive the early critical path. 002-US7 and 003-US4 were raised to must by Agent 1 and still need product owner confirmation, and they widen the must scope.",
+  "annotated": true,
+  "generated_at": "2026-11-16T12:20:52Z"
+}

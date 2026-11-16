@@ -1,0 +1,27 @@
+# Atlantis repo config. apply_requirements / workflow are restricted keys and are set
+# server-side in repos.yaml (infra-catalog/atlantis/repos.yaml).
+version: 3
+automerge: false
+parallel_plan: true
+projects:
+  - name: clinic-test-2-dev-core
+    dir: envs/dev/core
+    workspace: default
+    terraform_distribution: opentofu
+    autoplan:
+      enabled: true
+      when_modified: ["*.tf", "*.tfvars", ".terraform.lock.hcl"]
+  - name: clinic-test-2-stg-core
+    dir: envs/stg/core
+    workspace: default
+    terraform_distribution: opentofu
+    autoplan:
+      enabled: true
+      when_modified: ["*.tf", "*.tfvars", ".terraform.lock.hcl"]
+  - name: clinic-test-2-prod-core
+    dir: envs/prod/core
+    workspace: default
+    terraform_distribution: opentofu
+    autoplan:
+      enabled: true
+      when_modified: ["*.tf", "*.tfvars", ".terraform.lock.hcl"]

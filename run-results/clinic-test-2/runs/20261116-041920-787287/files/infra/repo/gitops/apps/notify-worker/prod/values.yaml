@@ -1,0 +1,18 @@
+# notify-worker (prod) - values for gitops/charts/app
+name: notify-worker
+image:
+  repository: "ECR_REGISTRY/clinic-test-2/taskflow-api"
+  tag: "0.0.0"   # set when a built image is promoted to this environment
+args: ["TODO-start-command"]  # TODO set the command this component runs with (it shares the taskflow-api image)
+replicas: 2
+http: false
+port: 8080
+healthPath: /healthz
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPU: 70
+envFromSecret: "notify-worker-env"
+env:
+  APP_ENV: "prod"

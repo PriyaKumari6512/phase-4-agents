@@ -1,0 +1,16 @@
+{
+  "gate": "P4-G2",
+  "project": "clinic-test-2",
+  "decision": "approved",
+  "approver": {
+    "name": "Automated reviewer"
+  },
+  "submitted_by": {
+    "name": "Automated test"
+  },
+  "decided_at": "2026-11-16T12:21:23+00:00",
+  "comment": "Automated approval for test run; plan was infeasible.",
+  "artifacts": {
+    "sprint/sprint-plan.json": "sha256:c8fb9a2642e5340ce6304da4fb561b953ec815b5b62c8eaeacf143f4222dc05d"
+  }
+}

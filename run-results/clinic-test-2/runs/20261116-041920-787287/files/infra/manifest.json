@@ -1,0 +1,484 @@
+{
+  "schema_version": "1.0.0",
+  "project": "clinic-test-2",
+  "intent_sha256": "e41e039f80adab1c4e55bcb2a75ec346cd4acbcd45864ace96bf2671ebc98453",
+  "source_hashes": {
+    "architecture.md": "8ffddf605891c8ab4434fa535dda2002a23ac801657da8bc554b42b963a0157a",
+    "phase4/project.json": "426e04cefc30e767625bb5721ebd69090cf2bdda7da0c5493b4cb46fe0b7a10e",
+    "catalog": "72f32e0a2077c5cdd280b99a203121ea3072254ef8ef8cb5cf2a53f81f5d33e6"
+  },
+  "infra_repo": "acme/taskflow-infra",
+  "environments": [
+    "dev",
+    "stg",
+    "prod"
+  ],
+  "files": [
+    {
+      "path": "repo/.github/workflows/drift.yml",
+      "sha256": "e7e86ece82ef3b1b3709200d5befe432b0f16b9b6935577a760c034a2c97a0ab",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "e7e86ece82ef3b1b3709200d5befe432b0f16b9b6935577a760c034a2c97a0ab"
+    },
+    {
+      "path": "repo/.trivyignore",
+      "sha256": "e70f72f68316b898c6acaeb262524690f0496db59b95fdbb5ec3ba7105141d86",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "e70f72f68316b898c6acaeb262524690f0496db59b95fdbb5ec3ba7105141d86"
+    },
+    {
+      "path": "repo/CODEOWNERS",
+      "sha256": "341845f36eaf735d1b7db7391e7c59a4330c971e8ba43cd3046ff20bbe7b18c7",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "341845f36eaf735d1b7db7391e7c59a4330c971e8ba43cd3046ff20bbe7b18c7"
+    },
+    {
+      "path": "repo/atlantis.yaml",
+      "sha256": "83aceeb22f04e3a34f6b500493272d440dbe90db68f2d19bb59d49ef28c028c0",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "83aceeb22f04e3a34f6b500493272d440dbe90db68f2d19bb59d49ef28c028c0"
+    },
+    {
+      "path": "repo/envs/dev/core/main.tf",
+      "sha256": "ced36aeaa4e1eca5758df7a7f01c01ec337c24292eb4e0b63f739411a246057b",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "ced36aeaa4e1eca5758df7a7f01c01ec337c24292eb4e0b63f739411a246057b"
+    },
+    {
+      "path": "repo/envs/prod/core/main.tf",
+      "sha256": "507938b110ca4dde0bafff55a9c59caa965640d4e9a0df1432e5595cbaa8c854",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "507938b110ca4dde0bafff55a9c59caa965640d4e9a0df1432e5595cbaa8c854"
+    },
+    {
+      "path": "repo/envs/stg/core/main.tf",
+      "sha256": "7234c0d357770cc5ad13c1f5bd8122bf189cd724f09556d93175bce103ce26ad",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "7234c0d357770cc5ad13c1f5bd8122bf189cd724f09556d93175bce103ce26ad"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-dev-platform.yaml",
+      "sha256": "507f511adb9c4a26d671fd41e98008b29290a2f2ceba501185672dcdab4cd29b",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "507f511adb9c4a26d671fd41e98008b29290a2f2ceba501185672dcdab4cd29b"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-dev.yaml",
+      "sha256": "895cdaffbde7874d5d77ba0c14329696d1ba4787ef5b07b2772b2c7a52e41e7c",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "895cdaffbde7874d5d77ba0c14329696d1ba4787ef5b07b2772b2c7a52e41e7c"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-prod-platform.yaml",
+      "sha256": "130800a1f306f437ea9b8f5a587224e3fbd64de6d0e25c68d5260db21c2d4fac",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "130800a1f306f437ea9b8f5a587224e3fbd64de6d0e25c68d5260db21c2d4fac"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-prod.yaml",
+      "sha256": "70b22fc779797d5ea27cb7f5d898c9940d9271404dc658c7f59c7ee1c7ac6228",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "70b22fc779797d5ea27cb7f5d898c9940d9271404dc658c7f59c7ee1c7ac6228"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-stg-platform.yaml",
+      "sha256": "673d953ba1a0861ed7b1c7694ebeb189f3bcd07d01eafda4d19858e5bd46a6ca",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "673d953ba1a0861ed7b1c7694ebeb189f3bcd07d01eafda4d19858e5bd46a6ca"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-stg.yaml",
+      "sha256": "1fe3e27ffc8a64449297c6bb9de73a0265e16aa67235326e51d9c1b6a2e82210",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "1fe3e27ffc8a64449297c6bb9de73a0265e16aa67235326e51d9c1b6a2e82210"
+    },
+    {
+      "path": "repo/gitops/apps/notify-worker/dev/externalsecret.yaml",
+      "sha256": "9704ed8e2afc3bf4486bba67b2b69e0f2b5e076fe02edd477ea44e91e88d0190",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "9704ed8e2afc3bf4486bba67b2b69e0f2b5e076fe02edd477ea44e91e88d0190"
+    },
+    {
+      "path": "repo/gitops/apps/notify-worker/dev/values.yaml",
+      "sha256": "edb15ffeb9f0be6acc7eef87ada75dc72bb7c981dd42f12879a75aa516438e86",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "edb15ffeb9f0be6acc7eef87ada75dc72bb7c981dd42f12879a75aa516438e86"
+    },
+    {
+      "path": "repo/gitops/apps/notify-worker/prod/externalsecret.yaml",
+      "sha256": "67eb8c58550dcef7b9b0e5784c6ee357871d06ea065e3bde4c7f4e2060ec0afe",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "67eb8c58550dcef7b9b0e5784c6ee357871d06ea065e3bde4c7f4e2060ec0afe"
+    },
+    {
+      "path": "repo/gitops/apps/notify-worker/prod/values.yaml",
+      "sha256": "3f12b0c357ab36c1442f5d7eed9d3e4d474e700870b3e0b7e0ea874750e007ba",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "3f12b0c357ab36c1442f5d7eed9d3e4d474e700870b3e0b7e0ea874750e007ba"
+    },
+    {
+      "path": "repo/gitops/apps/notify-worker/stg/externalsecret.yaml",
+      "sha256": "202f5704b0ea32f9d61fb73832f87a4072b9a499b4268a96b5f1598958d7fe46",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "202f5704b0ea32f9d61fb73832f87a4072b9a499b4268a96b5f1598958d7fe46"
+    },
+    {
+      "path": "repo/gitops/apps/notify-worker/stg/values.yaml",
+      "sha256": "60c88086f2220d851a36e335dc98eb51151a897cd09bea511f69b0f7c234f6f4",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "60c88086f2220d851a36e335dc98eb51151a897cd09bea511f69b0f7c234f6f4"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-api/dev/externalsecret.yaml",
+      "sha256": "d338dc47922c95220c1a55b6e775d5eb5c7acad9a7ac9c576246cb212a736afc",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "d338dc47922c95220c1a55b6e775d5eb5c7acad9a7ac9c576246cb212a736afc"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-api/dev/values.yaml",
+      "sha256": "61463315549a041c674054ef57e5bcb6096e83c27234c96f69ee0d9f92ad5cb2",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "61463315549a041c674054ef57e5bcb6096e83c27234c96f69ee0d9f92ad5cb2"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-api/prod/externalsecret.yaml",
+      "sha256": "cc174fde97ebc7e82caf73b0e822bde5500dd19794dcb71c912d0093020273e9",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "cc174fde97ebc7e82caf73b0e822bde5500dd19794dcb71c912d0093020273e9"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-api/prod/values.yaml",
+      "sha256": "ad4b20a562213dc35d26dc36582b6de90a6f09f5bf88f3ccd4d57a79409da81a",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "ad4b20a562213dc35d26dc36582b6de90a6f09f5bf88f3ccd4d57a79409da81a"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-api/stg/externalsecret.yaml",
+      "sha256": "9a5554966a6b1193e1924bf287c8a59aa7b12c813f53c689836f93fb8282cf0f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "9a5554966a6b1193e1924bf287c8a59aa7b12c813f53c689836f93fb8282cf0f"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-api/stg/values.yaml",
+      "sha256": "cc9f425d02fc8430113192de11a3612aa379b7c8ea0dc3039b1d7283632e6d41",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "cc9f425d02fc8430113192de11a3612aa379b7c8ea0dc3039b1d7283632e6d41"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-web/dev/values.yaml",
+      "sha256": "a66aad74f6a7a5522edcdd2ed512731ef484ab818e446be7b9c9eb6f4321f019",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "a66aad74f6a7a5522edcdd2ed512731ef484ab818e446be7b9c9eb6f4321f019"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-web/prod/values.yaml",
+      "sha256": "bb103648fc0529e8fc34b9c409764fab7acffc12d3e434b0aeef653affe1c1e8",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "bb103648fc0529e8fc34b9c409764fab7acffc12d3e434b0aeef653affe1c1e8"
+    },
+    {
+      "path": "repo/gitops/apps/taskflow-web/stg/values.yaml",
+      "sha256": "0ee28841aa206d4d41f6c1379487b802ecabd52afa80781461d8587f329cb8e5",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "0ee28841aa206d4d41f6c1379487b802ecabd52afa80781461d8587f329cb8e5"
+    },
+    {
+      "path": "repo/gitops/charts/app/Chart.yaml",
+      "sha256": "c1902eb8f8fa54a25943387ab7200500536852a45f74d0121dd7847efdd9d48e",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "c1902eb8f8fa54a25943387ab7200500536852a45f74d0121dd7847efdd9d48e"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/deployment.yaml",
+      "sha256": "e342bc24ef9ceb061ea4e9e1b3609725a8e1b539bceaf6beee2fbed74034a642",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "e342bc24ef9ceb061ea4e9e1b3609725a8e1b539bceaf6beee2fbed74034a642"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/ingress.yaml",
+      "sha256": "d2f5aae33020e9b2f80b2a775474bee87a55ffa20fd850d25f9d00962c4a4ddd",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d2f5aae33020e9b2f80b2a775474bee87a55ffa20fd850d25f9d00962c4a4ddd"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/service.yaml",
+      "sha256": "d1d70fe8601070588c2be17d151fc4da51e9300cf574284628277a0b71606694",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d1d70fe8601070588c2be17d151fc4da51e9300cf574284628277a0b71606694"
+    },
+    {
+      "path": "repo/gitops/charts/app/values.yaml",
+      "sha256": "25db7b0c210e62eb505c5b5e2168f1fa27f9d7d842e2f5f2681effc7b883dbb3",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "25db7b0c210e62eb505c5b5e2168f1fa27f9d7d842e2f5f2681effc7b883dbb3"
+    },
+    {
+      "path": "repo/gitops/platform/dev/alerts/notify-worker.yaml",
+      "sha256": "a555d8b67fe15ef01b0ebc50968febb760afa045cd1b0b1ed80b5e37c849b67c",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "a555d8b67fe15ef01b0ebc50968febb760afa045cd1b0b1ed80b5e37c849b67c"
+    },
+    {
+      "path": "repo/gitops/platform/dev/alerts/taskflow-api.yaml",
+      "sha256": "d43505f167bb27114ebe16b5a54ff3c34ad531eddd27292cba94b5acfb149a30",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "d43505f167bb27114ebe16b5a54ff3c34ad531eddd27292cba94b5acfb149a30"
+    },
+    {
+      "path": "repo/gitops/platform/dev/alerts/taskflow-web.yaml",
+      "sha256": "2f81c0041aec15253012e41b796ed0b4f216eac0302074cb47c11060f58a96d8",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "2f81c0041aec15253012e41b796ed0b4f216eac0302074cb47c11060f58a96d8"
+    },
+    {
+      "path": "repo/gitops/platform/dev/clustersecretstore.yaml",
+      "sha256": "58a472eb5d7418731005d7205c3c7564234da1aa572642590cd91c02e42c3381",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "58a472eb5d7418731005d7205c3c7564234da1aa572642590cd91c02e42c3381"
+    },
+    {
+      "path": "repo/gitops/platform/prod/alerts/notify-worker.yaml",
+      "sha256": "4d58bcd89a0e3ca1fa571083a647535e388f3c11aa205384e7b91d4128b09ddf",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "4d58bcd89a0e3ca1fa571083a647535e388f3c11aa205384e7b91d4128b09ddf"
+    },
+    {
+      "path": "repo/gitops/platform/prod/alerts/taskflow-api.yaml",
+      "sha256": "30de9060da2763eea1ac2472b588312ef526e2078bec23852b48f18e2325a52b",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "30de9060da2763eea1ac2472b588312ef526e2078bec23852b48f18e2325a52b"
+    },
+    {
+      "path": "repo/gitops/platform/prod/alerts/taskflow-web.yaml",
+      "sha256": "16eb10cf86fac9ca27745ba6c0d97894f5b7270d1639e0de7371cac940787a82",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "16eb10cf86fac9ca27745ba6c0d97894f5b7270d1639e0de7371cac940787a82"
+    },
+    {
+      "path": "repo/gitops/platform/prod/clustersecretstore.yaml",
+      "sha256": "58a472eb5d7418731005d7205c3c7564234da1aa572642590cd91c02e42c3381",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "58a472eb5d7418731005d7205c3c7564234da1aa572642590cd91c02e42c3381"
+    },
+    {
+      "path": "repo/gitops/platform/stg/alerts/notify-worker.yaml",
+      "sha256": "da11923650e1a63d666ac23212460aa1a53abfba01bdda2f2957fd8d2cd1fec7",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "da11923650e1a63d666ac23212460aa1a53abfba01bdda2f2957fd8d2cd1fec7"
+    },
+    {
+      "path": "repo/gitops/platform/stg/alerts/taskflow-api.yaml",
+      "sha256": "4a6022111531a13efd568ae16fba59159dc00c83e54b01d9bd5bfa5327a0986f",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "4a6022111531a13efd568ae16fba59159dc00c83e54b01d9bd5bfa5327a0986f"
+    },
+    {
+      "path": "repo/gitops/platform/stg/alerts/taskflow-web.yaml",
+      "sha256": "964f5ef0692560cb2bd2a1f1e74d551207f5e4e2e564f7c29b3dad493f173cc1",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "964f5ef0692560cb2bd2a1f1e74d551207f5e4e2e564f7c29b3dad493f173cc1"
+    },
+    {
+      "path": "repo/gitops/platform/stg/clustersecretstore.yaml",
+      "sha256": "58a472eb5d7418731005d7205c3c7564234da1aa572642590cd91c02e42c3381",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "58a472eb5d7418731005d7205c3c7564234da1aa572642590cd91c02e42c3381"
+    },
+    {
+      "path": "ci/acme__taskflow-api/.github/workflows/ci-taskflow-api.yml",
+      "sha256": "dfdbc960e0cbb4c3b496fdfd9b809b4326e89f53ac0c523b86e28ee92d7ab170",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "dfdbc960e0cbb4c3b496fdfd9b809b4326e89f53ac0c523b86e28ee92d7ab170"
+    },
+    {
+      "path": "ci/acme__taskflow-api/.github/workflows/phase4-claude.yml",
+      "sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c"
+    },
+    {
+      "path": "ci/acme__taskflow-web/.github/workflows/ci-taskflow-web.yml",
+      "sha256": "378800a814cc15314e842e7bb08181fa17227464cd3a04e13a04ffb451606704",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "378800a814cc15314e842e7bb08181fa17227464cd3a04e13a04ffb451606704"
+    },
+    {
+      "path": "ci/acme__taskflow-web/.github/workflows/phase4-claude.yml",
+      "sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c"
+    }
+  ],
+  "ci_repos": [
+    "acme/taskflow-api",
+    "acme/taskflow-web"
+  ],
+  "secrets_refs": [
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/taskflow-api/DATABASE_URL"
+    },
+    {
+      "name": "REDIS_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/taskflow-api/REDIS_URL"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/notify-worker/DATABASE_URL"
+    },
+    {
+      "name": "EMAIL_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/notify-worker/EMAIL_PROVIDER_API_KEY"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/taskflow-api/DATABASE_URL"
+    },
+    {
+      "name": "REDIS_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/taskflow-api/REDIS_URL"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/notify-worker/DATABASE_URL"
+    },
+    {
+      "name": "EMAIL_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/notify-worker/EMAIL_PROVIDER_API_KEY"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/taskflow-api/DATABASE_URL"
+    },
+    {
+      "name": "REDIS_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/taskflow-api/REDIS_URL"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/notify-worker/DATABASE_URL"
+    },
+    {
+      "name": "EMAIL_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/notify-worker/EMAIL_PROVIDER_API_KEY"
+    }
+  ],
+  "stateful_resources": [
+    "dev:aws-rds-postgres:taskflow-db",
+    "dev:aws-elasticache-redis:taskflow-cache",
+    "stg:aws-rds-postgres:taskflow-db",
+    "stg:aws-elasticache-redis:taskflow-cache",
+    "prod:aws-rds-postgres:taskflow-db",
+    "prod:aws-elasticache-redis:taskflow-cache"
+  ],
+  "gaps": [
+    "bootstrap: create the remote state bucket 'clinic-test-2-tfstate' (versioned, encrypted) once per account",
+    "taskflow-web is public: set ingress.host and ingress.certificateArn in gitops/apps/taskflow-web/<env>/values.yaml; the AWS Load Balancer Controller and DNS come from the platform bootstrap",
+    "notify-worker runs the taskflow-api image: set its start command in gitops/apps/notify-worker/<env>/values.yaml (args)",
+    "bootstrap: register Argo CD clusters named clinic-test-2-dev, clinic-test-2-stg, clinic-test-2-prod; install platform CRDs before syncing platform applications",
+    "shared container registries are owned only by dev/core state; apply that state before image builds for other environments",
+    "platform add-ons (external-secrets operator, kube-prometheus-stack, OpenTelemetry Collector) are installed by the platform team's cluster bootstrap; their chart versions are not pinned here",
+    "module terraform-aws-modules/eks/aws ~> 21.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/ecr/aws ~> 2.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/rds/aws ~> 6.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/elasticache/aws ~> 1.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "image promotion is not generated: CI builds and pushes images, and a new tag reaches gitops/apps/<component>/<env>/values.yaml through a PR to the infra repo (or Argo CD Image Updater, installed by the platform team)"
+  ],
+  "checks_passed": false,
+  "checks_skipped": [
+    "tofu_fmt",
+    "tofu_validate",
+    "tflint",
+    "trivy",
+    "checkov",
+    "actionlint",
+    "helm_lint",
+    "kubeconform",
+    "gitleaks",
+    "conftest"
+  ],
+  "validation_complete": false,
+  "checks_incomplete": [
+    "tofu_fmt: tool_unavailable",
+    "tofu_validate: tool_unavailable",
+    "tflint: tool_unavailable",
+    "trivy: tool_unavailable",
+    "checkov: tool_unavailable",
+    "actionlint: tool_unavailable",
+    "helm_lint: tool_unavailable",
+    "kubeconform: tool_unavailable",
+    "gitleaks: tool_unavailable",
+    "conftest: tool_unavailable",
+    "ci/acme__taskflow-api actionlint: tool_unavailable",
+    "ci/acme__taskflow-web actionlint: tool_unavailable"
+  ],
+  "risk_score": 60,
+  "risk_reasons": [
+    "6 stateful resources (databases, caches, buckets)",
+    "public endpoints: taskflow-web",
+    "includes prod",
+    "checks not run here: tofu_fmt, tofu_validate, tflint, trivy, checkov, actionlint, helm_lint, kubeconform, gitleaks, conftest"
+  ],
+  "generated_at": "2026-11-16T12:19:41Z"
+}
