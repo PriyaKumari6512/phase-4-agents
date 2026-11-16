@@ -18,6 +18,7 @@ from collections import defaultdict
 
 import networkx as nx
 
+from agent_engine import perf
 from agent_engine.gates import stale_approvals
 from agent_engine.phase4 import capacity as cap
 from agent_engine.phase4 import files
@@ -49,19 +50,29 @@ RISKY = ("auth", "login", "password", "permission", "role", "payment", "billing"
 
 # ============================================================================ context
 def _ctx(project: str, sprint_index: int):
-    settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
-    plan = files.read_json(project, files.SPRINT_PLAN, SprintPlan)
-    backlog = files.read_json(project, files.BACKLOG, Backlog)
-    slot = next((s for s in plan.sprints if s.sprint_index == sprint_index), None)
-    if slot is None:
-        raise files.ProjectError(f"sprint_index {sprint_index} is not in sprint-plan.json "
-                                 f"(have {[s.sprint_index for s in plan.sprints]})")
-    tasks = [t for sid in slot.story_ids for t in backlog.tasks_of(sid)]
+    with perf.span("phase", "allocation.load_inputs", sprint_index=sprint_index) as sp:
+        settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+        plan = files.read_json(project, files.SPRINT_PLAN, SprintPlan)
+        backlog = files.read_json(project, files.BACKLOG, Backlog)
+        slot = next((s for s in plan.sprints if s.sprint_index == sprint_index), None)
+        if slot is None:
+            raise files.ProjectError(f"sprint_index {sprint_index} is not in sprint-plan.json "
+                                     f"(have {[s.sprint_index for s in plan.sprints]})")
+        tasks = [t for sid in slot.story_ids for t in backlog.tasks_of(sid)]
+        sp.set(tasks=len(tasks), stories=len(slot.story_ids), team=len(settings.team),
+               ai_agents=len([a for a in settings.ai_agents if a.enabled]))
     return settings, plan, backlog, slot, tasks
 
 
 def _profiles(project: str, settings: ProjectSettings) -> tuple[dict[str, dict[str, float]], list[dict]]:
     """worker -> skill -> level (declared blended with mined evidence), and ownership rows."""
+    with perf.span("phase", "allocation.profiles") as sp:
+        levels, rows = _profiles_impl(project, settings)
+        sp.set(workers=len(levels), ownership_rows=len(rows))
+    return levels, rows
+
+
+def _profiles_impl(project: str, settings: ProjectSettings) -> tuple[dict[str, dict[str, float]], list[dict]]:
     mined = files.read_json(project, files.SKILL_PROFILES) if files.exists(project, files.SKILL_PROFILES) else {}
     observed: dict[str, dict[str, float]] = mined.get("skills", {})
     levels: dict[str, dict[str, float]] = {}
@@ -135,8 +146,9 @@ def hard_checks(task: WorkItem, max_hours: float, repo: str | None, ready: set[s
 
 
 def _window(settings: ProjectSettings, slot) -> cap.SprintWindow:
-    w = cap.SprintWindow(index=slot.sprint_index, number=slot.number, start=slot.start, end=slot.end)
-    cap.fill_availability(settings, [w])
+    with perf.span("phase", "allocation.availability"):
+        w = cap.SprintWindow(index=slot.sprint_index, number=slot.number, start=slot.start, end=slot.end)
+        cap.fill_availability(settings, [w])
     return w
 
 
@@ -198,33 +210,40 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
     max_hours = max((a.max_task_hours for a in agents), default=0)
     ready = ci_ready_repos(project)
     eligibility: dict[str, EligibilityVerdict] = {}
-    for t in tasks:
-        repo = t.repo or (settings.code_repos[0] if len(settings.code_repos) == 1 else None)
-        if not agents:
-            eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason="no AI agents enabled")
-            continue
-        if t.item_id in blocked:
-            eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason="AI blocked by the approver")
-            continue
-        reason = hard_checks(t, max_hours, repo, ready)
-        if reason:
-            eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason=reason)
-            continue
-        v = (ai_verdicts or {}).get(t.item_id)
-        if v is None:
-            eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason="no AI-eligibility verdict given")
-            continue
-        rates = [_agent_success(project, a.provider, t.type) for a in agents]
-        n = max((r[1] for r in rates), default=0)
-        best = max((r[0] or 0 for r in rates), default=0)
-        shadow = bool(v.get("eligible")) and n < settings.ai_min_recorded_outcomes
-        ok = bool(v.get("eligible")) and not shadow and (n == 0 or best >= MIN_SUCCESS)
-        why = str(v.get("reason", "")).strip() or "no reason given"
-        if shadow:
-            why = f"{why} (shadow mode: {n} recorded agent outcomes, {settings.ai_min_recorded_outcomes} needed)"
-        elif v.get("eligible") and not ok:
-            why = f"{why} (recorded success rate {best:.0%} below {MIN_SUCCESS:.0%})"
-        eligibility[t.item_id] = EligibilityVerdict(eligible=ok, reason=why, shadow=shadow)
+    with perf.span("phase", "allocation.eligibility", tasks=len(tasks), pins=len(pins), vetoes=len(vetoes),
+                   ai_blocks=len(blocked), verdicts=len(ai_verdicts or {})) as elig_span:
+        outcome_reads = 0
+        for t in tasks:
+            repo = t.repo or (settings.code_repos[0] if len(settings.code_repos) == 1 else None)
+            if not agents:
+                eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason="no AI agents enabled")
+                continue
+            if t.item_id in blocked:
+                eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason="AI blocked by the approver")
+                continue
+            reason = hard_checks(t, max_hours, repo, ready)
+            if reason:
+                eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason=reason)
+                continue
+            v = (ai_verdicts or {}).get(t.item_id)
+            if v is None:
+                eligibility[t.item_id] = EligibilityVerdict(eligible=False, reason="no AI-eligibility verdict given")
+                continue
+            outcome_reads += len(agents)       # each call re-reads phase4/agent-outcomes.json
+            rates = [_agent_success(project, a.provider, t.type) for a in agents]
+            n = max((r[1] for r in rates), default=0)
+            best = max((r[0] or 0 for r in rates), default=0)
+            shadow = bool(v.get("eligible")) and n < settings.ai_min_recorded_outcomes
+            ok = bool(v.get("eligible")) and not shadow and (n == 0 or best >= MIN_SUCCESS)
+            why = str(v.get("reason", "")).strip() or "no reason given"
+            if shadow:
+                why = f"{why} (shadow mode: {n} recorded agent outcomes, {settings.ai_min_recorded_outcomes} needed)"
+            elif v.get("eligible") and not ok:
+                why = f"{why} (recorded success rate {best:.0%} below {MIN_SUCCESS:.0%})"
+            eligibility[t.item_id] = EligibilityVerdict(eligible=ok, reason=why, shadow=shadow)
+        elig_span.set(eligible=sum(v.eligible for v in eligibility.values()),
+                      ineligible=sum(not v.eligible for v in eligibility.values()),
+                      shadow=sum(v.shadow for v in eligibility.values()), outcome_history_reads=outcome_reads)
 
     w0 = _window(settings, slot)
     levels, own_rows = _profiles(project, settings)
@@ -292,6 +311,8 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
             aff = _ownership(own_rows, w.worker_id, area)[0] if (w.kind == "human" and any_owner) else "MEDIUM"
             w.affinities[area] = aff if aff != "UNKNOWN" else "MEDIUM"
 
+    perf.event("solver_input", "allocation", tasks=len(tin), workers=len(workers), pinned=len(pins),
+               vetoed=len(vetoes), areas=len({t.customer for t in tin}))
     res = run_solver(workers, tin, f"{project}-sprint{slot.number}")
     tin_by = {t.task_id: t for t in tin}
     loads: dict[str, int] = defaultdict(int)
@@ -356,8 +377,10 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
                   "capacity_hours": round(w.capacity_minutes / 60, 1), "planned_hours": round(planned[w.worker_id], 1)}
                  for w in workers],
         generated_at=files.utcnow())
-    files.write_json(project, files.ASSIGNMENTS, ap)
-    files.write_text(project, files.ASSIGNMENTS_MD, render_md(ap, backlog, slot.name))
+    with perf.span("fs", "allocation.write_assignments") as sp:
+        files.write_json(project, files.ASSIGNMENTS, ap)
+        files.write_text(project, files.ASSIGNMENTS_MD, render_md(ap, backlog, slot.name))
+        sp.set(assigned=len(assignments), unassigned=len(unassigned), engine=ap.solver_engine, status=res.status)
     return json.dumps({
         "written": files.virtual(project, files.ASSIGNMENTS), "engine": ap.solver_engine, "status": res.status,
         "assignments": [{"task_id": a.task_id, "task": by[a.task_id].title, "worker": wk[a.worker_id].name,

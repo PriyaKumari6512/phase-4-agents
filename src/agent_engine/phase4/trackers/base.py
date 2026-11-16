@@ -9,7 +9,14 @@ from typing import Any
 
 import httpx
 
+from agent_engine import perf
+
 log = logging.getLogger(__name__)
+
+
+def _operation(method: str) -> str:
+    return {"GET": "read", "POST": "create", "PUT": "update", "PATCH": "update", "DELETE": "delete"}.get(
+        method.upper(), method.lower())
 
 
 @dataclass
@@ -67,28 +74,37 @@ class HttpClient:
         self._last_write = 0.0
 
     def request(self, method: str, url: str, **kw: Any) -> httpx.Response:
-        if method.upper() in ("POST", "PUT", "PATCH", "DELETE") and self.min_write_interval_s:
-            wait = self._last_write + self.min_write_interval_s - time.monotonic()
-            if wait > 0:
-                time.sleep(wait)
-            self._last_write = time.monotonic()
-        delay = 1.0
-        for attempt in range(self.max_retries + 1):
-            resp = self.client.request(method, url, **kw)
-            if resp.status_code in (429, 500, 502, 503, 504) or (
-                    resp.status_code == 403 and "rate limit" in resp.text.lower()):
-                if attempt == self.max_retries:
-                    break
-                ra = resp.headers.get("retry-after")
-                sleep_s = float(ra) if ra and ra.replace(".", "", 1).isdigit() else delay
-                log.warning("tracker %s %s -> %s; retrying in %.1fs", method, url, resp.status_code, sleep_s)
-                time.sleep(min(sleep_s, 120))
-                delay = min(delay * 2, 60)
-                continue
-            break
-        if resp.status_code >= 400:
-            raise TrackerError(f"{method} {url} -> {resp.status_code}: {resp.text[:500]}")
-        return resp
+        with perf.http_span("tracker", _operation(method), method.upper(), str(self.client.base_url).rstrip("/") + url,
+                            include_path=True, max_retries=self.max_retries) as sp:
+            throttle_s = 0.0
+            if method.upper() in ("POST", "PUT", "PATCH", "DELETE") and self.min_write_interval_s:
+                wait = self._last_write + self.min_write_interval_s - time.monotonic()
+                if wait > 0:
+                    time.sleep(wait)
+                    throttle_s = wait
+                self._last_write = time.monotonic()
+            delay = 1.0
+            backoff_s = 0.0
+            for attempt in range(self.max_retries + 1):
+                resp = self.client.request(method, url, **kw)
+                perf.event("http_attempt", "tracker.response", attempt=attempt + 1, status_code=resp.status_code)
+                if resp.status_code in (429, 500, 502, 503, 504) or (
+                        resp.status_code == 403 and "rate limit" in resp.text.lower()):
+                    if attempt == self.max_retries:
+                        break
+                    ra = resp.headers.get("retry-after")
+                    sleep_s = float(ra) if ra and ra.replace(".", "", 1).isdigit() else delay
+                    log.warning("tracker %s %s -> %s; retrying in %.1fs", method, url, resp.status_code, sleep_s)
+                    time.sleep(min(sleep_s, 120))
+                    backoff_s += min(sleep_s, 120)
+                    delay = min(delay * 2, 60)
+                    continue
+                break
+            perf.http_result(sp, resp)
+            sp.set(attempts=attempt + 1, throttle_wait_s=round(throttle_s, 3), retry_backoff_s=round(backoff_s, 3))
+            if resp.status_code >= 400:
+                raise TrackerError(f"{method} {url} -> {resp.status_code}: {resp.text[:500]}")
+            return resp
 
     def get(self, url: str, **kw: Any) -> httpx.Response: return self.request("GET", url, **kw)
     def post(self, url: str, **kw: Any) -> httpx.Response: return self.request("POST", url, **kw)

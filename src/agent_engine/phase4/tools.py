@@ -12,19 +12,25 @@ from typing import Callable
 
 from langchain_core.tools import tool
 
+from agent_engine import perf
 from agent_engine.phase4 import allocation, backlog, files, infra, speckit, sprint
 
 logger = logging.getLogger(__name__)
 
 
-def _run(fn: Callable[[], str]) -> str:
-    try:
-        return fn()
-    except files.ProjectError as e:
-        return f"ERROR: {e}"
-    except Exception as e:  # a tool bug must reach the model as text, not crash the run
-        logger.exception("phase4 tool failed")
-        return f"ERROR: {type(e).__name__}: {e}"
+def _run(name: str, fn: Callable[[], str]) -> str:
+    with perf.span("tool_exec", name, tool=name) as sp:
+        try:
+            result = fn()
+        except files.ProjectError as e:
+            result = f"ERROR: {e}"
+            sp.set_status("domain_error", result, "project_error")
+        except Exception as e:  # a tool bug must reach the model as text, not crash the run
+            logger.exception("phase4 tool failed")
+            result = f"ERROR: {type(e).__name__}: {e}"
+            sp.set_status("domain_error", result, "tool_exception:" + perf.classify_error(e))
+        sp.set(output_chars=len(result))
+        return result
 
 
 # ============================================================================ spec-kit
@@ -33,7 +39,7 @@ def speckit_init(project: str) -> str:
     """Prepare spec-kit for the project: writes .specify/ (templates, constitution from phase4/project.json) under
     /outputs/<project>/, which is spec-kit's REPO_ROOT. Call once before any speckit skill. Returns REPO_ROOT and the
     existing specs/ folders."""
-    return _run(lambda: speckit.init(project))
+    return _run("speckit_init", lambda: speckit.init(project))
 
 
 @tool
@@ -44,7 +50,7 @@ def speckit_script(project: str, script: str, script_args: str = "", feature_dir
     "spec-template --json") and feature_directory, the feature's folder relative to REPO_ROOT (e.g.
     "specs/001-task-board"). Returns the script's JSON output; paths in it are /outputs/... paths you can read and
     write directly."""
-    return _run(lambda: speckit.run_script(project, script, script_args, feature_directory))
+    return _run("speckit_script", lambda: speckit.run_script(project, script, script_args, feature_directory))
 
 
 # ============================================================================ backlog (Agent 1)
@@ -54,7 +60,7 @@ def backlog_set_features(project: str, features: list[dict]) -> str:
     feature_dir ("specs/001-short-name", unique 3-digit number), title, summary, requirement_ids (ids from prd.md
     such as FR-1, US-2), component_ids (architecture components it touches), repo (code repository, optional).
     Writes backlog/features.json and reports prd.md ids not yet covered by any feature."""
-    return _run(lambda: backlog.set_features(project, features))
+    return _run("backlog_set_features", lambda: backlog.set_features(project, features))
 
 
 @tool
@@ -63,7 +69,7 @@ def backlog_build(project: str) -> str:
     feature, stories from spec.md user stories plus setup/foundational/polish phases, tasks from tasks.md with
     spec-kit dependencies. Re-applies earlier backlog_update enrichments to unchanged items. Call after spec-kit
     finished for all features, and again whenever a spec changes."""
-    return _run(lambda: backlog.build(project))
+    return _run("backlog_build", lambda: backlog.build(project))
 
 
 @tool
@@ -71,7 +77,7 @@ def backlog_find_similar(project: str, story_ids: list[str]) -> str:
     """For each story, resolved tickets from phase4/history.json that look similar (TF-IDF), one per point value
     first so they span the scale, with similarity and the team median. Use them as anchors when estimating;
     analogy_valid=false means estimate with method 'llm' and confidence 'low'."""
-    return _run(lambda: backlog.find_similar(project, story_ids))
+    return _run("backlog_find_similar", lambda: backlog.find_similar(project, story_ids))
 
 
 @tool
@@ -88,7 +94,7 @@ def backlog_update(project: str, updates: list[dict]) -> str:
     add_dependencies ([{on_id, reason, confidence 0-1}], same level only), remove_dependencies ([ids]),
     split_into (tasks only: 2-5 parts [{title, description, acceptance_criteria, hours}]).
     Returns how many applied and per-item errors."""
-    return _run(lambda: backlog.update(project, updates))
+    return _run("backlog_update", lambda: backlog.update(project, updates))
 
 
 @tool
@@ -97,14 +103,14 @@ def backlog_validate(project: str) -> str:
     criteria, estimates on the point scale, story and task size, skills taxonomy, duplicates, open questions),
     compute waves and the critical path, and write backlog.json + backlog/backlog.md. ready_for_review is true only
     with no blocking issues."""
-    return _run(lambda: backlog.validate_report(project))
+    return _run("backlog_validate", lambda: backlog.validate_report(project))
 
 
 @tool
 def backlog_check(project: str) -> str:
     """Read-only: the same validation as backlog_validate without writing anything. Returns blocking issues and
     warnings for the current backlog/backlog.json."""
-    return _run(lambda: backlog.validate_report(project, write=False))
+    return _run("backlog_check", lambda: backlog.validate_report(project, write=False))
 
 
 # ============================================================================ sprint (Agent 2)
@@ -114,7 +120,7 @@ def sprint_capacity(project: str, as_of: str = "") -> str:
     ceremonies, maintenance reserve) and Monte Carlo capacity from phase4/history.json: P50 and P85 story points
     per sprint. Also lists stories that cannot be planned (unestimated, too large). as_of: YYYY-MM-DD, default
     today. Writes sprint/capacity.json."""
-    return _run(lambda: sprint.capacity_report(project, as_of or None))
+    return _run("sprint_capacity", lambda: sprint.capacity_report(project, as_of or None))
 
 
 @tool
@@ -126,7 +132,7 @@ def sprint_solve(project: str, business_values: dict[str, int], pins: dict[str, 
     capacity (P50 hard, above P85 penalized), dependencies, hard deadlines, must-haves and plan stability; when
     infeasible it returns the conflicting constraints and options it verified to be feasible. Writes
     sprint/sprint-plan.json and sprint-plan.md."""
-    return _run(lambda: sprint.solve(project, business_values, pins, relax, as_of or None))
+    return _run("sprint_solve", lambda: sprint.solve(project, business_values, pins, relax, as_of or None))
 
 
 @tool
@@ -135,14 +141,14 @@ def sprint_annotate(project: str, goals: dict[str, str], deferral_explanations: 
     """Write a goal for every sprint with stories ({sprint_index: goal}), optional plain-language explanations for
     deferred stories ({story_id: text}), and a short summary for the approver. Updates sprint-plan.json and
     sprint-plan.md."""
-    return _run(lambda: sprint.annotate(project, goals, deferral_explanations, summary_md))
+    return _run("sprint_annotate", lambda: sprint.annotate(project, goals, deferral_explanations, summary_md))
 
 
 @tool
 def sprint_check(project: str) -> str:
     """Read-only: checks sprint/sprint-plan.json against the backlog (capacity, dependency order, every story
     planned or deferred, goals written, built from the current backlog)."""
-    return _run(lambda: sprint.check(project))
+    return _run("sprint_check", lambda: sprint.check(project))
 
 
 # ============================================================================ allocation (Agent 3)
@@ -152,7 +158,7 @@ def allocation_prepare(project: str, sprint_index: int = 1) -> str:
     at most 4 files, estimate within the agent limit, no sensitive area, no open questions, repository CI approved
     at gate P4-G4), team availability and skills, skill gaps and capacity shortfalls. ai_candidates are the tasks
     that need your eligibility verdict. Writes allocation/problem.json."""
-    return _run(lambda: allocation.prepare(project, sprint_index))
+    return _run("allocation_prepare", lambda: allocation.prepare(project, sprint_index))
 
 
 @tool
@@ -165,21 +171,21 @@ def allocation_solve(project: str, sprint_index: int = 1, ai_verdicts: dict[str,
     pins {task_id: worker_id}, vetoes {task_id: [worker_ids]}, block_ai [task_ids] come from the approver.
     Writes allocation/assignments.json and assignments.md; returns each assignment with its score breakdown and
     runner-up."""
-    return _run(lambda: allocation.solve(project, sprint_index, ai_verdicts, pins, vetoes, block_ai))
+    return _run("allocation_solve", lambda: allocation.solve(project, sprint_index, ai_verdicts, pins, vetoes, block_ai))
 
 
 @tool
 def allocation_annotate(project: str, explanations: dict[str, str]) -> str:
     """Write one plain sentence per assigned task explaining the choice ({task_id: text}), from its score
     breakdown (skill fit, ownership, load, cost) and runner-up. Updates assignments.json and assignments.md."""
-    return _run(lambda: allocation.annotate(project, explanations))
+    return _run("allocation_annotate", lambda: allocation.annotate(project, explanations))
 
 
 @tool
 def allocation_check(project: str) -> str:
     """Read-only: checks allocation/assignments.json (built from the current sprint plan, every task assigned or
     explained as unassigned, AI only on eligible tasks, explanations present, capacity)."""
-    return _run(lambda: allocation.check(project))
+    return _run("allocation_check", lambda: allocation.check(project))
 
 
 # ============================================================================ infra (Agent 4)
@@ -195,7 +201,7 @@ def infra_set_intent(project: str, intent: dict) -> str:
     architecture.md)}]}. A component that shares another component's image (same repo) gets no container_registry
     need of its own. Checks it against
     the catalog and org rules and writes infra/intent.json."""
-    return _run(lambda: infra.set_intent(project, intent))
+    return _run("infra_set_intent", lambda: infra.set_intent(project, intent))
 
 
 @tool
@@ -203,7 +209,7 @@ def infra_render(project: str) -> str:
     """Render the golden-path catalog for infra/intent.json into infra/repo/ (OpenTofu per environment, Argo CD,
     Helm values, ExternalSecrets, alerts, Atlantis, drift workflow, CODEOWNERS) and infra/ci/<owner>__<repo>/ (CI
     workflows per code repository). Overwrites earlier output. Writes infra/manifest.json and returns gaps."""
-    return _run(lambda: infra.render(project))
+    return _run("infra_render", lambda: infra.render(project))
 
 
 @tool
@@ -211,21 +217,21 @@ def infra_validate(project: str) -> str:
     """Run the IaC sandbox checks (tofu fmt/validate, tflint, trivy, checkov, actionlint, helm lint, kubeconform,
     gitleaks, conftest policy tests) on infra/repo and the CI workflows, scan for secret-like values, score risk,
     and write infra/checks.json, infra/manifest.json and infra/PR.md. Returns failing findings to repair."""
-    return _run(lambda: infra.validate(project))
+    return _run("infra_validate", lambda: infra.validate(project))
 
 
 @tool
 def infra_registry_versions(source: str) -> str:
     """Published versions of a Terraform registry module, newest first, e.g. source
     'terraform-aws-modules/eks/aws'. Read-only."""
-    return _run(lambda: infra.registry_versions(source))
+    return _run("infra_registry_versions", lambda: infra.registry_versions(source))
 
 
 @tool
 def infra_check(project: str) -> str:
     """Read-only: checks infra/manifest.json against the files on disk and infra/checks.json (intent unchanged,
     files unchanged since validation, checks passed, PR.md present)."""
-    return _run(lambda: infra.check(project))
+    return _run("infra_check", lambda: infra.check(project))
 
 
 _ALL = [speckit_init, speckit_script, backlog_set_features, backlog_build, backlog_find_similar, backlog_update,

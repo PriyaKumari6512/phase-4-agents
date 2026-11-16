@@ -57,8 +57,15 @@ def run(args: argparse.Namespace) -> int:
         if args.phase4_command == "init":
             return _init(args.project_name, args.example, args.force)
         if args.phase4_command == "publish":
+            from agent_engine import perf
             from agent_engine.phase4.publish import PUBLISHERS
-            print(json.dumps(PUBLISHERS[args.what](args.project_name), indent=2, default=str))
+
+            blocked = perf.publication_blocked()
+            if blocked:
+                print(f"ERROR: {blocked}")
+                return 1
+            with perf.span("publish", args.what, project=args.project_name):
+                print(json.dumps(PUBLISHERS[args.what](args.project_name), indent=2, default=str))
             return 0
         if args.phase4_command == "mine-profiles":
             from agent_engine.phase4.profiles import mine_repo

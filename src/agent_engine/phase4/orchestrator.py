@@ -24,12 +24,13 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from agent_engine import config
+from agent_engine import config, perf
 from agent_engine.gates import APPROVED_SUFFIX, Gate, load_gates, record_decision
 from agent_engine.history import file_digest
 
@@ -90,6 +91,13 @@ def _digest_json(value: object) -> str:
 
 def input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
     """What the agent reads, as digests: whole files, the parts of project.json it uses, and its parameters."""
+    with perf.span("fs", "input_digests", stage=stage.agent) as sp:
+        digests = _input_digests(stage, root, sprint)
+        sp.set(inputs=len(digests))
+    return digests
+
+
+def _input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
     digests = {f: file_digest(root / f) for f in (*stage.files, *stage.optional) if (root / f).is_file()}
     project = root / PROJECT_FILE
     if project.is_file():
@@ -134,9 +142,10 @@ def load_state(root: Path) -> dict:
 
 
 def save_state(root: Path, state: dict) -> None:
-    path = root / STATE_FILE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    with perf.span("fs", "save_orchestrator_state"):
+        path = root / STATE_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 @dataclass
@@ -216,30 +225,67 @@ def _outputs(stage: Stage) -> tuple[str, ...]:
 # --- running ----------------------------------------------------------------------------------------------------
 
 Runner = Callable[[str, str, str], dict]
+SUCCESS = ("success", "done")
+
+
+def read_child_report(report: Path, agent: str, invocation_id: str, exit_code: int) -> tuple[str, list[str], str | None]:
+    """(status, gaps, problem) for the child run `invocation_id`.
+
+    report.json is shared by every run of the project, so a child that fails before writing its own report
+    leaves an older one in place. Only a report stamped with this invocation's id counts, and its status must
+    agree with the process exit code (0 exactly for success/done); anything else is a failure with a reason.
+    """
+    if not report.is_file():
+        return "fail", [], "the child wrote no report.json"
+    try:
+        data = json.loads(report.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return "fail", [], f"report.json could not be read: {e}"
+    if data.get("invocation_id") != invocation_id:
+        return "fail", [], "report.json is not from this invocation (an older or different run's report)"
+    if data.get("agent") != agent:
+        return "fail", [], f"report.json is for agent {data.get('agent')!r}, not {agent!r}"
+    status = data.get("status", "fail")
+    gaps = (data.get("verdict") or {}).get("gaps", [])
+    if exit_code != 0 and status in SUCCESS:
+        return "fail", gaps, f"exit code {exit_code} contradicts report status {status!r}"
+    if exit_code == 0 and status not in SUCCESS:
+        return status, gaps, f"exit code 0 with report status {status!r}"
+    return status, gaps, None
 
 
 def run_agent(agent: str, request: str, project: str) -> dict:
-    """`agent-engine run` as a child process, output shown live. Returns {status, exit_code, rate_limited, gaps}."""
+    """`agent-engine run` as a child process, output shown live.
+    Returns {status, exit_code, rate_limited, gaps, invocation_id, report_problem}."""
+    invocation_id = perf.new_id(24)
     cmd = [sys.executable, "-m", "agent_engine.cli", "run", request, "--agent", agent, "--project-name", project]
-    proc = subprocess.Popen(
-        cmd, cwd=config.ENGINE_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace", env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-    )
-    tail: list[str] = []
-    for line in proc.stdout:  # type: ignore[union-attr]
-        print(line, end="")
-        tail = (tail + [line])[-80:]
-    code = proc.wait()
-    report, status, gaps = _root(project) / "report.json", "fail", []
-    if report.is_file():
-        data = json.loads(report.read_text(encoding="utf-8"))
-        if data.get("agent") == agent:
-            status = data.get("status", "fail")
-            gaps = data.get("verdict", {}).get("gaps", [])
-    text = "".join(tail)
+    with perf.span("child", agent, agent=agent, invocation_id=invocation_id) as sp:
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8", perf.ENV_INVOCATION: invocation_id, **perf.child_env(sp.id)}
+        t0 = time.perf_counter()
+        proc = subprocess.Popen(
+            cmd, cwd=config.ENGINE_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", env=env,
+        )
+        sp.set(spawn_s=round(time.perf_counter() - t0, 4))
+        tail: list[str] = []
+        first_output = None
+        for line in proc.stdout:  # type: ignore[union-attr]
+            if first_output is None:
+                first_output = round(time.perf_counter() - t0, 4)
+            print(line, end="")
+            tail = (tail + [line])[-80:]
+        code = proc.wait()
+        with perf.span("fs", "read_child_report"):
+            status, gaps, problem = read_child_report(_root(project) / "report.json", agent, invocation_id, code)
+        text = "".join(tail)
+        rate_limited = any(m in text for m in RATE_LIMIT_MARKERS)
+        sp.set(exit_code=code, report_status=status, report_problem=problem, first_output_s=first_output,
+               rate_limited=rate_limited)
+        if status not in SUCCESS:
+            sp.set_status("failed", problem or f"stage ended {status}", "stage_outcome")
     return {
-        "status": status, "exit_code": code, "gaps": gaps,
-        "rate_limited": any(m in text for m in RATE_LIMIT_MARKERS),
+        "status": status, "exit_code": code, "gaps": gaps, "rate_limited": rate_limited,
+        "invocation_id": invocation_id, "report_problem": problem,
     }
 
 
@@ -260,18 +306,63 @@ def format_table(steps: list[Step]) -> str:
     return "\n".join(rows)
 
 
+def _observe_approvals(root: Path, gates: dict[str, Gate]) -> None:
+    """Diagnostics only: when each currently approved gate was decided, and whether it was a test approval."""
+    if not perf.enabled():
+        return
+    for stage in STAGES:
+        gate = gates.get(stage.gate)
+        approval = root / gate.approval_file if gate else None
+        if approval is None or not approval.is_file():
+            continue
+        try:
+            record = json.loads(approval.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        automated = "NOT a human sign-off" in str((record.get("approver") or {}).get("role", ""))
+        perf.event("approval_observed", gate.name, decided_at=record.get("decided_at"), automated=automated)
+
+
 def orchestrate(
     project: str, sprint: int = 1, test_approve: bool = False, publish: bool = False, plan_only: bool = False,
     runner: Runner = run_agent, out: Callable[[str], None] = print,
 ) -> int:
-    root, gates = _root(project), load_gates()
-    if not (root / PROJECT_FILE).is_file():
-        out(f"ERROR: {root / PROJECT_FILE} is missing. Add the project inputs first (phase4 init, or copy your own).")
-        return FAILED
-    state = load_state(root)
+    pipeline_id = perf.new_id()
+    perf.set_pipeline(pipeline_id)
+    with perf.span("pipeline", project, project=project, sprint=sprint, test_approve=test_approve, publish=publish,
+                   plan_only=plan_only, pipeline_id=pipeline_id) as sp:
+        if publish and (blocked := perf.publication_blocked()):
+            out(f"ERROR: {blocked}")
+            sp.set_status("blocked", blocked, "publication_blocked")
+            return FAILED
+        if perf.enabled() and not plan_only:
+            from agent_engine import perf_manifest
+
+            packs = sorted({p for s in STAGES for p in (s.agent, f"{s.agent}/validator")})
+            perf_manifest.write("pipeline", pipeline_id, project=project, packs=packs,
+                                execution_mode="publication_authorized" if publish else "generation_only",
+                                extra={"test_approve": test_approve, "sprint": sprint})
+        code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out)
+        sp.set(exit_code=code, outcome={DONE: "done", FAILED: "failed", WAITING: "waiting"}.get(code, str(code)))
+        if code == FAILED:
+            sp.set_status("failed", category="pipeline_outcome")
+        return code
+
+
+def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, plan_only: bool, runner: Runner,
+                 out: Callable[[str], None]) -> int:
+    with perf.span("orchestrator", "preflight"):
+        root, gates = _root(project), load_gates()
+        if not (root / PROJECT_FILE).is_file():
+            out(f"ERROR: {root / PROJECT_FILE} is missing. Add the project inputs first (phase4 init, or copy your own).")
+            return FAILED
+        state = load_state(root)
+        _observe_approvals(root, gates)
     ran: list[str] = []
     for _ in range(MAX_STEPS):
-        steps = assess(project, sprint, gates)
+        with perf.span("orchestrator", "assess") as asp:
+            steps = assess(project, sprint, gates)
+            asp.set(actions={s.stage.agent: s.action for s in steps})
         # Existing outputs of a project run by hand: take them as up to date.
         for s in steps:
             if s.action in ("done", "gate_pending") and s.stage.agent not in state:
@@ -304,6 +395,8 @@ def orchestrate(
                                                "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
                     save_state(root, state)
                 out(f"\nSTOP: {step.stage.agent} ended {result['status']!r}; a human has to look at it.")
+                if result.get("report_problem"):
+                    out(f"  report: {result['report_problem']}")
                 for gap in result.get("gaps", []):
                     out(f"  - {gap}")
                 return FAILED
@@ -317,8 +410,13 @@ def orchestrate(
             if test_approve and approvable:
                 for s in approvable:
                     _approve(root, s, gates, state[s.stage.agent]["status"])
+                    perf.event("gate_decision", s.stage.gate, decision="approved", automated=True,
+                               decided_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
                     out(f">>> TEST-approved {s.stage.gate} (not a human sign-off)")
                 continue
+            # Diagnostics: human waiting starts now; it ends at the gate decision (gate command or approval record).
+            perf.event("approval_wait_start", ",".join(s.stage.gate for s in pending),
+                       gates=[s.stage.gate for s in pending], project=project)
             out("\nWAITING for a human. Approve (or request changes) with:")
             for s in pending:
                 out(f'  uv run agent-engine gate {s.stage.gate} --project-name {project} --decision approved '
@@ -340,7 +438,8 @@ def orchestrate(
 
         for what in ("backlog", "sprint", "assignments", "infra"):
             out(f"\n>>> publish {what}")
-            out(json.dumps(PUBLISHERS[what](project), indent=2, default=str))
+            with perf.span("publish", what, project=project):
+                out(json.dumps(PUBLISHERS[what](project), indent=2, default=str))
     else:
         out("Next: add --publish (or `agent-engine phase4 publish backlog|sprint|assignments|infra`) to push to the tracker / GitHub.")
     return DONE

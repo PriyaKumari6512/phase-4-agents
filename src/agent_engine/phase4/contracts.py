@@ -397,12 +397,17 @@ class Finding(Strict):
     message: str
 
 
+CheckOutcome = Literal["passed", "findings", "tool_unavailable", "skipped", "timeout", "parse_error", "execution_error"]
+
+
 class CheckResult(Strict):
     tool: CheckTool
     passed: bool
     skipped: bool = False    # tool unavailable here; never counted as passed
     summary: str
     findings: list[Finding] = []
+    # What actually happened (sandbox.py). Optional so checks.json files written before it still load.
+    outcome: CheckOutcome | None = None
 
 
 class SecretRef(Strict):
@@ -460,6 +465,9 @@ class InfraManifest(Strict):
     gaps: list[str] = []
     checks_passed: bool = False
     checks_skipped: list[str] = []
+    # Whether every check ran to completion here; checks_passed still counts skipped checks as not failing.
+    validation_complete: bool | None = None
+    checks_incomplete: list[str] = []          # "tool: outcome" for each check that did not complete
     risk_score: int = Field(default=0, ge=0, le=100)
     risk_reasons: list[str] = []
     generated_at: datetime

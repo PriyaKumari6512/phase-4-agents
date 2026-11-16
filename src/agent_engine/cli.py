@@ -24,6 +24,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import re
 import sys
 import time
@@ -32,6 +33,7 @@ from pathlib import Path
 
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 
+from agent_engine import perf
 from agent_engine.agent import AgentPack, Verdict, available_packs, build_agent, load_pack, model_spec
 from agent_engine.config import (
     APP_LOG_FILENAME,
@@ -163,43 +165,85 @@ def _fix_message(pack: AgentPack, project_name: str, gaps: list[str]) -> str:
     )
 
 
-async def _run(request: str, agent_name: str, project_name: str) -> int:
-    try:  # fail on a bad pack (or its verifier) before any model call
-        pack = load_pack(agent_name)
-        verifier = load_pack(pack.verifier) if pack.verifier else None
-        if verifier is not None and verifier.returns != "verdict":
-            raise ValueError(f"verifier {pack.verifier!r} must declare returns = \"verdict\"")
-    except ValueError as e:
-        print(f"ERROR: {e}")
-        return 1
+def verdict_status(verdict: Verdict) -> tuple[str, str | None]:
+    """The run status a verdict supports, and why it differs from `status_so_far` when it does.
 
-    # Declared inputs must exist before any model call (and before this request is recorded).
-    missing = _missing(project_name, pack.input_files)
-    if missing:
-        try:
-            approval_files = {g.approval_file: g.name for g in load_gates().values()}
+    A structured verdict can contradict itself (`satisfied=false` with `status_so_far="success"`). The
+    validator's explicit `satisfied` flag is the judgement; a contradictory reply must never count as success.
+    """
+    if verdict.status_so_far == "success" and not verdict.satisfied:
+        return "partial", "verdict said status_so_far=success but satisfied=false; treated as partial"
+    return verdict.status_so_far, None
+
+
+async def _run(request: str, agent_name: str, project_name: str) -> int:
+    with perf.span("stage", agent_name, agent=agent_name, project=project_name,
+                   invocation_id=os.environ.get(perf.ENV_INVOCATION)) as stage:
+        code = await _run_stage(request, agent_name, project_name, stage)
+        stage.set(exit_code=code)
+        if code:
+            stage.set_status("failed", category="exit_code")
+        return code
+
+
+def _model_tiers() -> dict[str, str]:
+    try:
+        return {spec: tier for tier in ("fast", "strong") if (spec := model_spec(tier))}
+    except Exception:  # noqa: BLE001  (no credentials: the run itself reports it)
+        return {}
+
+
+async def _run_stage(request: str, agent_name: str, project_name: str, stage) -> int:
+    with perf.span("phase", "preflight") as pre:
+        try:  # fail on a bad pack (or its verifier) before any model call
+            pack = load_pack(agent_name)
+            verifier = load_pack(pack.verifier) if pack.verifier else None
+            if verifier is not None and verifier.returns != "verdict":
+                raise ValueError(f"verifier {pack.verifier!r} must declare returns = \"verdict\"")
         except ValueError as e:
             print(f"ERROR: {e}")
+            pre.set_status("blocked", str(e), "invalid_pack")
             return 1
-        for f in missing:
-            if f in approval_files:
-                print(f"ERROR: {pack.name} can't run until gate {approval_files[f]} is approved (agent-engine gate {approval_files[f]} ...).")
-                continue
-            producers = _producers(f)
-            hint = f" Run --agent {' or --agent '.join(producers)} on this project first." if producers else ""
-            print(f"ERROR: {pack.name} needs {OUTPUTS_DIR / project_name / f}, which doesn't exist yet.{hint}")
-        return 1
-    # A gate approval listed as an input only counts while the files it approved are unchanged.
-    stale = stale_approvals(OUTPUTS_DIR / project_name, pack.input_files)
-    if stale:
-        for problem in stale:
-            print(f"ERROR: {pack.name} can't run: {problem}. Get the gate approved again first.")
-        return 1
+
+        # Declared inputs must exist before any model call (and before this request is recorded).
+        missing = _missing(project_name, pack.input_files)
+        if missing:
+            pre.set_status("blocked", "missing inputs: " + ", ".join(missing), "missing_input")
+            try:
+                approval_files = {g.approval_file: g.name for g in load_gates().values()}
+            except ValueError as e:
+                print(f"ERROR: {e}")
+                return 1
+            for f in missing:
+                if f in approval_files:
+                    print(f"ERROR: {pack.name} can't run until gate {approval_files[f]} is approved (agent-engine gate {approval_files[f]} ...).")
+                    continue
+                producers = _producers(f)
+                hint = f" Run --agent {' or --agent '.join(producers)} on this project first." if producers else ""
+                print(f"ERROR: {pack.name} needs {OUTPUTS_DIR / project_name / f}, which doesn't exist yet.{hint}")
+            return 1
+        # A gate approval listed as an input only counts while the files it approved are unchanged.
+        stale = stale_approvals(OUTPUTS_DIR / project_name, pack.input_files)
+        if stale:
+            pre.set_status("blocked", "; ".join(stale), "stale_approval")
+            for problem in stale:
+                print(f"ERROR: {pack.name} can't run: {problem}. Get the gate approved again first.")
+            return 1
 
     job_id = new_job_id()
+    stage.set(job_id=job_id)
+    if perf.enabled():
+        from agent_engine import perf_manifest
+
+        names = [pack.name] + ([verifier.name] if verifier else [])
+        under_pipeline = bool(os.environ.get(perf.ENV_PIPELINE))
+        perf_manifest.write("invocation", os.environ.get(perf.ENV_INVOCATION) or job_id, project=project_name,
+                            packs=names, light=under_pipeline,
+                            extra={"job_id": job_id, "agent": pack.name, "under_orchestrator": under_pipeline})
     attach_job_log_handler(job_id)
     notify_job_log_path(f"{OUTPUTS_VIRTUAL_PREFIX}{project_name}/")
-    request_number = _record_request(project_name, request, pack.requests_file)
+    with perf.span("fs", "record_request"):
+        request_number = _record_request(project_name, request, pack.requests_file)
     outputs_before = fingerprint(OUTPUTS_DIR / project_name)
     logger.info("run start job_id=%s agent=%s project=%s request=%d", job_id, pack.name, project_name, request_number)
 
@@ -207,16 +251,21 @@ async def _run(request: str, agent_name: str, project_name: str) -> int:
     usage = UsageMetadataCallbackHandler()
     langfuse = build_langfuse_handler()
     callbacks = [usage, *([langfuse] if langfuse else [])]
+    tiers = _model_tiers() if perf.enabled() else {}
     started = time.perf_counter()
     report: dict = {
         "job_id": job_id, "agent": pack.name, "project": project_name, "request": request_number, "request_text": request,
     }
+    # Stamped so the orchestrator can tell this run's report from an older one (orchestrator.run_agent).
+    if os.environ.get(perf.ENV_INVOCATION):
+        report["invocation_id"] = os.environ[perf.ENV_INVOCATION]
     exit_code = 0
 
     passes: list[dict] = []
     report["passes"] = passes
     # Where each pack is in its `model` escalation order (agent.AgentPack.models).
     level = {pack.name: 0, **({verifier.name: 0} if verifier else {})}
+    pass_counts: dict[str, int] = {}
 
     async def run_pass(p: AgentPack, kind: str, message: str) -> dict | None:
         """One pass of pack `p` on its current model; a model error moves it
@@ -226,17 +275,33 @@ async def _run(request: str, agent_name: str, project_name: str) -> int:
             tier = p.models[level[p.name]]
             entry = {"kind": kind, "agent": p.name, "model_tier": tier, "model": model_spec(tier)}
             passes.append(entry)
-            try:
-                state = await _stream(build_agent(p, level[p.name]), message, callbacks, f"{p.name}-{kind}")
-                entry["ok"] = True
-                return state
-            except Exception as e:
-                entry.update(ok=False, error=str(e))
-                if level[p.name] + 1 >= len(p.models):
-                    raise
-                level[p.name] += 1
-                logger.warning("%s %s pass failed on %s, retrying on %s: %s", p.name, kind, tier, p.models[level[p.name]], e)
-                print(f"\n[{p.name}: {tier} model failed ({e}); retrying on {p.models[level[p.name]]}]")
+            pass_counts[kind] = pass_counts.get(kind, 0) + 1
+            with perf.span("pass", f"{p.name}:{kind}", pass_kind=kind, agent=p.name, model_tier=tier,
+                           model=entry["model"], attempt=pass_counts[kind], pass_index=len(passes)) as ps:
+                pass_callbacks = callbacks
+                handler = None
+                if perf.enabled():
+                    from agent_engine.perf_callbacks import PerfCallbackHandler
+
+                    handler = PerfCallbackHandler(ps.id, tiers)
+                    pass_callbacks = [*callbacks, handler]
+                try:
+                    built = build_agent(p, level[p.name])
+                    with perf.span("graph", f"{p.name}-{kind}") as gs:
+                        state = await _stream(built, message, pass_callbacks, f"{p.name}-{kind}")
+                        gs.set(messages=len(state.get("messages", [])) if isinstance(state, dict) else None)
+                    entry["ok"] = True
+                    return state
+                except Exception as e:
+                    entry.update(ok=False, error=str(e))
+                    if handler is not None:
+                        ps.set(open_model_or_tool_runs=handler.open_runs())
+                    if level[p.name] + 1 >= len(p.models):
+                        raise
+                    ps.set_status("error", str(e), perf.classify_error(e))
+                    level[p.name] += 1
+                    logger.warning("%s %s pass failed on %s, retrying on %s: %s", p.name, kind, tier, p.models[level[p.name]], e)
+                    print(f"\n[{p.name}: {tier} model failed ({e}); retrying on {p.models[level[p.name]]}]")
 
     try:
         state = await run_pass(pack, "write", _agent_message(pack, request, project_name, request_number))
@@ -265,9 +330,19 @@ async def _run(request: str, agent_name: str, project_name: str) -> int:
                         summary="The verifier could not complete this attempt; the output was not judged.",
                     )
                     report.update(status="partial", verified=False, verdict=verdict.model_dump())
+                    perf.event("verdict", verifier.name, attempt=attempt, verifier_failed=True,
+                               error=perf.error_summary(e))
                     print(f"\n=== {verifier.name} failed (attempt {attempt}): {e} ===")
                     break
-                report.update(status=verdict.status_so_far, verified=True, verdict=verdict.model_dump())
+                status, inconsistency = verdict_status(verdict)
+                report.update(status=status, verified=True, verdict=verdict.model_dump())
+                if inconsistency:
+                    report["verdict_inconsistent"] = inconsistency
+                    logger.warning("verifier %s attempt %d: %s", verifier.name, attempt, inconsistency)
+                    print(f"\n[{verifier.name}: {inconsistency}]")
+                perf.event("verdict", verifier.name, attempt=attempt, satisfied=verdict.satisfied,
+                           status_so_far=verdict.status_so_far, effective_status=status, gaps=len(verdict.gaps),
+                           inconsistent=bool(inconsistency))
                 print(f"\n=== {verifier.name} verdict (attempt {attempt}): {verdict.status_so_far} ===\n{verdict.summary}")
                 for gap in verdict.gaps:
                     print(f"  - {gap}")
@@ -278,6 +353,10 @@ async def _run(request: str, agent_name: str, project_name: str) -> int:
                     level[pack.name] += 1
                     print(f"\n[{pack.name}: escalating fix pass to the {pack.models[level[pack.name]]} model]")
                 await run_pass(pack, "fix", _fix_message(pack, project_name, verdict.gaps))
+            # Fix passes can delete or move files: success also needs every declared output to still exist.
+            missing = _missing(project_name, pack.output_files)
+            if missing and report.get("status") in ("done", "success"):
+                raise RuntimeError(f"{pack.name}'s declared output is missing after its fix passes: {', '.join(missing)}")
         exit_code = 0 if report["status"] in ("done", "success") else 1
     except Exception as e:
         logger.exception("run failed job_id=%s", job_id)
@@ -288,10 +367,17 @@ async def _run(request: str, agent_name: str, project_name: str) -> int:
         report["elapsed_seconds"] = round(time.perf_counter() - started, 1)
         report["tokens"] = usage.usage_metadata
         report["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        stage.set(status=report.get("status"), passes=len(passes),
+                  writes=pass_counts.get("write", 0), verifies=pass_counts.get("verify", 0),
+                  fixes=pass_counts.get("fix", 0))
+        perf.event("usage_aggregate", pack.name, tokens=usage.usage_metadata,
+                   note="UsageMetadataCallbackHandler totals for every pass of this stage (report.json 'tokens')")
         save_run(OUTPUTS_DIR / project_name, job_id, outputs_before, report)
         report_path = OUTPUTS_DIR / project_name / REPORT_FILENAME
-        report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
-        trace_host = flush_langfuse(langfuse)
+        with perf.span("fs", "write_report"):
+            report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        with perf.span("diagnostics", "langfuse_flush"):
+            trace_host = flush_langfuse(langfuse)
         job_log = current_job_log_path()
         detach_job_log_handler()
 
@@ -331,6 +417,9 @@ def _gate(name: str, project_name: str, decision: str, approver: dict, submitted
     except ValueError as e:
         print(f"ERROR: {e}")
         return 1
+    # Evidence for human-wait accounting: when the decision was recorded (no names or comments).
+    perf.event("gate_decision", gate.name, project=project_name, decision=decision, decided_at=record["decided_at"],
+               automated=False)
     print(f"{gate.name} {decision} by {approver['name']} at {record['decided_at']}")
     for f, digest in record["artifacts"].items():
         print(f"  {f:40} {digest[:19]}")
@@ -368,8 +457,37 @@ def main() -> None:
     gate_parser.add_argument("--comment", default="", help="Reason, or the changes requested.")
     sub.add_parser("list", help="List the available agent packs.")
     phase4_cli.add_parser(sub)
+    perf_parser = sub.add_parser("perf", help="Offline performance diagnostics (no model or network calls).")
+    perf_sub = perf_parser.add_subparsers(dest="perf_command", required=True)
+    summarize = perf_sub.add_parser("summarize", help="Summarize a diagnostic session's events (complete or partial).")
+    summarize.add_argument("--session", required=True, help="The AGENT_ENGINE_PERF_SESSION value of the run.")
+    summarize.add_argument("--dir", help="Diagnostics folder (default: AGENT_ENGINE_PERF_DIR or logs/perf).")
+    summarize.add_argument("--json", action="store_true", help="Print summary.json instead of the Markdown summary.")
+    perf_list = perf_sub.add_parser("list", help="List diagnostic sessions.")
+    perf_list.add_argument("--dir", help="Diagnostics folder (default: AGENT_ENGINE_PERF_DIR or logs/perf).")
     args = parser.parse_args()
 
+    if args.command == "perf":
+        from agent_engine import perf_summary
+
+        raise SystemExit(perf_summary.cli(args))
+    command = args.command if args.command != "phase4" else f"phase4 {args.phase4_command}"
+    perf.init(command)
+    code: int | None = None
+    try:
+        code = _dispatch(args)
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+        raise
+    except BaseException:
+        code = 1
+        raise
+    finally:
+        perf.shutdown(code)
+    raise SystemExit(code)
+
+
+def _dispatch(args: argparse.Namespace) -> int | None:
     if args.command == "phase4":
         raise SystemExit(phase4_cli.run(args))
     if args.command == "list":

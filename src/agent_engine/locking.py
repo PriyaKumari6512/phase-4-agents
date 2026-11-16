@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any, Awaitable, Callable
 
 from langchain.agents.middleware import AgentMiddleware, ToolCallRequest
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
+from agent_engine import perf
 from agent_engine.config import FILE_LOCK_ACQUIRE_TIMEOUT_SECONDS, MUTATING_FILESYSTEM_TOOLS
 
 logger = logging.getLogger(__name__)
@@ -45,10 +47,13 @@ class FileLockMiddleware(AgentMiddleware):
 
         file_path = request.tool_call["args"].get("file_path", "<unknown>")
 
+        t_wait = time.perf_counter()
         try:
             await asyncio.wait_for(_global_lock.acquire(), timeout=FILE_LOCK_ACQUIRE_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             logger.warning("%s on %s timed out waiting for the file lock", tool_name, file_path)
+            perf.event("lock", "file_lock", tool=tool_name, wait_s=round(time.perf_counter() - t_wait, 4),
+                       acquired=False)
             return ToolMessage(
                 content=(
                     f"ERROR: the filesystem lock stayed held by another agent for "
@@ -58,9 +63,12 @@ class FileLockMiddleware(AgentMiddleware):
                 tool_call_id=request.tool_call["id"],
             )
 
+        t_hold = time.perf_counter()
         try:
             logger.info("%s acquired global file lock for %s", tool_name, file_path)
             return await handler(request)
         finally:
             _global_lock.release()
             logger.info("%s released global file lock for %s", tool_name, file_path)
+            perf.event("lock", "file_lock", tool=tool_name, wait_s=round(t_hold - t_wait, 4),
+                       hold_s=round(time.perf_counter() - t_hold, 4), acquired=True)

@@ -21,6 +21,7 @@ from pathlib import Path
 import networkx as nx
 import numpy as np
 
+from agent_engine import perf
 from agent_engine.phase4 import files, skills_taxonomy, textsim
 from agent_engine.phase4.contracts import (
     AcceptanceCriterion,
@@ -191,7 +192,10 @@ def build(project: str) -> str:
         features = files.read_json(project, files.FEATURES, FeatureList).features
         items: list[WorkItem] = []
         for f in features:
-            items += _feature_items(project, f, settings)
+            with perf.span("compute", "backlog.parse_feature", feature=f.feature_key) as sp:
+                feature_items = _feature_items(project, f, settings)
+                sp.set(items=len(feature_items))
+            items += feature_items
         by = {i.item_id: i for i in items}
         enrich = _load_enrichments(project)
         # an enrichment only carries over while its item still exists with the same title
@@ -203,8 +207,12 @@ def build(project: str) -> str:
                           sources={rel: files.file_sha(project, rel) for rel in (files.PRD, files.ARCHITECTURE,
                                    files.PROJECT_SETTINGS, files.FEATURES) if files.exists(project, rel)},
                           features=features, items=items, generated_at=files.utcnow())
-        _apply_all(backlog, enrich, settings)
+        with perf.span("compute", "backlog.enrichment_replay", reapplied=reapplied, dropped=len(stale)) as sp:
+            replay_errors = _apply_all(backlog, enrich, settings)
+            sp.set(errors=len(replay_errors))
         _save(project, backlog, enrich)
+        perf.event("backlog_counts", "build", features=len(features), epics=sum(i.level == "epic" for i in items),
+                   stories=len(backlog.stories()), tasks=sum(i.level == "task" for i in backlog.items))
     stories = backlog.stories()
     return json.dumps({
         "written": files.virtual(project, files.BACKLOG), "version": backlog.version,
@@ -237,8 +245,11 @@ def _load_enrichments(project: str) -> dict:
 
 
 def _save(project: str, backlog: Backlog, enrich: dict) -> None:
-    files.write_json(project, ENRICHMENTS, enrich)
-    files.write_json(project, files.BACKLOG, backlog)
+    with perf.span("fs", "backlog.save") as sp:
+        p1 = files.write_json(project, ENRICHMENTS, enrich)
+        p2 = files.write_json(project, files.BACKLOG, backlog)
+        if perf.enabled():
+            sp.set(bytes=p1.stat().st_size + p2.stat().st_size, items=len(backlog.items))
 
 
 # ============================================================================ update (the agent's enrichments)
@@ -400,6 +411,7 @@ def update(project: str, updates: list[dict]) -> str:
                 enrich[item_id] = merged
                 applied.append(item_id)
         _save(project, backlog, enrich)
+    perf.event("backlog_counts", "update", updates=len(updates), applied=len(applied), errors=len(errors))
     return json.dumps({"applied": len(applied), "errors": errors})
 
 
@@ -424,7 +436,8 @@ def find_similar(project: str, story_ids: list[str], top: int = 8) -> str:
         return json.dumps(out)
     queries = [f"{s.title}\n" + "\n".join(a.text for a in s.acceptance_criteria) + "\n" +
                "\n".join(t.title for t in backlog.tasks_of(s.item_id)) for s in stories]
-    sims = textsim.similarities(queries, [f"{t.title}\n{t.body}" for t in tickets])
+    with perf.span("compute", "backlog.similarity", stories=len(stories), tickets=len(tickets)):
+        sims = textsim.similarities(queries, [f"{t.title}\n{t.body}" for t in tickets])
     for row, s in zip(sims, stories):
         order = list(np.argsort(-row))
         top_idx = [i for i in order[:20] if row[i] > 0]
@@ -487,6 +500,7 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
     def issue(rule: str, msg: str, ids: list[str], severity: str = "blocking") -> None:
         issues.append(ValidationIssue(rule=rule, severity=severity, item_ids=ids, message=msg))
 
+    sec = perf.start_span("compute", "backlog.validate.hierarchy_and_targets", attrs={"items": len(items)})
     for i in items.values():
         expected = {"epic": None, "story": "epic", "task": "story"}[i.level]
         parent = items.get(i.parent_id) if i.parent_id else None
@@ -504,8 +518,12 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
                 continue
             keep.append(d)
         i.dependencies = keep
+    sec.end()
+    sec = perf.start_span("compute", "backlog.validate.cycles")
+    cycle_iterations = 0
     for level in ("story", "task"):
         for _ in range(50):
+            cycle_iterations += 1
             g = _graph(items, level)
             try:
                 cycle = nx.find_cycle(g)
@@ -518,11 +536,15 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
             u, v = min(llm_edges, key=lambda e: g.edges[e]["confidence"])
             items[v].dependencies = [d for d in items[v].dependencies if d.on_id != u]
             issue("dependency_cycle", f"removed low-confidence edge {v} -> {u} to break a cycle", [v], "warning")
+    sec.end(iterations=cycle_iterations)
+    sec = perf.start_span("compute", "backlog.validate.transitive_reduction")
     g = _graph(items, "story")
     if nx.is_directed_acyclic_graph(g):
         red = nx.transitive_reduction(g)
         for s in [i for i in items.values() if i.level == "story"]:
             s.dependencies = [d for d in s.dependencies if red.has_edge(d.on_id, s.item_id)]
+    sec.end(story_edges=g.number_of_edges())
+    sec = perf.start_span("compute", "backlog.validate.rules", attrs={"prd_ids": len(prd_ids)})
     coverage: dict[str, list[str]] = {r: [] for r in prd_ids}
     for s in items.values():
         if s.level != "story":
@@ -581,7 +603,11 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
     no_skill = [t.item_id for t in items.values() if t.level == "task" and not t.skills_required]
     if no_skill:
         issue("skills", f"{len(no_skill)} tasks without a skill tag", no_skill, "warning")
+    sec.end()
     tasks = [t for t in items.values() if t.level == "task"]
+    sec = perf.start_span("compute", "backlog.validate.duplicates",
+                          attrs={"tasks": len(tasks), "skipped_input_size_limit": len(tasks) > 1500,
+                                 "skipped_too_few": len(tasks) <= 1, "pairs": len(tasks) * (len(tasks) - 1) // 2})
     if 1 < len(tasks) <= 1500:
         m = textsim.tfidf_matrix([f"{t.title}\n{t.description_md}" for t in tasks])
         sim = m @ m.T
@@ -590,6 +616,8 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
                 if tasks[a].parent_id != tasks[b].parent_id and sim[a, b] >= DUPLICATE_THRESHOLD:
                     issue("duplicates", f"possible duplicates {tasks[a].item_id} / {tasks[b].item_id}",
                           [tasks[a].item_id, tasks[b].item_id], "warning")
+    sec.end()
+    sec = perf.start_span("compute", "backlog.validate.waves_and_critical_path")
     questions = [i.item_id for i in items.values() if i.open_questions]
     if questions:
         issue("open_questions", f"{len(questions)} items have open questions for the reviewer", questions, "warning")
@@ -605,6 +633,7 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
         backlog.critical_path = nx.dag_longest_path(sg, weight="w")
     else:
         issue("dependency_cycle", "story graph (with task-derived edges) has a cycle", [])
+    sec.end(critical_path=len(backlog.critical_path), waves=len(backlog.story_waves))
     return issues
 
 
@@ -614,9 +643,16 @@ def validate(project: str, *, write: bool = True) -> tuple[Backlog, list[Validat
         backlog = files.read_json(project, files.BACKLOG, Backlog)
         issues = _validate(backlog, settings, _prd_ids(project))
         backlog.issues = issues
+        perf.event("backlog_counts", "validate", blocking=sum(i.severity == "blocking" for i in issues),
+                   warnings=sum(i.severity == "warning" for i in issues), stories=len(backlog.stories()),
+                   tasks=sum(i.level == "task" for i in backlog.items), write=write)
         if write:
-            files.write_json(project, files.BACKLOG, backlog)
-            files.write_text(project, files.BACKLOG_MD, render_md(backlog))
+            with perf.span("fs", "backlog.write_validated") as sp:
+                files.write_json(project, files.BACKLOG, backlog)
+                with perf.span("compute", "backlog.render_md"):
+                    md = render_md(backlog)
+                files.write_text(project, files.BACKLOG_MD, md)
+                sp.set(md_chars=len(md))
     return backlog, issues
 
 

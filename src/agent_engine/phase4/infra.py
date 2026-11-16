@@ -26,6 +26,7 @@ import httpx
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from agent_engine import perf
 from agent_engine.phase4 import files, sandbox
 from agent_engine.phase4.contracts import (
     CheckResult,
@@ -266,7 +267,8 @@ def render(project: str) -> str:
     else:
         out.gaps.append(f"bootstrap: create the remote state bucket '{project}-tfstate' (versioned, encrypted) once per account")
         for env in it.environments:
-            _render_env(out, project, settings, it, env)
+            with perf.span("compute", "infra.render_env", env=env, components=len(it.components)):
+                _render_env(out, project, settings, it, env)
         chart_dir = catalog_dir() / "templates" / "gitops" / "chart"
         for p in sorted(chart_dir.rglob("*")):
             if p.is_file():
@@ -316,6 +318,22 @@ def render(project: str) -> str:
         if claude:
             repo_files[".github/workflows/phase4-claude.yml"] = j.get_template("repo/phase4-claude.yml.j2").render(
                 actions=ACTIONS)
+    write_span = perf.span("fs", "infra.write_rendered_files", files=len(out.files) + sum(len(v) for v in ci.values()),
+                           bytes=sum(len(c) for c in out.files.values()))
+    with write_span:
+        manifest_files = _write_rendered(project, out, ci)
+    manifest = InfraManifest(project=project, intent_sha256=files.file_sha(project, files.INFRA_INTENT),
+                             infra_repo=settings.infra_repo, environments=it.environments, files=manifest_files,
+                             ci_repos=sorted(ci), secrets_refs=out.secrets, stateful_resources=out.stateful,
+                             gaps=list(dict.fromkeys(out.gaps)), generated_at=files.utcnow())
+    files.write_json(project, files.INFRA_MANIFEST, manifest)
+    return json.dumps({"written": files.virtual(project, files.INFRA_MANIFEST), "files": len(manifest_files),
+                       "infra_repo_dir": files.virtual(project, files.INFRA_REPO_DIR),
+                       "ci_repos": sorted(ci), "secrets_refs": len(out.secrets), "gaps": manifest.gaps,
+                       "next": "call infra_validate; repair failing files with edit_file, then validate again"})
+
+
+def _write_rendered(project: str, out: _Out, ci: dict[str, dict[str, str]]) -> list[ManifestFile]:
     root = files.path(project, "infra", write=True)
     for sub in ("repo", "ci"):
         shutil.rmtree(root / sub, ignore_errors=True)
@@ -332,15 +350,7 @@ def render(project: str) -> str:
             sha = files.sha256_text(content)
             manifest_files.append(ManifestFile(path=f"ci/{repo_dir_name(repo)}/{rel}", sha256=sha, origin="template",
                                                template_ref="ci", rendered_sha256=sha))
-    manifest = InfraManifest(project=project, intent_sha256=files.file_sha(project, files.INFRA_INTENT),
-                             infra_repo=settings.infra_repo, environments=it.environments, files=manifest_files,
-                             ci_repos=sorted(ci), secrets_refs=out.secrets, stateful_resources=out.stateful,
-                             gaps=list(dict.fromkeys(out.gaps)), generated_at=files.utcnow())
-    files.write_json(project, files.INFRA_MANIFEST, manifest)
-    return json.dumps({"written": files.virtual(project, files.INFRA_MANIFEST), "files": len(manifest_files),
-                       "infra_repo_dir": files.virtual(project, files.INFRA_REPO_DIR),
-                       "ci_repos": sorted(ci), "secrets_refs": len(out.secrets), "gaps": manifest.gaps,
-                       "next": "call infra_validate; repair failing files with edit_file, then validate again"})
+    return manifest_files
 
 
 # ============================================================================ validate
@@ -388,38 +398,51 @@ def _risk(manifest: InfraManifest, checks: list[CheckResult], it: InfraIntent) -
 def validate(project: str) -> str:
     manifest = files.read_json(project, files.INFRA_MANIFEST, InfraManifest)
     it = files.read_json(project, files.INFRA_INTENT, InfraIntent)
-    gone = _refresh_manifest(project, manifest)
+    with perf.span("fs", "infra.refresh_manifest_hashes", files=len(manifest.files)):
+        gone = _refresh_manifest(project, manifest)
     workdir = files.path(project, files.INFRA_REPO_DIR)
     checks = sandbox.run_checks(workdir, list(it.environments)) if workdir.is_dir() else []
     ci_root = files.path(project, files.INFRA_CI_DIR)
     ci_findings = []
+    ci_incomplete = []
     if ci_root.is_dir():
         for repo_dir in sorted(p for p in ci_root.iterdir() if p.is_dir()):
-            for res in sandbox.run_checks(repo_dir, [], include_init=False, only={"actionlint"}):
+            with perf.span("phase", "infra.ci_repo_checks"):
+                ci_results = sandbox.run_checks(repo_dir, [], include_init=False, only={"actionlint"})
+            for res in ci_results:
                 if not res.passed and not res.skipped:
                     ci_findings += res.findings
+            ci_incomplete += [f"ci/{repo_dir.name} {x}" for x in sandbox.incomplete(ci_results)]
     if ci_findings:
         for c in checks:
             if c.tool == "actionlint":
                 c.passed, c.findings, c.summary = False, c.findings + ci_findings, "errors in CI workflows"
-    secret_hits = []
-    for f in manifest.files:
-        p = files.path(project, f"infra/{f.path}")
-        if p.is_file():
-            text = p.read_text(encoding="utf-8", errors="replace")
-            if any(pat.search(text) for pat in SECRET_PATTERNS):
-                secret_hits.append(f.path)
+    with perf.span("compute", "infra.secret_scan", files=len(manifest.files)) as sp:
+        secret_hits = []
+        for f in manifest.files:
+            p = files.path(project, f"infra/{f.path}")
+            if p.is_file():
+                text = p.read_text(encoding="utf-8", errors="replace")
+                if any(pat.search(text) for pat in SECRET_PATTERNS):
+                    secret_hits.append(f.path)
+        sp.set(hits=len(secret_hits))
     files.write_json(project, files.INFRA_CHECKS, [c.model_dump(mode="json") for c in checks])
     manifest.checks_passed = bool(checks) and all(c.passed or c.skipped for c in checks) and not secret_hits and not gone
     manifest.checks_skipped = [c.tool for c in checks if c.skipped]
+    manifest.checks_incomplete = sandbox.incomplete(checks) + ci_incomplete
+    manifest.validation_complete = bool(checks) and not manifest.checks_incomplete
     manifest.risk_score, manifest.risk_reasons = _risk(manifest, checks, it)
     if secret_hits:
         manifest.risk_reasons.append(f"secret-like values in: {', '.join(secret_hits)}")
-    files.write_json(project, files.INFRA_MANIFEST, manifest)
-    files.write_text(project, files.INFRA_PR, render_pr(project, manifest, checks, it))
+    with perf.span("fs", "infra.write_reports") as sp:
+        files.write_json(project, files.INFRA_MANIFEST, manifest)
+        files.write_text(project, files.INFRA_PR, render_pr(project, manifest, checks, it))
+        sp.set(checks_passed=manifest.checks_passed, validation_complete=manifest.validation_complete,
+               incomplete=len(manifest.checks_incomplete), risk_score=manifest.risk_score)
     failing = [c for c in checks if not c.passed and not c.skipped]
     return json.dumps({
         "checks_passed": manifest.checks_passed, "risk_score": manifest.risk_score,
+        "validation_complete": manifest.validation_complete, "incomplete": manifest.checks_incomplete,
         "failing": [{"tool": c.tool, "summary": c.summary, "findings": [x.model_dump() for x in c.findings[:15]]}
                     for c in failing],
         "skipped": manifest.checks_skipped, "secret_like_values": secret_hits, "missing_files": gone,
@@ -462,11 +485,15 @@ def registry_versions(source: str, limit: int = 10) -> str:
     if len(parts) != 3 or not all(re.fullmatch(r"[A-Za-z0-9_.-]+", p) for p in parts):
         raise files.ProjectError("source must look like 'terraform-aws-modules/vpc/aws'")
     url = f"{get_settings().phase4_terraform_registry_url.rstrip('/')}/v1/modules/{'/'.join(parts)}/versions"
-    try:
-        r = httpx.get(url, timeout=20)
-        r.raise_for_status()
-    except httpx.HTTPError as e:
-        return json.dumps({"source": source, "error": f"registry lookup failed: {e}"})
+    with perf.http_span("terraform_registry", "module_versions", "GET", url, include_path=True) as sp:
+        try:
+            r = httpx.get(url, timeout=20)
+            perf.http_result(sp, r)
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            # Returned to the model as JSON (not "ERROR:" text): a failed lookup, recorded as such here.
+            sp.set_status("error", perf.error_summary(e), perf.classify_error(e))
+            return json.dumps({"source": source, "error": f"registry lookup failed: {e}"})
     versions = [v["version"] for m in r.json().get("modules", []) for v in m.get("versions", [])]
     def key(v: str):
         return tuple(int(x) if x.isdigit() else 0 for x in re.split(r"[.-]", v)[:3])
@@ -492,6 +519,9 @@ def check(project: str) -> str:
         problems.append("checks did not all pass (see infra/checks.json)")
     if manifest.checks_skipped:
         warnings.append(f"checks not run in this environment: {', '.join(manifest.checks_skipped)}")
+    if manifest.checks_incomplete:
+        warnings.append("validation incomplete (static checks that did not run to completion): "
+                        + ", ".join(manifest.checks_incomplete))
     covered = {c.component_id for c in it.components}
     if not covered:
         problems.append("intent has no components")

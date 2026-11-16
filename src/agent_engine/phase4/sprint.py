@@ -10,10 +10,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, timedelta
 
 import networkx as nx
 
+from agent_engine import perf
 from agent_engine.phase4 import capacity as cap
 from agent_engine.phase4 import files
 from agent_engine.phase4.backlog import story_graph
@@ -31,13 +33,17 @@ from agent_engine.phase4.contracts import (
 from agent_engine.phase4.sprint_model import DeadlineIn, SprintIn, StoryIn, solve as cpsat_solve, verified_options
 
 RELAX_KINDS = ("relax", "soften", "downgrade", "unpin", "capacity")
+log = logging.getLogger(__name__)
 
 
 def _load(project: str):
-    settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
-    backlog = files.read_json(project, files.BACKLOG, Backlog)
-    history = files.read_json(project, files.HISTORY, History) if files.exists(project, files.HISTORY) else History()
-    prev = files.read_json(project, files.SPRINT_PLAN, SprintPlan) if files.exists(project, files.SPRINT_PLAN) else None
+    with perf.span("phase", "sprint.load_inputs") as sp:
+        settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+        backlog = files.read_json(project, files.BACKLOG, Backlog)
+        history = files.read_json(project, files.HISTORY, History) if files.exists(project, files.HISTORY) else History()
+        prev = files.read_json(project, files.SPRINT_PLAN, SprintPlan) if files.exists(project, files.SPRINT_PLAN) else None
+        sp.set(stories=len(backlog.stories()), items=len(backlog.items), history_sprints=len(history.sprints),
+               previous_plan=prev is not None)
     return settings, backlog, history, prev
 
 
@@ -46,10 +52,12 @@ def _as_of(as_of: str | None) -> date:
 
 
 def _windows(settings: ProjectSettings, history: History, as_of: date):
-    windows = cap.sprint_windows(settings, as_of)
-    cap.fill_availability(settings, windows)
-    hist = [h.model_dump() for h in history.sprints]
-    assumptions = cap.fill_capacity(settings, windows, hist)
+    with perf.span("phase", "sprint.windows_and_capacity", horizon=settings.calendar.planning_horizon_sprints) as sp:
+        windows = cap.sprint_windows(settings, as_of)
+        cap.fill_availability(settings, windows)
+        hist = [h.model_dump() for h in history.sprints]
+        assumptions = cap.fill_capacity(settings, windows, hist)
+        sp.set(sprints=len(windows), capacity_p50=[w.cap_p50 for w in windows])
     return windows, hist, assumptions
 
 
@@ -186,7 +194,21 @@ def solve(project: str, business_values: dict[str, int], pins: dict[str, int] | 
     _apply_relax(relax, stories, sprints, deadlines, assumptions)
     if defaulted:
         assumptions.append(f"Business value 5 (neutral) assumed for {len(defaulted)} stories without a score.")
+    perf.event("solver_input", "sprint", stories=len(stories), sprints=len(sprints), deadlines=len(deadlines),
+               pins=len(pins), relaxations=len(relax), excluded=len(excluded))
     res = cpsat_solve(stories, sprints, deadlines, time_limit_s=time_limit_s)
+    if res.status not in ("OPTIMAL", "FEASIBLE", "INFEASIBLE"):
+        # UNKNOWN (time limit without a solution) or MODEL_INVALID: neither a plan nor a proof that none exists.
+        # Writing it would replace the last valid plan with one that defers every story for no stated reason.
+        log.warning("sprint solve for %s ended %s after %ss (limit %ss); sprint-plan.json left unchanged",
+                    project, res.status, res.wall_time_s, time_limit_s)
+        perf.event("solver_unsuccessful", "sprint", status=res.status, wall_time_s=res.wall_time_s,
+                   time_limit_s=time_limit_s, previous_plan_kept=prev is not None)
+        kept = f"the previous plan (v{prev.version}) is kept" if prev else "no plan was written"
+        raise files.ProjectError(
+            f"the CP-SAT solver ended {res.status} after {res.wall_time_s}s (time limit {time_limit_s}s) without a plan "
+            f"or a proof of infeasibility; sprint/sprint-plan.json was not changed and {kept}. Nothing was relaxed. "
+            "Tell the approver; do not present an empty plan.")
     options = verified_options(stories, sprints, deadlines, res.conflicting) if res.status == "INFEASIBLE" else []
     placement = res.placement or {s.story_id: 0 for s in stories}
     deferred = []
@@ -209,7 +231,8 @@ def solve(project: str, business_values: dict[str, int], pins: dict[str, int] | 
         else:
             code, why = "capacity", "Capacity in the horizon is used by higher-value, deadline or must-have stories."
         deferred.append(Deferral(story_id=s.story_id, reason_code=code, explanation=why))
-    p50_k, p85_k = cap.forecast(sum(s.points for s in stories if not s.wont), windows, hist)
+    with perf.span("phase", "sprint.forecast"):
+        p50_k, p85_k = cap.forecast(sum(s.points for s in stories if not s.wont), windows, hist)
     L = settings.calendar.sprint_length_days
     end_of = lambda k: windows[0].start + timedelta(days=k * L - 1)  # noqa: E731
     pts = {s.story_id: s.points for s in stories}
@@ -230,8 +253,11 @@ def solve(project: str, business_values: dict[str, int], pins: dict[str, int] | 
                             wall_time_s=res.wall_time_s, conflicting_constraints=res.conflicting),
         assumptions=assumptions, options_if_infeasible=[PlanOption(**o) for o in options],
         business_values=business, wsjf=values, pins=pins, relaxations=relax, generated_at=files.utcnow())
-    files.write_json(project, files.SPRINT_PLAN, plan)
-    files.write_text(project, files.SPRINT_PLAN_MD, render_md(plan, backlog))
+    with perf.span("fs", "sprint.write_plan") as sp:
+        files.write_json(project, files.SPRINT_PLAN, plan)
+        files.write_text(project, files.SPRINT_PLAN_MD, render_md(plan, backlog))
+        sp.set(planned=sum(len(s.story_ids) for s in slots), deferred=len(deferred), options=len(options),
+               solver_status=res.status)
     return json.dumps({
         "written": files.virtual(project, files.SPRINT_PLAN), "solver": res.status, "conflicting": res.conflicting,
         "sprints": [{"sprint_index": s.sprint_index, "name": s.name, "start": str(s.start), "end": str(s.end),
@@ -295,6 +321,8 @@ def check(project: str) -> str:
                 problems.append(f"{sid} (sprint {k}) depends on {d.on_id} planned later or not at all")
     if not plan.annotated:
         problems.append("goals and deferral explanations not written (sprint_annotate not called)")
+    if plan.solver.status in ("UNKNOWN", "MODEL_INVALID"):
+        problems.append(f"the solver ended {plan.solver.status}: this plan is not a solution; re-run sprint_solve")
     if plan.solver.status == "INFEASIBLE" and not plan.options_if_infeasible:
         warnings.append("infeasible with no verified options; the approver must change inputs")
     must_deferred = [d.story_id for d in plan.deferred if d.story_id in by and by[d.story_id].moscow == "must"]

@@ -415,3 +415,11 @@ uv run python -m pytest -q
 ```
 
 They need no API key and make no model calls.
+
+## 9. Performance diagnostics
+
+`AGENT_ENGINE_PERF=1` records structured timing evidence (model calls, tools,
+helpers, solvers, sandbox commands, HTTP, approvals) as JSON Lines outside the
+project folders; `agent-engine perf summarize --session <id>` turns it into a
+report offline. Off by default. See [docs/PERF_DIAGNOSTICS.md](docs/PERF_DIAGNOSTICS.md)
+and, for a benchmark of a real project, [docs/PERF_BENCHMARK_RUNBOOK.md](docs/PERF_BENCHMARK_RUNBOOK.md).

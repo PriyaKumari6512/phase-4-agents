@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
+from agent_engine import perf
+
 SCALE = 10                # points are scaled to integers (0.1 SP resolution)
 LATE_WEIGHT = 40
 OVER_WEIGHT = 30
@@ -73,9 +75,14 @@ def _status(code: int) -> str:
             cp_model.MODEL_INVALID: "MODEL_INVALID"}.get(code, "UNKNOWN")
 
 
+def _model_size(m: cp_model.CpModel) -> dict:
+    proto = m.Proto()
+    return {"variables": len(proto.variables), "constraints": len(proto.constraints)}
+
+
 def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[DeadlineIn],
           relax: Relaxation | None = None, time_limit_s: float = 10.0, workers: int = 8,
-          want_core: bool = True) -> SolveResult:
+          want_core: bool = True, purpose: str = "main") -> SolveResult:
     relax = relax or Relaxation()
     K = len(sprints)
     ids = [s.story_id for s in stories]
@@ -166,17 +173,27 @@ def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[Deadl
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s
     solver.parameters.num_workers = workers
+    sizes = _model_size(m) if perf.enabled() else {}
     t0 = time.perf_counter()
-    code = solver.solve(m)
-    status = _status(code)
+    with perf.span("solver", "sprint.cpsat", purpose=purpose, stories=len(stories), sprints=K, switches=len(lits),
+                   time_limit_s=time_limit_s, workers=workers, **sizes) as sp:
+        code = solver.solve(m)
+        status = _status(code)
+        sp.set(status=status, objective=solver.objective_value if status in ("OPTIMAL", "FEASIBLE") else None,
+               best_bound=solver.best_objective_bound if status in ("OPTIMAL", "FEASIBLE") else None,
+               solver_wall_s=round(solver.wall_time, 4))
     conflicting: list[str] = []
     if status == "INFEASIBLE" and want_core and lits:
-        core_solver = cp_model.CpSolver()           # assumption cores are reliable with one worker
-        core_solver.parameters.max_time_in_seconds = time_limit_s
-        core_solver.parameters.num_workers = 1
-        core_solver.solve(m)
-        idx = set(core_solver.sufficient_assumptions_for_infeasibility())
-        conflicting = sorted(lit.name for lit in lits if lit.index in idx)
+        # A second solve with its own time budget: total time can exceed time_limit_s.
+        with perf.span("solver", "sprint.core_extraction", time_limit_s=time_limit_s, workers=1,
+                       switches=len(lits)) as sp:
+            core_solver = cp_model.CpSolver()           # assumption cores are reliable with one worker
+            core_solver.parameters.max_time_in_seconds = time_limit_s
+            core_solver.parameters.num_workers = 1
+            core_code = core_solver.solve(m)
+            idx = set(core_solver.sufficient_assumptions_for_infeasibility())
+            conflicting = sorted(lit.name for lit in lits if lit.index in idx)
+            sp.set(status=_status(core_code), core_size=len(conflicting), solver_wall_s=round(core_solver.wall_time, 4))
     wall = time.perf_counter() - t0
     placement, load = {}, {}
     if status in ("OPTIMAL", "FEASIBLE"):
@@ -211,13 +228,21 @@ def verified_options(stories, sprints, deadlines, conflicting: list[str], time_l
         candidates.append((f"Add {round((factor - 1) * 100)}% capacity", Relaxation(capacity_factor=factor),
                            [f"capacity:x{factor}"], f"needs about {round((factor - 1) * 100)}% more person-days per sprint"))
     out, seen = [], set()
-    for summary, relax, changes, impact in candidates:
-        res = solve(stories, sprints, deadlines, relax, time_limit_s=time_limit_s, want_core=False)
-        if res.status in ("OPTIMAL", "FEASIBLE") and summary not in seen:
-            seen.add(summary)
-            deferred = [s for s, k in res.placement.items() if k == 0]
-            out.append({"option_id": f"OPT-{len(out) + 1}", "summary": summary, "changes": changes,
-                        "impact": f"{impact}; {len(deferred)} stories left unplanned"})
-        if len(out) >= 4:
-            break
+    with perf.span("solver", "sprint.verified_options", candidates=len(candidates), conflicting=len(conflicting),
+                   time_limit_s_each=time_limit_s) as group:
+        attempts = 0
+        for n, (summary, relax, changes, impact) in enumerate(candidates, 1):
+            attempts += 1
+            with perf.span("solver", "sprint.candidate", candidate=n, transformation=",".join(changes)) as sp:
+                res = solve(stories, sprints, deadlines, relax, time_limit_s=time_limit_s, want_core=False,
+                            purpose="candidate")
+                sp.set(status=res.status, feasible=res.status in ("OPTIMAL", "FEASIBLE"))
+            if res.status in ("OPTIMAL", "FEASIBLE") and summary not in seen:
+                seen.add(summary)
+                deferred = [s for s, k in res.placement.items() if k == 0]
+                out.append({"option_id": f"OPT-{len(out) + 1}", "summary": summary, "changes": changes,
+                            "impact": f"{impact}; {len(deferred)} stories left unplanned"})
+            if len(out) >= 4:
+                break
+        group.set(attempts=attempts, verified=len(out))
     return out

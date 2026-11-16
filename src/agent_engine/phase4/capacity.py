@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import numpy as np
 
+from agent_engine import perf
 from agent_engine.phase4.contracts import ProjectSettings
 from agent_engine.phase4.calendars import unavailable_days, utc_today
 
@@ -60,7 +61,9 @@ def fill_availability(project: ProjectSettings, windows: list[SprintWindow]) -> 
     if not windows:
         return
     ids = [m.calendar_id for m in project.team if m.calendar_id]
-    ooo = unavailable_days(ids, windows[0].start, windows[-1].end)
+    with perf.span("calendar", "unavailable_days", calendars=len(ids), sprints=len(windows)) as sp:
+        ooo = unavailable_days(ids, windows[0].start, windows[-1].end)
+        sp.set(calendars_with_days=len([k for k, v in ooo.items() if v]))
     for w in windows:
         total_days = total_hours = 0.0
         for m in project.team:
@@ -92,6 +95,12 @@ def monte_carlo_capacity(rates: list[float], person_days: float, rng: np.random.
 def fill_capacity(project: ProjectSettings, windows: list[SprintWindow], history: list[dict],
                   seed: int = 7) -> list[str]:
     """Sets cap_p50 / cap_p85 / reserved per window. Returns assumptions for the plan."""
+    with perf.span("compute", "capacity_simulation", sprints=len(windows), history_sprints=len(history),
+                   samples=SAMPLES, seed=seed):
+        return _fill_capacity(project, windows, history, seed)
+
+
+def _fill_capacity(project: ProjectSettings, windows: list[SprintWindow], history: list[dict], seed: int) -> list[str]:
     assumptions: list[str] = []
     rng = np.random.default_rng(seed)
     rates = history_rates(history)

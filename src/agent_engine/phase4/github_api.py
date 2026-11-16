@@ -9,6 +9,7 @@ import base64
 from dataclasses import dataclass
 from pathlib import Path
 
+from agent_engine import perf
 from agent_engine.phase4.settings import get_settings
 
 from .trackers.base import TrackerError
@@ -27,6 +28,13 @@ class PrResult:
 def open_pr(repo: str, branch: str, files: dict[str, str], title: str, body: str, local_root: Path,
             base: str | None = None) -> PrResult:
     """Create or update branch + PR (idempotent: the same branch updates the open PR)."""
+    mode = get_settings().phase4_pr_mode
+    with perf.span("publish", "open_pr", mode=mode, files=len(files), operation="pull_request"):
+        return _open_pr(repo, branch, files, title, body, local_root, base)
+
+
+def _open_pr(repo: str, branch: str, files: dict[str, str], title: str, body: str, local_root: Path,
+             base: str | None = None) -> PrResult:
     if get_settings().phase4_pr_mode != "github":
         root = local_root / repo.replace("/", "__") / branch.replace("/", "__")
         for path, content in files.items():

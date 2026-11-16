@@ -24,6 +24,7 @@ from pathlib import Path
 
 from jinja2 import Template
 
+from agent_engine import perf
 from agent_engine.phase4 import files
 from agent_engine.phase4.contracts import ProjectSettings
 
@@ -125,6 +126,7 @@ def _available_docs(project: str, rel: str, include_tasks: bool) -> list[str]:
 def run_script(project: str, script: str, args: str = "", feature_directory: str = "") -> str:
     """Python stand-in for `.specify/scripts/bash/<script>.sh <args>`: same JSON keys, same errors."""
     script = script.strip().removesuffix(".sh").rsplit("/", 1)[-1]
+    perf.event("speckit_script", script, feature_directory=(feature_directory or "").strip().strip("/")[:80])
     if script not in SCRIPTS:
         raise files.ProjectError(f"unknown spec-kit script {script!r}; available: {', '.join(SCRIPTS)}")
     argv = shlex.split(args or "")

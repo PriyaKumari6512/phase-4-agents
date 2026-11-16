@@ -21,6 +21,7 @@ import re
 from datetime import date
 from typing import Any
 
+from agent_engine import perf
 from agent_engine.gates import load_gates, stale_approvals
 from agent_engine.phase4 import files
 from agent_engine.phase4.contracts import (
@@ -405,7 +406,8 @@ def publish_assignments(project: str) -> dict:
         feature = features.get(a.task_id[:3])
         brief = dispatch.brief_for(task, by.get(task.parent_id), feature.feature_dir if feature else None, row.get("key"))
         adapter = dispatch.adapter_for(agent.provider, files.path(project, f"{files.PUBLISH_DIR}/dispatch", write=True))
-        handle = adapter.start(repo=repo, base_ref="main", task_id=a.task_id, brief=brief)
+        with perf.span("dispatch", agent.provider, adapter=type(adapter).__name__, operation="dispatch"):
+            handle = adapter.start(repo=repo, base_ref="main", task_id=a.task_id, brief=brief)
         ids.put("dispatch", a.task_id, handle, None, {"provider": agent.provider, "repo": repo})
         tracker.add_comment(row["id"], f"Dispatched to {agent.agent_id} ({agent.provider}): {handle}. "
                                        f"{a.explanation}")
