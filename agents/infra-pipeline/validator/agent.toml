@@ -1,0 +1,11 @@
+# Infra Validator: read-only judge of the Infra & Pipeline agent's change set.
+description = "Infra Validator: checks the generated infrastructure against architecture.md, the catalog and the checks."
+model = "strong"
+filesystem = ["ls", "read_file", "glob", "grep"]
+tools = ["phase4-infra-check"]
+knowledge = "../knowledge"
+returns = "verdict"
+
+[input]
+description = "The intent, manifest, checks, PR description and generated files, architecture.md and the agent's request history."
+files = ["infra/intent.json", "infra/manifest.json", "infra/checks.json", "infra/PR.md", "architecture.md"]

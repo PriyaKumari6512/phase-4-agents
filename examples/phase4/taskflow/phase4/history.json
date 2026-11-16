@@ -1,0 +1,132 @@
+{
+  "tickets": [
+    {
+      "key": "OLD-101",
+      "title": "Create project CRUD API",
+      "body": "REST endpoints to create, read, update and delete projects with validation and tests",
+      "story_points": 5
+    },
+    {
+      "key": "OLD-102",
+      "title": "Kanban board drag and drop",
+      "body": "React board view with draggable cards between columns, optimistic updates",
+      "story_points": 8
+    },
+    {
+      "key": "OLD-103",
+      "title": "Add comments to projects",
+      "body": "Users can comment on a project; API + UI list",
+      "story_points": 3
+    },
+    {
+      "key": "OLD-104",
+      "title": "Email when invited to a project",
+      "body": "Send transactional email via worker when a user is invited",
+      "story_points": 3
+    },
+    {
+      "key": "OLD-105",
+      "title": "Weekly summary email",
+      "body": "Scheduled job that sends a weekly digest of activity",
+      "story_points": 5
+    },
+    {
+      "key": "OLD-106",
+      "title": "CSV export of projects",
+      "body": "Download all projects and fields as CSV from the settings page",
+      "story_points": 2
+    },
+    {
+      "key": "OLD-107",
+      "title": "Velocity chart",
+      "body": "Chart of completed points per sprint for managers",
+      "story_points": 5
+    },
+    {
+      "key": "OLD-108",
+      "title": "Full-text search for projects",
+      "body": "Postgres full text search with ranking, results under 300ms",
+      "story_points": 8
+    },
+    {
+      "key": "OLD-109",
+      "title": "Mention users in comments",
+      "body": "@mention autocomplete and notification",
+      "story_points": 5
+    },
+    {
+      "key": "OLD-110",
+      "title": "User notification settings page",
+      "body": "Users choose email frequency and channels",
+      "story_points": 3
+    },
+    {
+      "key": "OLD-111",
+      "title": "Due dates on items",
+      "body": "Add due date field with date picker and validation",
+      "story_points": 2
+    },
+    {
+      "key": "OLD-112",
+      "title": "Assign items to users",
+      "body": "Assignee field, filter by assignee",
+      "story_points": 3
+    },
+    {
+      "key": "OLD-113",
+      "title": "Database migrations setup",
+      "body": "Alembic migrations and CI check",
+      "story_points": 1
+    },
+    {
+      "key": "OLD-114",
+      "title": "Redis caching for board reads",
+      "body": "Cache board payloads with invalidation on writes",
+      "story_points": 5
+    }
+  ],
+  "sprints": [
+    {
+      "name": "Sprint 1",
+      "start": "2026-08-03",
+      "end": "2026-08-16",
+      "completed_points": 24,
+      "available_person_days": 30
+    },
+    {
+      "name": "Sprint 2",
+      "start": "2026-08-17",
+      "end": "2026-08-30",
+      "completed_points": 27,
+      "available_person_days": 32
+    },
+    {
+      "name": "Sprint 3",
+      "start": "2026-08-31",
+      "end": "2026-09-13",
+      "completed_points": 21,
+      "available_person_days": 27
+    },
+    {
+      "name": "Sprint 4",
+      "start": "2026-09-14",
+      "end": "2026-09-27",
+      "completed_points": 26,
+      "available_person_days": 31
+    },
+    {
+      "name": "Sprint 5",
+      "start": "2026-09-28",
+      "end": "2026-10-11",
+      "completed_points": 23,
+      "available_person_days": 29
+    },
+    {
+      "name": "Sprint 6",
+      "start": "2026-10-12",
+      "end": "2026-10-25",
+      "completed_points": 28,
+      "available_person_days": 33
+    }
+  ]
+}

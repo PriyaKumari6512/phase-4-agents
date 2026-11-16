@@ -1,0 +1,9 @@
+# Requirements Validator: read-only judge of the PRD Writer's output.
+description = "Requirements Validator: checks a PRD against every request it came from."
+model = "strong"
+filesystem = ["ls", "read_file", "glob", "grep"]
+returns = "verdict"
+
+[input]
+description = "The PRD and the project's request history."
+files = ["prd.md", "requests.md"]

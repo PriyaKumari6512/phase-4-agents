@@ -1,0 +1,18 @@
+{
+  "gate": "P4-G4",
+  "project": "clinic-test-2",
+  "decision": "approved",
+  "approver": {
+    "name": "Claude Code",
+    "role": "Test approver (on user's instruction)"
+  },
+  "submitted_by": {
+    "name": "infra-pipeline agent"
+  },
+  "decided_at": "2026-11-13T12:37:07+00:00",
+  "comment": "Test approval by Claude Code on the user's instruction, not a real platform-engineer sign-off. Caveat: tofu_validate failed in dev/stg/prod due to a provider-plugin crash in the sandbox (environment fault, documented in PR.md); HCL is unverified. 9 of 10 checks pass.",
+  "artifacts": {
+    "infra/intent.json": "sha256:a3254a5b5de95ed3a9d2f50b5dd7c5264aef94b3a5c1f21e66c4085eec33de0e",
+    "infra/manifest.json": "sha256:42948d598d288620297f8f42a52fcea8fd0d28118050be43b0bd48db276836c5"
+  }
+}

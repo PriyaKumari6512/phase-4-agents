@@ -1,0 +1,132 @@
+openapi: 3.0.3
+info:
+  title: BrightSmile Clinic API - family members additions
+  version: 1.1.0-draft
+  description: >
+    Additions to api-clinic-api-v1 (contracts/clinic-api-v1.openapi.yaml) for feature 007.
+    All operations need a patient session (HttpOnly cookie, CSRF header on writes).
+    The account is taken from the session; no account id is accepted from the client.
+    When the family_members feature flag is off, operations other than GET /api/patient/people
+    answer 404 family_disabled.
+paths:
+  /api/patient/people:
+    get:
+      summary: List the people on the signed-in patient's account (holder first, then active family members)
+      responses:
+        '200':
+          description: People list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [people, family_limit]
+                properties:
+                  family_limit: {type: integer, example: 5}
+                  people:
+                    type: array
+                    items: {$ref: '#/components/schemas/Person'}
+  /api/patient/family-members:
+    post:
+      summary: Add a family member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FamilyMemberInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Person'}
+        '404': {description: family_disabled}
+        '409': {description: family_limit_reached or duplicate_member, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '422': {description: Field errors (name, birth_year); values are not echoed, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /api/patient/family-members/{personId}:
+    parameters:
+      - {name: personId, in: path, required: true, schema: {type: string, format: uuid}}
+    patch:
+      summary: Edit name or birth year of a family member of this account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FamilyMemberInput'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Person'}
+        '404': {description: Not a person of this account (same answer as not found)}
+        '409': {description: duplicate_member}
+        '422': {description: Field errors}
+    delete:
+      summary: Remove a family member of this account
+      responses:
+        '204': {description: Removed}
+        '404': {description: Not a person of this account}
+        '409': {description: has_upcoming_appointments, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /api/bookings:
+    post:
+      summary: (changed, feature 003) Booking request gains an optional person
+      description: >
+        patient_id is the person the visit is for. If absent, the account holder.
+        Refused with 404 person_not_found when the person is not an active person of the signed-in account.
+        When the flag is off, patient_id other than the holder is refused with 404 family_disabled.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patient_id: {type: string, format: uuid, description: Person id (new in 1.1.0)}
+      responses:
+        '404': {description: person_not_found or family_disabled}
+  /api/patient/appointments:
+    get:
+      summary: (changed, feature 004) Appointments of every person on the account
+      description: Each item carries the person it is for. Includes persons removed from the account.
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: string, format: uuid}
+                    person: {$ref: '#/components/schemas/PersonRef'}
+components:
+  schemas:
+    FamilyMemberInput:
+      type: object
+      required: [name, birth_year]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        birth_year: {type: integer, minimum: 1900, description: Four digits, not in the future, not more than 120 years ago}
+    Person:
+      type: object
+      required: [id, name, birth_year, is_account_holder]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        birth_year: {type: integer, nullable: true}
+        is_account_holder: {type: boolean}
+    PersonRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        removed: {type: boolean}
+    Error:
+      type: object
+      required: [code]
+      properties:
+        code: {type: string}
+        fields:
+          type: array
+          items: {type: object, properties: {field: {type: string}, message: {type: string}}}

@@ -1,0 +1,1710 @@
+openapi: 3.0.3
+info:
+  title: BrightSmile Booking - Clinic API
+  version: 1.0.0
+  description: |
+    Contract api-clinic-api-v1, owned by ctr-clinic-api. Based on architecture v1.
+    All paths are under the server base path /api, except GET /health. Times are ISO 8601 UTC
+    (date-time); "date" parameters are IST calendar days (YYYY-MM-DD). Every list is paginated
+    with page and page_size. Every 4xx/5xx body is the Error schema.
+servers:
+  - url: /api
+tags:
+  - name: Health
+  - name: Auth
+  - name: Staff
+  - name: Patients
+  - name: Catalogue
+  - name: Schedules
+  - name: Appointments
+  - name: Reception
+  - name: Reports
+  - name: Webhooks
+security:
+  - cookieAuth: []
+paths:
+  /health:
+    servers:
+      - url: /
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Liveness and readiness probe
+      description: Unauthenticated; used by the platform health check and the deploy contract.
+      security: []
+      responses:
+        '200':
+          description: Service and database reachable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /auth/patient/code:
+    post:
+      tags: [Auth]
+      operationId: requestPatientCode
+      summary: Send a sign-in code by SMS
+      description: |
+        Sends a 6-digit code to the phone (valid 10 minutes). Stories: US-002, US-002.AC1.
+        Limits per phone and per IP apply (BR-001, thr-008).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CodeRequest'}
+      responses:
+        '204': {description: Code sent}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /auth/patient/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyPatientCode
+      summary: Verify the code and sign in
+      description: |
+        Verifies the code and sets the session cookie. A new phone number needs name and creates the
+        account and its first person. Stories: US-002.AC2, US-002.AC3, US-002.AC4.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CodeVerify'}
+      responses:
+        '200':
+          description: Signed in; Set-Cookie carries the session
+          headers:
+            Set-Cookie: {schema: {type: string}, description: HttpOnly, Secure, SameSite=Strict session cookie}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /auth/staff/login:
+    post:
+      tags: [Auth]
+      operationId: staffLogin
+      summary: Staff sign-in with username and password
+      description: 'Stories: US-003, US-003.AC1, US-003.AC2.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StaffLogin'}
+      responses:
+        '200':
+          description: Signed in; Set-Cookie carries the session
+          headers:
+            Set-Cookie: {schema: {type: string}, description: HttpOnly, Secure, SameSite=Strict session cookie}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: End the session
+      description: 'Clears the session cookie. Stories: US-002, US-003.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      responses:
+        '204': {description: Signed out}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /me:
+    get:
+      tags: [Auth]
+      operationId: getMe
+      summary: Current session
+      description: |
+        Role, clinic, dentist link and (patients) the remembered channel, so the screens show only
+        what the role may use. Stories: US-004, US-004.AC1, US-004.AC4, US-013.AC1, US-013.AC2.
+      security: [{cookieAuth: []}]
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /staff:
+    get:
+      tags: [Staff]
+      operationId: listStaff
+      summary: List staff accounts
+      description: 'Practice manager only. Stories: US-005.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of staff accounts
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Staff]
+      operationId: createStaff
+      summary: Create a receptionist or dentist account
+      description: 'Practice manager only. Stories: US-005, US-005.AC1.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StaffCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffAccount'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /staff/{staff_id}:
+    patch:
+      tags: [Staff]
+      operationId: setStaffActive
+      summary: Activate or deactivate a staff account
+      description: 'Practice manager only; takes effect at the next request. Stories: US-005.AC2, US-003.AC2.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/StaffId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StaffActive'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffAccount'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /patients/family:
+    get:
+      tags: [Patients]
+      operationId: listFamily
+      summary: The signed-in patient's account holder and family members
+      description: 'Patient only. Stories: US-006, US-006.AC1.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of persons
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PatientPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Patients]
+      operationId: addFamilyMember
+      summary: Add a family member (R2)
+      description: 'Patient only; at most 5 besides the holder. Stories: US-006, US-006.AC2.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FamilyMemberCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Patient'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /patients:
+    get:
+      tags: [Patients]
+      operationId: findPatients
+      summary: Search patients by phone or name
+      description: |
+        Receptionist and practice manager. Returns name, phone and block flag only. Stories: US-019,
+        US-019.AC1, US-025.AC1.
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Phone number (any prefix of the E.164 form) or part of a name; at least 3 characters
+          schema: {type: string, minLength: 3, maxLength: 100}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of patient summaries
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PatientSummaryPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    post:
+      tags: [Patients]
+      operationId: createPatient
+      summary: Create a patient with name and phone number
+      description: 'Receptionist and practice manager. Stories: US-019.AC4.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PatientCreate'}
+      responses:
+        '201':
+          description: Created (or the existing holder when the phone already has an account)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PatientSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /patients/{patient_id}/reminder-preference:
+    put:
+      tags: [Patients]
+      operationId: setRemindersOptOut
+      summary: Switch reminders off or on for a patient's account
+      description: |
+        Receptionist and practice manager. Confirmations are still sent. Stories: US-028,
+        US-028.AC2.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/PatientId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReminderPreference'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PatientSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /patients/{patient_id}/block:
+    get:
+      tags: [Patients]
+      operationId: getBlockStatus
+      summary: Repeat no-show block status of a person (R2)
+      description: 'Receptionist and practice manager. Stories: US-025, US-025.AC1, US-024.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/PatientId'}
+      responses:
+        '200':
+          description: Block status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BlockStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /patients/{patient_id}/block/lift:
+    post:
+      tags: [Patients]
+      operationId: liftBlock
+      summary: Lift a block; the count starts again from zero (R2)
+      description: 'Receptionist and practice manager. Stories: US-025.AC2, US-025.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/PatientId'}
+      responses:
+        '200':
+          description: Block lifted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BlockStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /patient-accounts/{account_id}/erasure:
+    post:
+      tags: [Patients]
+      operationId: erasePatientData
+      summary: Erase a patient's personal data on request
+      description: |
+        Practice manager only. Future appointments must be cancelled first. Anonymises names,
+        birth years and the phone, deletes messages (BR-030). No user story: added for NFR-007
+        (ASM-013).
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - name: account_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Erased
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErasureResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /clinics:
+    get:
+      tags: [Catalogue]
+      operationId: listClinics
+      summary: List active clinics
+      description: 'All signed-in roles except dentist. Stories: US-001, US-001.AC1, US-001.AC3.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of clinics
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClinicPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Catalogue]
+      operationId: createClinic
+      summary: Add a clinic
+      description: 'Practice manager only. Stories: US-001.AC3.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClinicInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Clinic'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /clinics/{clinic_id}:
+    put:
+      tags: [Catalogue]
+      operationId: updateClinic
+      summary: Change a clinic
+      description: 'Practice manager only. Stories: US-001.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/ClinicId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClinicInput'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Clinic'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /clinics/{clinic_id}/to-move:
+    get:
+      tags: [Schedules]
+      operationId: listToMove
+      summary: Booked appointments that fall inside a dentist's leave
+      description: |
+        Receptionist (own clinic) and practice manager. Nothing is moved by the system. Stories:
+        US-008, US-008.AC2.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/ClinicId'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of appointments to move
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DayItemPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /dentists:
+    get:
+      tags: [Catalogue]
+      operationId: listDentists
+      summary: List dentists, optionally those working at a clinic
+      description: 'All signed-in roles except dentist. Stories: US-001, US-011.AC1.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: clinic_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of dentists
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DentistPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Catalogue]
+      operationId: createDentist
+      summary: Add a dentist
+      description: 'Practice manager only. Stories: US-001.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DentistInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Dentist'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /dentists/{dentist_id}:
+    put:
+      tags: [Catalogue]
+      operationId: updateDentist
+      summary: Change a dentist
+      description: 'Practice manager only. Stories: US-001.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DentistId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DentistInput'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Dentist'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /treatments:
+    get:
+      tags: [Catalogue]
+      operationId: listTreatments
+      summary: List treatment types
+      description: |
+        Patients get online types only; reception and manager get all. Stories: US-009,
+        US-009.AC1.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of treatment types
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TreatmentPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Catalogue]
+      operationId: createTreatment
+      summary: Add a treatment type
+      description: 'Practice manager only. Stories: US-009, US-009.AC2.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TreatmentInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Treatment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /treatments/{treatment_id}:
+    put:
+      tags: [Catalogue]
+      operationId: updateTreatment
+      summary: Change a treatment type
+      description: 'Practice manager only. Stories: US-009.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/TreatmentId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TreatmentInput'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Treatment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /dentists/{dentist_id}/working-hours:
+    get:
+      tags: [Schedules]
+      operationId: listWorkingHours
+      summary: A dentist's weekly hours and breaks
+      description: 'Practice manager only. Stories: US-007, US-001.AC2.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DentistId'}
+        - name: clinic_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of working-hours spans
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WorkingHoursPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /dentists/{dentist_id}/clinics/{clinic_id}/working-hours/{weekday}:
+    put:
+      tags: [Schedules]
+      operationId: setWorkingHours
+      summary: Replace a dentist's hours and breaks for one weekday at one clinic
+      description: |
+        Practice manager only. An empty spans list means the dentist does not work there that day.
+        Stories: US-007, US-007.AC1, US-007.AC2, US-001.AC2.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DentistId'}
+        - {$ref: '#/components/parameters/ClinicId'}
+        - {$ref: '#/components/parameters/Weekday'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WorkingHoursInput'}
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WorkingHoursInput'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /dentists/{dentist_id}/leave:
+    get:
+      tags: [Schedules]
+      operationId: listLeave
+      summary: A dentist's leave
+      description: 'Practice manager only. Stories: US-008.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DentistId'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of leave
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeavePage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [Schedules]
+      operationId: addLeave
+      summary: Record leave for a dentist
+      description: |
+        Practice manager only. Whole or part days. Returns how many booked appointments fall inside
+        the leave; they appear in the to-move list and are never moved by the system. Stories:
+        US-008, US-008.AC1, US-008.AC2.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DentistId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LeaveInput'}
+      responses:
+        '201':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeaveResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /slots:
+    get:
+      tags: [Schedules]
+      operationId: listFreeSlots
+      summary: Free slots for a clinic and treatment
+      description: |
+        Without dentist_id this is "first available": the earliest slots across the clinic's
+        dentists, at most 10, each with the dentist's name. Patients see online types only and up
+        to 30 days ahead. Slots start on the hour or half hour and never overlap hours, breaks,
+        leave or bookings. Stories: US-010, US-010.AC1, US-010.AC2, US-011.AC1, US-011.AC2,
+        US-011.AC3, US-012.AC1, US-016.AC1, US-019.AC3.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {name: clinic_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: treatment_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: dentist_id, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: date_from, in: query, required: true, description: IST day, schema: {type: string, format: date}}
+        - {name: date_to, in: query, required: true, description: IST day, at most 31 days after date_from, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of free slots, earliest first
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SlotPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /appointments:
+    get:
+      tags: [Appointments]
+      operationId: listMyAppointments
+      summary: The patient's appointments, family included
+      description: |
+        Patient: upcoming first (soonest at the top), then past (latest first). Practice manager:
+        all, filtered by clinic_id. Stories: US-015, US-015.AC1, US-015.AC2, US-004.AC1.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {name: clinic_id, in: query, required: false, description: Practice manager only, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of appointments
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AppointmentPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Appointments]
+      operationId: bookOnline
+      summary: Book online
+      description: |
+        Patient only, for themselves or a family member. Online treatment types only, a future
+        start within 30 days, refused when the person is blocked. The Idempotency-Key header makes a
+        repeated request return the first result. A taken slot answers 409 SLOT_TAKEN with the next
+        free slots. The channel is remembered for the next booking. Stories: US-011, US-011.AC1,
+        US-012, US-012.AC1, US-012.AC2, US-013, US-013.AC1, US-013.AC2, US-014, US-014.AC1,
+        US-014.AC2, US-024.AC1, US-006.AC1.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookOnline'}
+      responses:
+        '201':
+          description: Booked; confirmation queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: Slot taken or unavailable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SlotTakenError'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /appointments/{appointment_id}:
+    get:
+      tags: [Appointments]
+      operationId: getAppointment
+      summary: One appointment
+      description: |
+        Patient (own persons), receptionist (own clinic), dentist (own), manager. Carries
+        can_change and the clinic phone for the 4-hour rule. Stories: US-015, US-016.AC2,
+        US-017.AC2, US-006.AC3.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      responses:
+        '200':
+          description: The appointment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /appointments/{appointment_id}/reschedule:
+    post:
+      tags: [Appointments]
+      operationId: rescheduleOnline
+      summary: Patient moves an appointment
+      description: |
+        Same clinic and treatment, any dentist, until 4 hours before the start (CUTOFF_PASSED
+        after). Refused when the person is blocked. The old slot is free in the same transaction
+        and a notice is sent. Stories: US-016, US-016.AC1, US-016.AC2, US-016.AC3, US-024.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Reschedule'}
+      responses:
+        '200':
+          description: Moved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Slot taken, cut-off passed or invalid transition
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SlotTakenError'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /appointments/{appointment_id}/cancel:
+    post:
+      tags: [Appointments]
+      operationId: cancelOnline
+      summary: Patient cancels an appointment
+      description: |
+        Until 4 hours before the start. Status becomes cancelled by the patient, the slot is free at
+        once and a cancellation message is sent. Stories: US-017, US-017.AC1, US-017.AC2,
+        US-017.AC3.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /appointments/{appointment_id}/history:
+    get:
+      tags: [Appointments]
+      operationId: listAppointmentHistory
+      summary: Status changes of an appointment with who and when
+      description: 'Practice manager only. Stories: US-023, US-023.AC1.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of history events, oldest first
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EventPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reception/appointments:
+    post:
+      tags: [Reception]
+      operationId: bookByReception
+      summary: Reception books for a patient
+      description: |
+        Receptionist (own clinic) and practice manager. Any treatment type, no cut-off, no block
+        check; a start up to 30 minutes in the past is allowed for walk-ins. Stories: US-019,
+        US-019.AC1, US-019.AC3, US-019.AC4, US-009.AC2, US-006.AC3.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookByReception'}
+      responses:
+        '201':
+          description: Booked
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: Slot taken or unavailable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SlotTakenError'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /reception/appointments/{appointment_id}/reschedule:
+    post:
+      tags: [Reception]
+      operationId: rescheduleByReception
+      summary: Reception moves an appointment
+      description: 'No 4-hour cut-off. Stories: US-019, US-019.AC2, US-008.AC2.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Reschedule'}
+      responses:
+        '200':
+          description: Moved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Slot taken or invalid transition
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SlotTakenError'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /reception/appointments/{appointment_id}/cancel:
+    post:
+      tags: [Reception]
+      operationId: cancelByReception
+      summary: Reception cancels an appointment
+      description: |
+        Cancelled by the patient when patient_asked is true, otherwise by the clinic. Stories:
+        US-019, US-008.AC2, US-023.AC1.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReceptionCancel'}
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /reception/appointments/{appointment_id}/arrived:
+    post:
+      tags: [Reception]
+      operationId: markArrived
+      summary: Mark a patient arrived
+      description: 'Receptionist (own clinic). Stories: US-020, US-020.AC1, US-019.AC3.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      responses:
+        '200':
+          description: Status arrived
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /reception/appointments/{appointment_id}/no-show:
+    post:
+      tags: [Reception]
+      operationId: markNoShow
+      summary: Mark a no-show
+      description: |
+        Allowed from 15 minutes after the start until 23:59 IST of that day (NOSHOW_TOO_EARLY
+        before). Stories: US-021, US-021.AC1, US-021.AC2, US-024.
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      responses:
+        '200':
+          description: Status no-show
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /reception/appointments/{appointment_id}/undo-no-show:
+    post:
+      tags: [Reception]
+      operationId: undoNoShow
+      summary: Undo a no-show the same day
+      description: 'Back to booked, not counted. NOSHOW_UNDO_EXPIRED after the day. Stories: US-021.AC3.'
+      security: [{cookieAuth: [], csrfHeader: []}]
+      parameters:
+        - {$ref: '#/components/parameters/AppointmentId'}
+      responses:
+        '200':
+          description: Status booked
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Appointment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /reception/day:
+    get:
+      tags: [Reception]
+      operationId: getDayView
+      summary: Day view of a clinic
+      description: |
+        Receptionist (own clinic only) and practice manager. One column per dentist working that
+        day; the page items are columns. Stories: US-018, US-018.AC1, US-018.AC2, US-004.AC2.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {name: clinic_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: date, in: query, required: true, description: IST day, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of dentist columns
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DayColumnPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /dentist/my-day:
+    get:
+      tags: [Reception]
+      operationId: getMyDay
+      summary: A dentist's own day at each clinic, read only
+      description: 'Dentist only. Stories: US-022, US-022.AC1, US-022.AC2, US-004.AC3.'
+      security: [{cookieAuth: []}]
+      parameters:
+        - {name: date, in: query, required: true, description: IST day, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of the dentist's appointments, by time
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DayItemPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /reception/reminders-failed:
+    get:
+      tags: [Reception]
+      operationId: listFailedReminders
+      summary: Appointments whose reminder failed (R2)
+      description: |
+        Receptionist (own clinic) and practice manager. Lists appointments starting on the given
+        IST day (tomorrow by default) whose reminder chain ended failed, with the patient's name and
+        phone. Stories: US-027, US-027.AC2.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {name: clinic_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: date, in: query, required: false, description: IST day, default tomorrow, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of failed reminders
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FailedReminderPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /reports/no-shows:
+    get:
+      tags: [Reports]
+      operationId: getNoShowReport
+      summary: No-shows and rate per clinic and month (R2)
+      description: |
+        Practice manager only. The last 12 months for each clinic; rate is no-shows divided by
+        appointments that were not cancelled. On screen only. Stories: US-029, US-029.AC1,
+        US-029.AC2.
+      security: [{cookieAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of report rows
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /webhooks/sms:
+    post:
+      tags: [Webhooks]
+      operationId: smsWebhook
+      summary: SMS provider delivery receipts and STOP replies
+      description: |
+        Called by the SMS provider (rel-009). Signature checked, handler idempotent on provider
+        message id, unknown ids ignored. A STOP reply sets the reminders opt-out. Stories:
+        US-027.AC1, US-028.AC1.
+      security: [{webhookSignature: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProviderWebhook'}
+      responses:
+        '200': {description: Accepted (also when the message id is unknown)}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /webhooks/whatsapp:
+    post:
+      tags: [Webhooks]
+      operationId: whatsappWebhook
+      summary: WhatsApp provider delivery receipts
+      description: |
+        Called by the WhatsApp provider (rel-010). Same rules as the SMS webhook. A failed receipt
+        creates one SMS fallback. Stories: US-027, US-027.AC1.
+      security: [{webhookSignature: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProviderWebhook'}
+      responses:
+        '200': {description: Accepted (also when the message id is unknown)}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Signed JWT in an HttpOnly, Secure, SameSite=Strict cookie (ADR-0004). Role, clinic and active flag are re-read from the database on every request.
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: CSRF token returned by the Session response, required with the cookie on every write. The Origin header is checked too.
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: HMAC-SHA256 hex of timestamp + "." + raw body with the provider's shared secret; X-Timestamp must be within 5 minutes.
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: {type: integer, minimum: 1, default: 1}
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-generated UUID; a repeated request with the same key returns the first result
+      schema: {type: string, format: uuid}
+    AppointmentId:
+      {name: appointment_id, in: path, required: true, schema: {type: string, format: uuid}}
+    ClinicId:
+      {name: clinic_id, in: path, required: true, schema: {type: string, format: uuid}}
+    DentistId:
+      {name: dentist_id, in: path, required: true, schema: {type: string, format: uuid}}
+    PatientId:
+      {name: patient_id, in: path, required: true, schema: {type: string, format: uuid}}
+    StaffId:
+      {name: staff_id, in: path, required: true, schema: {type: string, format: uuid}}
+    TreatmentId:
+      {name: treatment_id, in: path, required: true, schema: {type: string, format: uuid}}
+    Weekday:
+      {name: weekday, in: path, required: true, description: 1 Monday to 7 Sunday, schema: {type: integer, minimum: 1, maximum: 7}}
+  responses:
+    ValidationError:
+      description: VALIDATION_ERROR, OUTSIDE_HORIZON, TREATMENT_NOT_ONLINE or HOURS_OVERLAP
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unauthorized:
+      description: AUTH_REQUIRED, AUTH_CODE_INVALID, AUTH_CODE_EXPIRED, AUTH_BAD_CREDENTIALS or WEBHOOK_SIGNATURE_INVALID
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: FORBIDDEN, AUTH_ACCOUNT_INACTIVE, CSRF_FAILED, ONLINE_BOOKING_BLOCKED
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: NOT_FOUND, also for a record the caller may not know exists
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: CONFLICT, FAMILY_LIMIT, SLOT_UNAVAILABLE, CUTOFF_PASSED, NOSHOW_TOO_EARLY, NOSHOW_UNDO_EXPIRED or INVALID_TRANSITION
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    TooManyRequests:
+      description: RATE_LIMITED or AUTH_LOCKED
+      headers:
+        Retry-After: {schema: {type: integer}, description: Seconds to wait}
+        X-RateLimit-Limit: {schema: {type: integer}}
+        X-RateLimit-Remaining: {schema: {type: integer}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unavailable:
+      description: PROVIDER_UNAVAILABLE or INTERNAL_ERROR
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    Error:
+      type: object
+      required: [code, message, timestamp, correlation_id]
+      properties:
+        code: {type: string, description: Stable code such as SLOT_TAKEN, example: SLOT_TAKEN}
+        message: {type: string, description: Plain English, safe to show}
+        timestamp: {type: string, format: date-time}
+        correlation_id: {type: string}
+    SlotTakenError:
+      description: Error with the data the screen needs. next_slots is set for SLOT_TAKEN, clinic_phone for CUTOFF_PASSED and ONLINE_BOOKING_BLOCKED.
+      allOf:
+        - {$ref: '#/components/schemas/Error'}
+        - type: object
+          properties:
+            next_slots:
+              type: array
+              maxItems: 10
+              items: {$ref: '#/components/schemas/Slot'}
+            clinic_phone: {type: string}
+    PageMeta:
+      type: object
+      required: [page, page_size, total]
+      properties:
+        page: {type: integer}
+        page_size: {type: integer}
+        total: {type: integer}
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [ok]}
+        version: {type: string}
+    CodeRequest:
+      type: object
+      required: [phone]
+      properties:
+        phone: {type: string, pattern: '^\+[1-9][0-9]{7,14}$', description: E.164, example: '+919800000000'}
+    CodeVerify:
+      type: object
+      required: [phone, code]
+      properties:
+        phone: {type: string, pattern: '^\+[1-9][0-9]{7,14}$'}
+        code: {type: string, pattern: '^[0-9]{6}$'}
+        name: {type: string, minLength: 1, maxLength: 100, description: Required for a new phone number}
+    StaffLogin:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string, maxLength: 60}
+        password: {type: string, format: password, maxLength: 200}
+    Session:
+      type: object
+      required: [role, csrf_token]
+      properties:
+        role: {type: string, enum: [patient, receptionist, dentist, manager]}
+        display_name: {type: string}
+        account_id: {type: string, format: uuid, description: Patient sessions only}
+        patient_id: {type: string, format: uuid, description: The account holder person, patient sessions only}
+        preferred_channel: {$ref: '#/components/schemas/Channel'}
+        clinic_id: {type: string, format: uuid, description: Receptionists only}
+        dentist_id: {type: string, format: uuid, description: Dentists only}
+        csrf_token: {type: string}
+    Channel:
+      type: string
+      enum: [sms, whatsapp]
+    AppointmentStatus:
+      type: string
+      enum: [booked, arrived, no_show, cancelled_by_patient, cancelled_by_clinic]
+    StaffAccount:
+      type: object
+      required: [id, username, display_name, role, active]
+      properties:
+        id: {type: string, format: uuid}
+        username: {type: string}
+        display_name: {type: string}
+        role: {type: string, enum: [receptionist, dentist, manager]}
+        clinic_id: {type: string, format: uuid, nullable: true}
+        dentist_id: {type: string, format: uuid, nullable: true}
+        active: {type: boolean}
+    StaffCreate:
+      type: object
+      required: [username, display_name, password, role]
+      properties:
+        username: {type: string, minLength: 3, maxLength: 60}
+        display_name: {type: string, minLength: 1, maxLength: 100}
+        password: {type: string, format: password, minLength: 10, maxLength: 200}
+        role: {type: string, enum: [receptionist, dentist]}
+        clinic_id: {type: string, format: uuid, description: Required for a receptionist}
+        dentist_id: {type: string, format: uuid, description: Required for a dentist}
+    StaffActive:
+      type: object
+      required: [active]
+      properties:
+        active: {type: boolean}
+    StaffPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/StaffAccount'}}
+    Patient:
+      type: object
+      required: [id, name, is_holder]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        birth_year: {type: integer, nullable: true}
+        is_holder: {type: boolean}
+    PatientPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Patient'}}
+    FamilyMemberCreate:
+      type: object
+      required: [name, birth_year]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        birth_year: {type: integer, minimum: 1900, maximum: 2100}
+    PatientCreate:
+      type: object
+      required: [name, phone]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        phone: {type: string, pattern: '^\+[1-9][0-9]{7,14}$'}
+    PatientSummary:
+      type: object
+      required: [id, name, phone, blocked, reminders_opt_out]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        phone: {type: string, description: The account holder's phone}
+        blocked: {type: boolean, description: Computed from the no-show block (R2; false before)}
+        reminders_opt_out: {type: boolean}
+    PatientSummaryPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/PatientSummary'}}
+    ReminderPreference:
+      type: object
+      required: [opt_out]
+      properties:
+        opt_out: {type: boolean}
+    BlockStatus:
+      type: object
+      required: [patient_id, blocked, no_show_count]
+      properties:
+        patient_id: {type: string, format: uuid}
+        blocked: {type: boolean}
+        no_show_count: {type: integer, description: No-shows in the last 6 months since the latest lift}
+        blocked_at: {type: string, format: date-time, nullable: true}
+        lifted_at: {type: string, format: date-time, nullable: true}
+        lifted_by: {type: string, format: uuid, nullable: true, description: Staff id}
+    ErasureResult:
+      type: object
+      required: [persons_anonymised, messages_deleted]
+      properties:
+        persons_anonymised: {type: integer}
+        messages_deleted: {type: integer}
+    Clinic:
+      type: object
+      required: [id, name, address, phone, active]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        address: {type: string}
+        phone: {type: string}
+        active: {type: boolean}
+    ClinicInput:
+      type: object
+      required: [name, address, phone]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        address: {type: string, maxLength: 300}
+        phone: {type: string, maxLength: 20}
+        active: {type: boolean, default: true}
+    ClinicPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Clinic'}}
+    Dentist:
+      type: object
+      required: [id, name, active]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        active: {type: boolean}
+    DentistInput:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        active: {type: boolean, default: true}
+    DentistPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Dentist'}}
+    Treatment:
+      type: object
+      required: [id, name, duration_minutes, online, active]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        duration_minutes: {type: integer, enum: [30, 60, 90]}
+        online: {type: boolean}
+        active: {type: boolean}
+    TreatmentInput:
+      type: object
+      required: [name, duration_minutes, online]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        duration_minutes: {type: integer, enum: [30, 60, 90]}
+        online: {type: boolean}
+        active: {type: boolean, default: true}
+    TreatmentPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Treatment'}}
+    TimeSpan:
+      type: object
+      required: [start_time, end_time]
+      properties:
+        start_time: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: IST clock time, example: '09:00'}
+        end_time: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '13:00'}
+    WorkingSpan:
+      allOf:
+        - {$ref: '#/components/schemas/TimeSpan'}
+        - type: object
+          properties:
+            breaks:
+              type: array
+              items: {$ref: '#/components/schemas/TimeSpan'}
+    WorkingHoursInput:
+      type: object
+      required: [spans]
+      properties:
+        spans:
+          type: array
+          items: {$ref: '#/components/schemas/WorkingSpan'}
+    WorkingHours:
+      type: object
+      required: [dentist_id, clinic_id, weekday, start_time, end_time]
+      properties:
+        dentist_id: {type: string, format: uuid}
+        clinic_id: {type: string, format: uuid}
+        weekday: {type: integer, minimum: 1, maximum: 7}
+        start_time: {type: string}
+        end_time: {type: string}
+        breaks:
+          type: array
+          items: {$ref: '#/components/schemas/TimeSpan'}
+    WorkingHoursPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/WorkingHours'}}
+    LeaveInput:
+      type: object
+      required: [start_at, end_at]
+      properties:
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+    Leave:
+      type: object
+      required: [id, dentist_id, start_at, end_at]
+      properties:
+        id: {type: string, format: uuid}
+        dentist_id: {type: string, format: uuid}
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+    LeaveResult:
+      type: object
+      required: [leave, to_move_count]
+      properties:
+        leave: {$ref: '#/components/schemas/Leave'}
+        to_move_count: {type: integer, description: Booked appointments inside the leave, left unchanged}
+    LeavePage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Leave'}}
+    Slot:
+      type: object
+      required: [dentist_id, dentist_name, start_at, end_at]
+      properties:
+        dentist_id: {type: string, format: uuid}
+        dentist_name: {type: string}
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+    SlotPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Slot'}}
+    BookOnline:
+      type: object
+      required: [patient_id, clinic_id, treatment_id, start_at, channel]
+      properties:
+        patient_id: {type: string, format: uuid, description: The person the visit is for; must belong to the signed-in account}
+        clinic_id: {type: string, format: uuid}
+        treatment_id: {type: string, format: uuid}
+        dentist_id: {type: string, format: uuid, description: Required; for "first available" the screen sends the dentist of the chosen slot}
+        start_at: {type: string, format: date-time}
+        channel: {$ref: '#/components/schemas/Channel'}
+    BookByReception:
+      type: object
+      required: [patient_id, clinic_id, treatment_id, dentist_id, start_at]
+      properties:
+        patient_id: {type: string, format: uuid}
+        clinic_id: {type: string, format: uuid}
+        treatment_id: {type: string, format: uuid}
+        dentist_id: {type: string, format: uuid}
+        start_at: {type: string, format: date-time}
+    Reschedule:
+      type: object
+      required: [dentist_id, start_at]
+      properties:
+        dentist_id: {type: string, format: uuid}
+        start_at: {type: string, format: date-time}
+    ReceptionCancel:
+      type: object
+      required: [patient_asked]
+      properties:
+        patient_asked: {type: boolean, description: true gives cancelled by the patient, false cancelled by the clinic}
+    Appointment:
+      type: object
+      required: [id, clinic_id, dentist_id, patient_id, treatment_id, start_at, end_at, status, channel, booked_by, can_change, clinic_phone]
+      properties:
+        id: {type: string, format: uuid}
+        clinic_id: {type: string, format: uuid}
+        clinic_name: {type: string, description: Computed from the clinic}
+        dentist_id: {type: string, format: uuid}
+        dentist_name: {type: string, description: Computed from the dentist}
+        patient_id: {type: string, format: uuid}
+        patient_name: {type: string, description: Computed from the person}
+        treatment_id: {type: string, format: uuid}
+        treatment_name: {type: string, description: Computed from the treatment}
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+        status: {$ref: '#/components/schemas/AppointmentStatus'}
+        channel: {$ref: '#/components/schemas/Channel'}
+        booked_by: {type: string, enum: [patient, staff]}
+        account_holder_phone: {type: string, description: 'Computed; staff roles only (US-006.AC3)'}
+        can_change: {type: boolean, description: 'Computed: booked and more than 4 hours to the start (patient view)'}
+        clinic_phone: {type: string, description: Computed; shown when can_change is false}
+        reminder_failed: {type: boolean, description: Computed from the reminder chain}
+    AppointmentPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Appointment'}}
+    DayItem:
+      type: object
+      required: [appointment_id, dentist_id, dentist_name, clinic_id, start_at, end_at, patient_name, treatment_name, status]
+      properties:
+        appointment_id: {type: string, format: uuid}
+        dentist_id: {type: string, format: uuid}
+        dentist_name: {type: string}
+        clinic_id: {type: string, format: uuid}
+        clinic_name: {type: string}
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+        patient_id: {type: string, format: uuid}
+        patient_name: {type: string}
+        patient_phone: {type: string, description: Reception and manager only; omitted for dentists}
+        treatment_name: {type: string}
+        status: {$ref: '#/components/schemas/AppointmentStatus'}
+        reminder_failed: {type: boolean}
+    DayItemPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/DayItem'}}
+    DayColumn:
+      type: object
+      required: [dentist_id, dentist_name, appointments]
+      properties:
+        dentist_id: {type: string, format: uuid}
+        dentist_name: {type: string}
+        appointments:
+          type: array
+          items: {$ref: '#/components/schemas/DayItem'}
+    DayColumnPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/DayColumn'}}
+    AppointmentEvent:
+      type: object
+      required: [id, appointment_id, event_type, to_status, actor_kind, at]
+      properties:
+        id: {type: string, format: uuid}
+        appointment_id: {type: string, format: uuid}
+        event_type: {type: string, enum: [booked, rescheduled, status_changed]}
+        from_status: {type: string, nullable: true}
+        to_status: {type: string}
+        old_start_at: {type: string, format: date-time, nullable: true}
+        new_start_at: {type: string, format: date-time, nullable: true}
+        actor_kind: {type: string, enum: [patient, staff, system]}
+        actor_name: {type: string, description: Computed from the actor id}
+        reason: {type: string, nullable: true}
+        at: {type: string, format: date-time}
+    EventPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/AppointmentEvent'}}
+    FailedReminder:
+      type: object
+      required: [appointment_id, start_at, patient_name, patient_phone, channel]
+      properties:
+        appointment_id: {type: string, format: uuid}
+        start_at: {type: string, format: date-time}
+        patient_name: {type: string}
+        patient_phone: {type: string}
+        channel: {$ref: '#/components/schemas/Channel'}
+        failed_at: {type: string, format: date-time, nullable: true}
+    FailedReminderPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/FailedReminder'}}
+    ReportRow:
+      type: object
+      required: [clinic_id, clinic_name, month, no_shows, not_cancelled, no_show_rate]
+      properties:
+        clinic_id: {type: string, format: uuid}
+        clinic_name: {type: string}
+        month: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$', description: IST month}
+        no_shows: {type: integer}
+        not_cancelled: {type: integer, description: Appointments booked, arrived or no-show}
+        no_show_rate: {type: number, minimum: 0, maximum: 1, description: no_shows divided by not_cancelled, 0 when none}
+    ReportPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/ReportRow'}}
+    ProviderWebhook:
+      type: object
+      description: Normalised by the channel adapter; the provider's own payload is mapped in integration-specs.md section 4.
+      required: [events]
+      properties:
+        events:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [type]
+            properties:
+              type: {type: string, enum: [delivered, failed, inbound]}
+              provider_message_id: {type: string, description: Set for delivered and failed}
+              from_phone: {type: string, description: Set for inbound}
+              text: {type: string, description: Set for inbound; only STOP is acted on}
+              occurred_at: {type: string, format: date-time}

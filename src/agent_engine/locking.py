@@ -1,0 +1,66 @@
+"""Cross-agent file locking: one GLOBAL asyncio.Lock across every
+write_file/edit_file/delete call, not one lock per file path.
+
+Per-path locking was tried first and didn't hold: two different files landing
+in the same brand-new directory at the same time can race on Windows'
+directory-creation/path-resolution, crashing the run even though the two
+calls have different lock keys. A single global lock removes that race
+outright, at negligible cost — writes are small next to model/network
+latency.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any, Awaitable, Callable
+
+from langchain.agents.middleware import AgentMiddleware, ToolCallRequest
+from langchain_core.messages import ToolMessage
+from langgraph.types import Command
+
+from agent_engine.config import FILE_LOCK_ACQUIRE_TIMEOUT_SECONDS, MUTATING_FILESYSTEM_TOOLS
+
+logger = logging.getLogger(__name__)
+
+# Module-level, not per-instance, so every subagent's own FileLockMiddleware
+# shares this one lock with the main agent.
+_global_lock = asyncio.Lock()
+
+
+class FileLockMiddleware(AgentMiddleware):
+    """Serializes write_file/edit_file/delete across the whole run onto one
+    global lock — see module docstring. Read-only tools and execute pass
+    through untouched.
+    """
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
+    ) -> ToolMessage | Command[Any]:
+        tool_name = request.tool.name if request.tool else request.tool_call["name"]
+        if tool_name not in MUTATING_FILESYSTEM_TOOLS:
+            return await handler(request)
+
+        file_path = request.tool_call["args"].get("file_path", "<unknown>")
+
+        try:
+            await asyncio.wait_for(_global_lock.acquire(), timeout=FILE_LOCK_ACQUIRE_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            logger.warning("%s on %s timed out waiting for the file lock", tool_name, file_path)
+            return ToolMessage(
+                content=(
+                    f"ERROR: the filesystem lock stayed held by another agent for "
+                    f"{FILE_LOCK_ACQUIRE_TIMEOUT_SECONDS}s while waiting to {tool_name} {file_path}. "
+                    "Retry this call."
+                ),
+                tool_call_id=request.tool_call["id"],
+            )
+
+        try:
+            logger.info("%s acquired global file lock for %s", tool_name, file_path)
+            return await handler(request)
+        finally:
+            _global_lock.release()
+            logger.info("%s released global file lock for %s", tool_name, file_path)

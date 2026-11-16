@@ -1,0 +1,1876 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "8da5ebb2-8653-4f35-8785-7230e7f43123",
+  "version": 3,
+  "project": "clinic-test-2",
+  "sprint_plan_sha256": "6ea28fecdf6a88266404465d8fbded4e1a72e23925b609c65dc88842c9665d83",
+  "sprint_index": 1,
+  "assignments": [
+    {
+      "task_id": "001-T008",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "claude-code",
+      "worker_kind": "ai_agent",
+      "planned_start_minute": 0,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.8,
+        "ownership": 0.0,
+        "load_after": 0.16,
+        "cost": 0.2
+      },
+      "explanation": "Claude Code writes this one-file test because its two criteria are concrete and it needs no human judgement; Copilot was equally qualified and the runner-up, so lower cost decided, and a human reviews the PR.",
+      "runner_up_worker_id": "copilot",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T013",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "claude-code",
+      "worker_kind": "ai_agent",
+      "planned_start_minute": 0,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Claude Code writes this one-file health-check test (two concrete outcomes, 1 h, test only) once 001-T012 provides the test database, and a human reviews the PR; it moves off Kavya, who is at about 85% load; Copilot would be equally qualified.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "002-T001",
+      "story_id": "S-SETUP-002",
+      "sprint_index": 1,
+      "worker_id": "claude-code",
+      "worker_kind": "ai_agent",
+      "planned_start_minute": 60,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.8,
+        "ownership": 0.0,
+        "load_after": 0.16,
+        "cost": 0.2
+      },
+      "explanation": "Claude Code takes this two-file package skeleton because its defaults (30, 31 and an env override) are checkable by a unit test; Copilot was equally qualified and the runner-up, so lower cost decided.",
+      "runner_up_worker_id": "copilot",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T064",
+      "story_id": "S-001-US6",
+      "sprint_index": 1,
+      "worker_id": "claude-code",
+      "worker_kind": "ai_agent",
+      "planned_start_minute": 240,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.8,
+        "ownership": 0.0,
+        "load_after": 0.16,
+        "cost": 0.2
+      },
+      "explanation": "Claude Code takes this single small registry module with two concrete criteria; Copilot was equally qualified and the runner-up, so lower cost decided, and a human reviews the PR.",
+      "runner_up_worker_id": "copilot",
+      "pinned": false
+    },
+    {
+      "task_id": "005-T001",
+      "story_id": "S-SETUP-005",
+      "sprint_index": 1,
+      "worker_id": "copilot",
+      "worker_kind": "ai_agent",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.8,
+        "ownership": 0.0,
+        "load_after": 0.17,
+        "cost": 0.2
+      },
+      "explanation": "Copilot creates this empty reception package (4 files, 3 h, both criteria checked by app start and CI); Claude Code was equally qualified and the runner-up, so the work is split between the two agents, and a human reviews the PR.",
+      "runner_up_worker_id": "claude-code",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T062",
+      "story_id": "S-001-US6",
+      "sprint_index": 1,
+      "worker_id": "copilot",
+      "worker_kind": "ai_agent",
+      "planned_start_minute": 180,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.8,
+        "ownership": 0.0,
+        "load_after": 0.17,
+        "cost": 0.2
+      },
+      "explanation": "Copilot writes this single unit-test file with exact expected values (due date plus 30 days, replacement strings, idempotence); Claude Code was equally qualified and the runner-up, and a human reviews the tests against the erasure rules.",
+      "runner_up_worker_id": "claude-code",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T038",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun does password hashing because it is auth-sensitive and he is the only person with auth-security; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T014",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 60,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun defines these models because the case-insensitive unique constraint needs data-modeling and postgres, which neither AI agent has and nobody else on the team has together; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T006",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 150,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun implements the settings because they hold the JWT and hash secrets, which are a sensitive area, and he has both backend-python and auth-security; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T015",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 270,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun writes this migration with seed data because migrations are human-only and he has postgres and data-modeling; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T017",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 390,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun writes the account-table migration because migrations are human-only and he is the only person with both postgres and data-modeling; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T018",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 510,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun writes the sessions, throttle and erasure migration because migrations are human-only and he is the only person with both postgres and data-modeling; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T041",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 600,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun writes the first-manager seed because it reads credentials from the environment and he is the only person with auth-security; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T022",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 660,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun writes the CSRF, Origin and HTTPS middleware because it is security-critical and he is the only person with auth-security and backend-python; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T016",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 810,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun defines the identity models because role constraints are a sensitive area and he is the only person with data-modeling; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T040",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 1020,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun implements the staff sign-in and password endpoints because they are auth-sensitive and he has auth-security and api-design; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T048",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 1170,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun implements GET /api/me because it reads identity state and he has auth-security and api-design; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T046",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 1230,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun implements the role-scoped reads because they are authorisation logic and he is the only person with auth-security plus backend-python; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T024",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 1410,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun writes the access-control dependencies because they are the authorisation core and he is the only person with auth-security; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T039",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 1620,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun implements staff authentication with lockout because it is auth-sensitive and he is the only person with auth-security; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "003-T004",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 1800,
+      "planned_hours": 4.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun defines the booking models because they need data-modeling and postgres together, which only he has and neither AI agent has; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "001-T021",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-arjun",
+      "worker_kind": "human",
+      "planned_start_minute": 2040,
+      "planned_hours": 4.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.78,
+        "cost": 1.0
+      },
+      "explanation": "Arjun implements session and JWT cookie handling because it is auth-sensitive and he is the only person with auth-security and backend-python; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "004-T001",
+      "story_id": "S-SETUP-004",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya creates this skeleton because its 8 files are over the 4-file limit for AI, and she has backend-python at about 85% load; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T012",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Kavya writes the test fixtures because she has qa-automation, with Vikram giving about 1 h on the PostgreSQL service in CI, since nobody holds qa-automation and postgres together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T019",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Kavya writes the migration tests because she has qa-automation, with Sanjay giving about 0.5 h on the constraint cases, since nobody holds qa-automation and postgres together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T036",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Kavya writes the password unit tests because she has qa-automation, and Arjun, who wrote the code under test, reviews for about 0.5 h, since nobody holds qa-automation and auth-security together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T037",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Kavya writes the staff sign-in integration tests because she has qa-automation, and Arjun reviews for about 0.5 h, since nobody holds qa-automation and auth-security together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T020",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Kavya writes the session and CSRF tests because she has qa-automation, and Arjun, who owns the sessions and security code, reviews for about 0.5 h.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "004-T007",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 90,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya implements this small reschedule rule and its unit test because she has backend-python and room at about 85% load; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T005",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 180,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya implements the change-window logic because she has backend-python and has the matching tests 004-T004 in the same area; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T001",
+      "story_id": "S-SETUP-003",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 270,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya creates this small booking skeleton and settings (2 files, 1.5 h), as she has backend-python and qa-automation; Priya was the runner-up.",
+      "runner_up_worker_id": "m-priya",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T004",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 360,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya writes the change-window unit tests because she has qa-automation and is writing the logic they test (004-T005); Priya was the runner-up.",
+      "runner_up_worker_id": "m-priya",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T011",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 510,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya adds the counters and log helper that must never log names or phones because it is a privacy-sensitive change that stays with a person; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T007",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 690,
+      "planned_hours": 5.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya builds the booking test fixtures because 5 h is over the 4 h AI limit and she is the QA lead with qa-automation; Priya was the runner-up.",
+      "runner_up_worker_id": "m-priya",
+      "pinned": false
+    },
+    {
+      "task_id": "006-T001",
+      "story_id": "S-SETUP-006",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 990,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya creates the messaging packages and provider settings because provider settings are a sensitive area and she has the spare capacity; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "006-T002",
+      "story_id": "S-SETUP-006",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 1170,
+      "planned_hours": 5.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya builds the messaging test fixtures because 5 h is over the 4 h AI limit and she has qa-automation; Priya was the runner-up.",
+      "runner_up_worker_id": "m-priya",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T070",
+      "story_id": "S-001-US7",
+      "sprint_index": 1,
+      "worker_id": "m-kavya",
+      "worker_kind": "human",
+      "planned_start_minute": 1470,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.79,
+        "cost": 1.0
+      },
+      "explanation": "Kavya wires the daily retention trigger into main.py because it can run twice across replicas and triggers deletion of personal data, so it stays with a person; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T008",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera defines the request and response models because they need api-design, which neither AI agent has, and she is at about 63% load; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T008",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Meera writes the booking telemetry because she has backend-python and low load, with Vikram giving about 1 h on OpenTelemetry, since only Vikram has observability and no AI agent has it.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "003-T010",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 150,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera builds the booking state store in clinic-web because she has frontend-react at about 63% load; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T005",
+      "story_id": "S-SETUP-001",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 270,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera copies the contract file because it needs api-design, which neither AI agent has, and she is at about 63% load; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T007",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 360,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera sets up the database layer and migrations because it is a sensitive area and she has backend-python and postgres; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T043",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 450,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera builds the change-password page because it is auth-related and she has frontend-react; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T002",
+      "story_id": "S-SETUP-004",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 570,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera builds the appointments web skeleton because she has frontend-react and api-design at about 63% load; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T042",
+      "story_id": "S-001-US2",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 750,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera builds the staff sign-in page because it is auth-related and she has frontend-react; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T005",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 930,
+      "planned_hours": 5.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera writes the booking migration because 5 h with an exclusion constraint is over the 4 h AI limit and she has postgres; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T047",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 1230,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera implements GET /api/clinics and /api/dentists because they are role-scoped endpoints that stay with a person and she has api-design and backend-python; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T069",
+      "story_id": "S-001-US7",
+      "sprint_index": 1,
+      "worker_id": "m-meera",
+      "worker_kind": "human",
+      "planned_start_minute": 1320,
+      "planned_hours": 5.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.6,
+        "cost": 1.0
+      },
+      "explanation": "Meera implements the retention job because 5.5 h is over the 4 h AI limit and it handles personal data, and she has backend-python and postgres; Sanjay was the runner-up.",
+      "runner_up_worker_id": "m-sanjay",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T050",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-neha",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Neha writes the access-framework doc because she is the idle docs person, and Arjun reviews for about 0.5 h, since nobody holds docs and auth-security together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "006-T003",
+      "story_id": "S-SETUP-006",
+      "sprint_index": 1,
+      "worker_id": "m-neha",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Neha writes the provider checklist because she is the project manager who can get the owners and dates from the client and providers, with Sanjay giving about 0.5 h on messaging; an AI agent must not invent those facts.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T010",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya implements the error model because it needs api-design, which neither AI agent has, and she is at about 80% load; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T068",
+      "story_id": "S-001-US7",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 4.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Priya writes the retention job test because she has qa-automation, and Meera, who owns the job under test (001-T069), reviews for about 0.5 h, since nobody holds qa-automation and postgres together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T044",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Priya writes the role-scope matrix tests because she has qa-automation, and Arjun reviews for about 0.5 h, since nobody holds qa-automation and auth-security together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T045",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Priya writes the deactivation tests because she has qa-automation, and Arjun reviews for about 0.5 h, since nobody holds qa-automation and auth-security together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T023",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Priya writes the access-context tests because she has qa-automation, and Arjun, who owns 001-T024, reviews for about 0.5 h.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "004-T003",
+      "story_id": "S-SETUP-004",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 60,
+      "planned_hours": 1.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya merges the appointment contract because it needs api-design, which neither AI agent has; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T025",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 150,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya implements the web API client because the sign-in redirect and auth boundary are not fixed by the criteria, and she has frontend-react and api-design; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T011",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 270,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya implements the health endpoint because it touches infrastructure and stays with a person, and she has backend-python and api-design; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T006",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 390,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya writes the booking schemas from the contract because they need api-design, which neither AI agent has; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T009",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 570,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya builds the booking API client because she has frontend-react and api-design; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T026",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 750,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya builds the web session base because it is auth-sensitive and she has frontend-react; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "002-T002",
+      "story_id": "S-SETUP-002",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 930,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya creates the scheduling web skeleton because she has frontend-react, and clinic-web CI is not yet approved so it cannot go to AI; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T051",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 1110,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya builds the role-home page because it depends on role rules and she has frontend-react and frontend-css; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T066",
+      "story_id": "S-001-US6",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 1320,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya implements the manager-only erasure endpoints because they delete personal data and she has api-design and backend-python; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T063",
+      "story_id": "S-001-US6",
+      "sprint_index": 1,
+      "worker_id": "m-priya",
+      "worker_kind": "human",
+      "planned_start_minute": 1440,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.74,
+        "cost": 1.0
+      },
+      "explanation": "Priya writes the erasure API tests because they cover manager-only deletion of personal data and she is the only person with qa-automation plus api-design; there is no runner-up.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "004-T006",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay defines these small interfaces because he has backend-python at about 69% load; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T001",
+      "story_id": "S-SETUP-001",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Sanjay creates the project skeleton first because he has backend-python and spare capacity, with Vikram giving about 0.5 h on the toolchain and CI layout, since nobody holds backend-python and devops-ci together.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T009",
+      "story_id": "S-FOUND-001",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Sanjay implements logging and OpenTelemetry because he has backend-python, with Vikram giving about 1 h on exporters, since only Vikram has observability and no AI agent has it.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "003-T002",
+      "story_id": "S-SETUP-003",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 60,
+      "planned_hours": 1.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay creates the booking feature folder because he has frontend-react at about 69% load, and clinic-web CI is not yet approved so it cannot go to AI; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T002",
+      "story_id": "S-SETUP-001",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 120,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay creates the web app skeleton because it has more than 4 files, over the AI limit, and he has frontend-react; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T010",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 270,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay extends the appointment history writer because it writes audit rows, a sensitive area, and he has backend-python and postgres; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "005-T002",
+      "story_id": "S-SETUP-005",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 420,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay creates the reception web skeleton because he has frontend-react, and clinic-web CI is not yet approved so it cannot go to AI; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "004-T009",
+      "story_id": "S-FOUND-004",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 600,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay implements the ownership-checked appointment query because it is authorisation logic and he has postgres and backend-python; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "003-T003",
+      "story_id": "S-FOUND-003",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 810,
+      "planned_hours": 4.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay defines the booking ports because 4 h of design judgement stays with a person and he has backend-python and api-design; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T049",
+      "story_id": "S-001-US3",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 1050,
+      "planned_hours": 2.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay implements patient search because it exposes personal data under role rules and he has backend-python and postgres; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T067",
+      "story_id": "S-001-US6",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 1200,
+      "planned_hours": 3.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay builds the erasure page because it is an irreversible UI whose criteria cover only part of the page, and he has frontend-react; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T065",
+      "story_id": "S-001-US6",
+      "sprint_index": 1,
+      "worker_id": "m-sanjay",
+      "worker_kind": "human",
+      "planned_start_minute": 1410,
+      "planned_hours": 4.5,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.65,
+        "cost": 1.0
+      },
+      "explanation": "Sanjay implements the erasure service because 4.5 h is over the AI limit and it handles personal data, and he has backend-python and postgres; Meera was the runner-up.",
+      "runner_up_worker_id": "m-meera",
+      "pinned": false
+    },
+    {
+      "task_id": "001-T003",
+      "story_id": "S-SETUP-001",
+      "sprint_index": 1,
+      "worker_id": "m-vikram",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 3.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Vikram writes the clinic-api CI workflow because he is the only person with devops-ci, with Sanjay giving about 0.5 h on the lint and test layout; this task gates everything else.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    },
+    {
+      "task_id": "001-T004",
+      "story_id": "S-SETUP-001",
+      "sprint_index": 1,
+      "worker_id": "m-vikram",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 2.0,
+      "score_breakdown": {
+        "pinned": 1.0
+      },
+      "explanation": "Vikram writes the clinic-web CI workflow because he is the only person with devops-ci, with Meera giving about 0.5 h on package.json; this task gates everything else.",
+      "runner_up_worker_id": null,
+      "pinned": true
+    }
+  ],
+  "unassigned": [],
+  "eligibility": {
+    "003-T001": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T002": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T001": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "004-T002": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T003": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "005-T001": {
+      "eligible": true,
+      "reason": "Empty reception package plus one router registration; 4 files, 3 h, both criteria checked by app start and CI; no auth, data or product decision.",
+      "shadow": false
+    },
+    "005-T002": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "002-T001": {
+      "eligible": true,
+      "reason": "Skeleton package and settings with two defaults (30, 31) and an env override; criteria testable by a unit test; two files.",
+      "shadow": false
+    },
+    "002-T002": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "001-T001": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "001-T002": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "001-T003": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T004": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T005": {
+      "eligible": true,
+      "reason": "Copy of an existing contract file; checkable by OpenAPI validation and path diff; no logic. Needs api-design, which neither agent has.",
+      "shadow": false
+    },
+    "006-T001": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "006-T002": {
+      "eligible": false,
+      "reason": "estimate above the agent limit of 4.0 h",
+      "shadow": false
+    },
+    "006-T003": {
+      "eligible": false,
+      "reason": "Needs client and provider facts (owners, dates) that are not in the repo and must not be invented.",
+      "shadow": false
+    },
+    "004-T004": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T005": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T006": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T007": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T008": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T009": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "004-T010": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "004-T011": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T003": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T004": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T005": {
+      "eligible": false,
+      "reason": "estimate above the agent limit of 4.0 h",
+      "shadow": false
+    },
+    "003-T006": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T007": {
+      "eligible": false,
+      "reason": "estimate above the agent limit of 4.0 h",
+      "shadow": false
+    },
+    "003-T008": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T009": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "003-T010": {
+      "eligible": false,
+      "reason": "CI for brightsmile/clinic-web is not set up by the Infra agent and approved (gate P4-G4)",
+      "shadow": false
+    },
+    "001-T044": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T045": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T046": {
+      "eligible": false,
+      "reason": "Role-scoped data access (authorisation) in two files.",
+      "shadow": false
+    },
+    "001-T047": {
+      "eligible": false,
+      "reason": "Role-scoped endpoints sit on the authorisation framework; a human should check scoping.",
+      "shadow": false
+    },
+    "001-T048": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T049": {
+      "eligible": false,
+      "reason": "Patient search exposes personal data under role rules; needs human review.",
+      "shadow": false
+    },
+    "001-T050": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T051": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T036": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T037": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T038": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T039": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T040": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T041": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T042": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T043": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T068": {
+      "eligible": false,
+      "reason": "Retention test deletes and anonymises personal data, needs postgres, and its file scope contains a bare registry.py that must be corrected first.",
+      "shadow": false
+    },
+    "001-T069": {
+      "eligible": false,
+      "reason": "estimate above the agent limit of 4.0 h",
+      "shadow": false
+    },
+    "001-T070": {
+      "eligible": false,
+      "reason": "Starts a daily scheduler in main.py and adds a setting in config.py: runtime wiring that can run twice across replicas and triggers deletion of personal data.",
+      "shadow": false
+    },
+    "001-T062": {
+      "eligible": true,
+      "reason": "Single unit-test file with three exact-value criteria; test only, no production change.",
+      "shadow": false
+    },
+    "001-T063": {
+      "eligible": false,
+      "reason": "Integration tests of manager-only deletion of personal data across two files.",
+      "shadow": false
+    },
+    "001-T064": {
+      "eligible": true,
+      "reason": "One small registry module with two concrete criteria; self-contained.",
+      "shadow": false
+    },
+    "001-T065": {
+      "eligible": false,
+      "reason": "estimate above the agent limit of 4.0 h",
+      "shadow": false
+    },
+    "001-T066": {
+      "eligible": false,
+      "reason": "Manager-only endpoints that delete personal data.",
+      "shadow": false
+    },
+    "001-T067": {
+      "eligible": false,
+      "reason": "Irreversible erasure UI; the criteria cover only part of the page.",
+      "shadow": false
+    },
+    "001-T006": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T007": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T008": {
+      "eligible": true,
+      "reason": "One test file, 1 h, two concrete criteria on masking and correlation_id; no auth or secrets.",
+      "shadow": false
+    },
+    "001-T009": {
+      "eligible": false,
+      "reason": "App-wide middleware and OpenTelemetry set-up; one criterion has no concrete test; needs observability, which no AI agent has.",
+      "shadow": false
+    },
+    "001-T010": {
+      "eligible": true,
+      "reason": "Single module with codes defined by the contract and two concrete criteria. Needs api-design, which neither agent has.",
+      "shadow": false
+    },
+    "001-T011": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T012": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T013": {
+      "eligible": true,
+      "reason": "One small integration test file, 1 h, two concrete outcomes (200 with db ok; 503 on a closed port), test only. It must start after 001-T012 provides the test database, which is sequencing, not a reason to keep it human.",
+      "shadow": false
+    },
+    "001-T014": {
+      "eligible": true,
+      "reason": "One models file with fully specified columns and constraints. Needs data-modeling and postgres, which neither agent has.",
+      "shadow": false
+    },
+    "001-T015": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T016": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T017": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T018": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T019": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T020": {
+      "eligible": false,
+      "reason": "Tests for session and CSRF security rules (auth).",
+      "shadow": false
+    },
+    "001-T021": {
+      "eligible": false,
+      "reason": "Session and token handling (auth); needs security review.",
+      "shadow": false
+    },
+    "001-T022": {
+      "eligible": false,
+      "reason": "CSRF, Origin and HTTPS security middleware.",
+      "shadow": false
+    },
+    "001-T023": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T024": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    },
+    "001-T025": {
+      "eligible": false,
+      "reason": "The sign-in redirect and auth boundary are not fixed by the criteria.",
+      "shadow": false
+    },
+    "001-T026": {
+      "eligible": false,
+      "reason": "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)",
+      "shadow": false
+    }
+  },
+  "workers": [
+    {
+      "worker_id": "m-arjun",
+      "name": "Arjun",
+      "kind": "human",
+      "capacity_hours": 48.6,
+      "planned_hours": 38.0
+    },
+    {
+      "worker_id": "m-meera",
+      "name": "Meera",
+      "kind": "human",
+      "capacity_hours": 45.6,
+      "planned_hours": 30.5
+    },
+    {
+      "worker_id": "m-sanjay",
+      "name": "Sanjay",
+      "kind": "human",
+      "capacity_hours": 43.1,
+      "planned_hours": 33.5
+    },
+    {
+      "worker_id": "m-priya",
+      "name": "Priya",
+      "kind": "human",
+      "capacity_hours": 37.1,
+      "planned_hours": 39.0
+    },
+    {
+      "worker_id": "m-kavya",
+      "name": "Kavya",
+      "kind": "human",
+      "capacity_hours": 34.1,
+      "planned_hours": 41.5
+    },
+    {
+      "worker_id": "m-rohan",
+      "name": "Rohan",
+      "kind": "human",
+      "capacity_hours": 24.3,
+      "planned_hours": 0.0
+    },
+    {
+      "worker_id": "m-neha",
+      "name": "Neha",
+      "kind": "human",
+      "capacity_hours": 22.5,
+      "planned_hours": 4.5
+    },
+    {
+      "worker_id": "m-vikram",
+      "name": "Vikram",
+      "kind": "human",
+      "capacity_hours": 7.2,
+      "planned_hours": 5.0
+    },
+    {
+      "worker_id": "claude-code",
+      "name": "claude-code",
+      "kind": "ai_agent",
+      "capacity_hours": 35.0,
+      "planned_hours": 6.5
+    },
+    {
+      "worker_id": "copilot",
+      "name": "copilot",
+      "kind": "ai_agent",
+      "capacity_hours": 36.0,
+      "planned_hours": 6.0
+    }
+  ],
+  "solver_engine": "timefold",
+  "solver_status": "SOLVING_COMPLETED",
+  "solver_score": "0hard/0medium/-16494360soft",
+  "pins": {
+    "001-T001": "m-sanjay",
+    "001-T003": "m-vikram",
+    "001-T004": "m-vikram",
+    "001-T009": "m-sanjay",
+    "003-T008": "m-meera",
+    "001-T012": "m-kavya",
+    "001-T019": "m-kavya",
+    "001-T068": "m-priya",
+    "001-T036": "m-kavya",
+    "001-T037": "m-kavya",
+    "001-T020": "m-kavya",
+    "001-T044": "m-priya",
+    "001-T045": "m-priya",
+    "001-T023": "m-priya",
+    "001-T050": "m-neha",
+    "006-T003": "m-neha",
+    "001-T013": "claude-code"
+  },
+  "vetoes": {},
+  "annotated": true,
+  "generated_at": "2026-11-13T13:10:52Z"
+}

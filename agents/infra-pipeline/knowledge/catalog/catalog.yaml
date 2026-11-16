@@ -1,0 +1,53 @@
+# Golden-path catalog. Owned by the platform team; the agent never adds entries itself.
+# Module versions: "verified" pins were checked against the registry on 2026-11-04. Others are major-version
+# constraints; the agent checks them with the infra_registry_versions tool (Terraform registry API)
+# and `tofu init` in the sandbox fails loudly if a pin is wrong.
+version: 1
+defaults:
+  required_tags: [project, environment, owner, managed-by]
+  allowed_regions: [us-east-1, us-west-2, eu-west-1, eu-central-1, ap-south-1]
+size_classes:
+  small:  {db_instance: db.t4g.small,  cache_node: cache.t4g.small,  node_instance: t3.large,  nodes_min: 2, nodes_max: 4}
+  medium: {db_instance: db.m7g.large,  cache_node: cache.m7g.large,  node_instance: m6i.xlarge, nodes_min: 3, nodes_max: 6}
+  large:  {db_instance: db.r7g.xlarge, cache_node: cache.r7g.large,  node_instance: m6i.2xlarge, nodes_min: 3, nodes_max: 10}
+templates:
+  - id: aws-network
+    applies_to: {cloud: aws, need: network}
+    module: {source: terraform-aws-modules/vpc/aws, version: "6.7.3", verified: true}
+    template: terraform/aws/network.tf.j2
+  - id: aws-eks
+    applies_to: {cloud: aws, need: k8s_cluster}
+    module: {source: terraform-aws-modules/eks/aws, version: "~> 21.0", verified: false}
+    template: terraform/aws/eks.tf.j2
+  - id: aws-ecr
+    applies_to: {cloud: aws, need: container_registry}
+    module: {source: terraform-aws-modules/ecr/aws, version: "~> 2.0", verified: false}
+    template: terraform/aws/ecr.tf.j2
+  - id: aws-rds-postgres
+    applies_to: {cloud: aws, need: postgres}
+    module: {source: terraform-aws-modules/rds/aws, version: "~> 6.0", verified: false}
+    template: terraform/aws/rds_postgres.tf.j2
+    stateful: true
+  - id: aws-elasticache-redis
+    applies_to: {cloud: aws, need: redis}
+    module: {source: terraform-aws-modules/elasticache/aws, version: "~> 1.0", verified: false}
+    template: terraform/aws/elasticache_redis.tf.j2
+    stateful: true
+  - id: aws-sqs
+    applies_to: {cloud: aws, need: queue}
+    module: {source: terraform-aws-modules/sqs/aws, version: "~> 5.0", verified: false}
+    template: terraform/aws/sqs.tf.j2
+  - id: aws-s3
+    applies_to: {cloud: aws, need: object_storage}
+    module: {source: terraform-aws-modules/s3-bucket/aws, version: "~> 5.0", verified: false}
+    template: terraform/aws/s3.tf.j2
+    stateful: true
+  - id: k8s-workload
+    applies_to: {cloud: any, need: k8s_workload}
+    template: gitops/app-values.yaml.j2
+  - id: external-secrets
+    applies_to: {cloud: aws, need: secrets}
+    template: gitops/externalsecret.yaml.j2
+  - id: observability
+    applies_to: {cloud: any, need: observability}
+    template: gitops/prometheusrule.yaml.j2

@@ -1,0 +1,17 @@
+{
+  "gate": "P4-G1",
+  "project": "clinic-test-2",
+  "decision": "approved",
+  "approver": {
+    "name": "Claude Code",
+    "role": "Test approver (on user's instruction)"
+  },
+  "submitted_by": {
+    "name": "task-breakdown agent"
+  },
+  "decided_at": "2026-11-13T07:38:04+00:00",
+  "comment": "Test approval by Claude Code on the user's instruction, not a real product-owner sign-off. Backlog: 10 epics, 79 stories, 484 tasks, 271 SP; validator success on attempt 3.",
+  "artifacts": {
+    "backlog/backlog.json": "sha256:b2a64261ead5b0db1bcf263e2673c8d60f1f104ef5b41fe20a5ccf2eaa2674d5"
+  }
+}

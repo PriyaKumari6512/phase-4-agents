@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: BrightSmile clinic API - patient appointments (feature 004)
+  version: 1.0.0
+  description: >
+    Fragment merged into contracts/clinic-api-v1.openapi.yaml. All operations need the patient session cookie;
+    writes need the CSRF header. Times are UTC ISO-8601; the web app shows IST.
+paths:
+  /api/me/appointments:
+    get:
+      operationId: listMyAppointments
+      summary: Upcoming and past appointments of every person on the signed-in account (R1: the account holder only)
+      parameters:
+        - name: past_cursor
+          in: query
+          schema: { type: string }
+        - name: past_limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Groups per person
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [groups]
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      required: [person, upcoming, past]
+                      properties:
+                        person: { $ref: "#/components/schemas/Person" }
+                        upcoming:
+                          type: array
+                          items: { $ref: "#/components/schemas/Appointment" }
+                        past:
+                          type: array
+                          items: { $ref: "#/components/schemas/Appointment" }
+                        past_next_cursor: { type: string, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /api/appointments/{appointmentId}:
+    get:
+      operationId: getMyAppointment
+      summary: One appointment of the signed-in account
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      responses:
+        "200":
+          description: The appointment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/appointments/{appointmentId}/reschedule-slots:
+    get:
+      operationId: listRescheduleSlots
+      summary: Free slots for the same clinic and treatment, any dentist, within the booking horizon
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: At most 7 days after `from`
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Free slots, earliest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [slots]
+                properties:
+                  slots:
+                    type: array
+                    items: { $ref: "#/components/schemas/Slot" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/ChangeRefused" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/ChangeRefused" }
+  /api/appointments/{appointmentId}/cancel:
+    post:
+      operationId: cancelMyAppointment
+      summary: Cancel an upcoming appointment (4-hour rule). Repeating it returns the current state.
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      responses:
+        "200":
+          description: Appointment now cancelled by the patient
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/ChangeRefused" }
+  /api/appointments/{appointmentId}/reschedule:
+    post:
+      operationId: rescheduleMyAppointment
+      summary: Move an upcoming appointment to another free slot (4-hour rule, same clinic and treatment)
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dentist_id, start_at]
+              properties:
+                dentist_id: { type: string, format: uuid }
+                start_at: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Appointment at its new time
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/ChangeRefused" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Slot taken meanwhile, or the change window is closed, or the appointment is no longer upcoming
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SlotTaken"
+                  - $ref: "#/components/schemas/ChangeRefusedBody"
+        "422":
+          description: Target slot is not a valid slot for this appointment (other clinic, other treatment length, outside the horizon)
+components:
+  parameters:
+    AppointmentId:
+      name: appointmentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Unauthenticated:
+      description: No valid session
+    NotFound:
+      description: Unknown appointment or not owned by the signed-in account (same answer for both)
+    ChangeRefused:
+      description: Change not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ChangeRefusedBody" }
+  schemas:
+    Person:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    Appointment:
+      type: object
+      required: [id, person, clinic, dentist, treatment, start_at, end_at, status, can_change]
+      properties:
+        id: { type: string, format: uuid }
+        person: { $ref: "#/components/schemas/Person" }
+        clinic:
+          type: object
+          required: [id, name, phone]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            phone: { type: string }
+        dentist:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        treatment:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [booked, arrived, no_show, cancelled_by_patient, cancelled_by_clinic]
+        channel: { type: string, enum: [sms, whatsapp] }
+        can_change:
+          type: boolean
+          description: True only for a booked appointment at least 4 hours ahead and allowed by the reschedule rule
+        change_block_reason:
+          type: string
+          nullable: true
+          enum: [within_cutoff, not_upcoming, policy_blocked, null]
+        change_deadline_at:
+          type: string
+          format: date-time
+          description: start_at minus 4 hours
+    Slot:
+      type: object
+      required: [dentist_id, dentist_name, start_at, end_at]
+      properties:
+        dentist_id: { type: string, format: uuid }
+        dentist_name: { type: string }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+    ChangeRefusedBody:
+      type: object
+      required: [code, clinic_phone]
+      properties:
+        code:
+          type: string
+          enum: [within_cutoff, not_upcoming, reschedule_blocked]
+        message: { type: string }
+        clinic_phone: { type: string }
+    SlotTaken:
+      type: object
+      required: [code, next_slots]
+      properties:
+        code: { type: string, enum: [slot_taken] }
+        next_slots:
+          type: array
+          items: { $ref: "#/components/schemas/Slot" }

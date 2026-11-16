@@ -1,0 +1,24 @@
+name: app
+image:
+  repository: example/app
+  tag: "0.0.0"
+replicas: 2
+http: true              # false for workers: no ports, probes or Service
+port: 8080
+args: []                # container args, e.g. the worker command when it shares an image
+healthPath: /healthz
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {memory: 512Mi}
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPU: 70
+envFromSecret: ""        # name of the Secret created by an ExternalSecret
+env: {}
+ingress:
+  enabled: false
+  host: ""              # public DNS name
+  certificateArn: ""    # ACM certificate for HTTPS
+otelEndpoint: "http://otel-collector.observability:4317"

@@ -1,0 +1,30 @@
+name: phase4-claude
+run-name: "phase4 ${{ "{{" }} inputs.task_id {{ "}}" }}"
+# Dispatch target for the Work Allocation agent. The brief is written by Phase 4 from the task.
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Phase 4 task id
+        required: true
+      brief:
+        description: Task brief (acceptance criteria, DoD, files, rules)
+        required: true
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: {{ actions.checkout }}
+        with:
+          fetch-depth: 1
+      - uses: {{ actions.claude_code_action }}
+        with:
+          anthropic_api_key: ${{ "{{" }} secrets.ANTHROPIC_API_KEY {{ "}}" }}
+          prompt: ${{ "{{" }} inputs.brief {{ "}}" }}
+          claude_args: "--max-turns 40"

@@ -1,0 +1,42 @@
+# Atlantis server-side repo config. Owned by the platform team.
+# Server env: ATLANTIS_ENABLE_POLICY_CHECKS=true, ATLANTIS_DEFAULT_TF_DISTRIBUTION=opentofu,
+#             ATLANTIS_DEFAULT_TF_VERSION=1.13.2, INFRACOST_CLI_AUTHENTICATION_TOKEN, PHASE4_PLAN_WEBHOOK_URL,
+#             PHASE4_PLAN_WEBHOOK_SECRET
+repos:
+  - id: /.*/
+    workflow: phase4
+    apply_requirements: [approved, mergeable]
+    allowed_overrides: []
+policies:
+  owners:
+    users: [platform-policy-owner]
+  policy_sets:
+    - name: phase4
+      path: /home/atlantis/policies/
+      source: local
+workflows:
+  phase4:
+    plan:
+      steps:
+        - init
+        - plan
+        - show
+        # UNVERIFIED pattern (no official Atlantis recipe): Checkov on the plan JSON.
+        - run: checkov -f $SHOWFILE --framework terraform_plan --repo-root-for-plan-enrichment $DIR -o cli --compact --hard-fail-on HIGH,CRITICAL
+        # UNVERIFIED for Infracost CLI 2.x inside Atlantis: cost of the plan (needs infracost >= 2.4.2).
+        - run:
+            command: infracost scan $SHOWFILE --json > $DIR/infracost.json || echo '{}' > $DIR/infracost.json
+            output: hide
+        # Phase 4 receiver: risk score, cost, plan summary (signed with HMAC-SHA256).
+        - run:
+            command: |
+              body=$(jq -c --arg pr "$PULL_NUM" --arg repo "$BASE_REPO_OWNER/$BASE_REPO_NAME" --arg dir "$REPO_REL_DIR" \
+                --slurpfile cost $DIR/infracost.json '{pull: ($pr|tonumber), repo: $repo, dir: $dir, plan: ., cost: $cost[0]}' $SHOWFILE)
+              sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$PHASE4_PLAN_WEBHOOK_SECRET" | sed 's/^.* //')
+              curl -fsS -X POST "$PHASE4_PLAN_WEBHOOK_URL" -H "Content-Type: application/json" -H "X-Phase4-Signature: sha256=$sig" --data "$body"
+            output: hide
+    policy_check:
+      steps:
+        - show
+        - policy_check:
+            extra_args: ["--all-namespaces"]

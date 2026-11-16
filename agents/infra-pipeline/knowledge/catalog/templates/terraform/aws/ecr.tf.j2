@@ -1,0 +1,9 @@
+module "ecr_{{ name }}" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  repository_name                 = "${var.project}/{{ component }}"
+  repository_image_tag_mutability = "IMMUTABLE"
+  repository_image_scan_on_push   = true
+  create_lifecycle_policy         = false
+}

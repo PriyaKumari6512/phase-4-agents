@@ -1,0 +1,147 @@
+{
+  "job_id": "20261110-151050-37425c",
+  "agent": "architecture/risk",
+  "project": "clinic-test-2",
+  "request": 0,
+  "runner": "claude-code",
+  "auth": "claude subscription token",
+  "passes": [
+    {
+      "kind": "write",
+      "agent": "architecture/risk",
+      "model_tier": "strong",
+      "model": "sonnet",
+      "ok": true,
+      "session_id": "fc1912ef-e98c-49e2-b7be-099647c2b1ed",
+      "num_turns": 26,
+      "duration_seconds": 295.6,
+      "cost_usd_equivalent": 1.0824686000000001,
+      "usage": {
+        "input_tokens": 16,
+        "cache_creation_input_tokens": 150720,
+        "cache_read_input_tokens": 523166,
+        "output_tokens": 42724,
+        "output_tokens_details": {
+          "thinking_tokens": 17056
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 150720,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 1343,
+            "cache_read_input_tokens": 152657,
+            "cache_creation_input_tokens": 1251,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 1251
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      }
+    },
+    {
+      "kind": "verify",
+      "agent": "architecture/risk/validator",
+      "model_tier": "strong",
+      "model": "sonnet",
+      "ok": true,
+      "session_id": "d6d66b62-9ef0-4de9-81b6-4a630d97b0b6",
+      "num_turns": 8,
+      "duration_seconds": 21.6,
+      "cost_usd_equivalent": 0.2542049,
+      "usage": {
+        "input_tokens": 6,
+        "cache_creation_input_tokens": 54919,
+        "cache_read_input_tokens": 59469,
+        "output_tokens": 2857,
+        "output_tokens_details": {
+          "thinking_tokens": 1471
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 54919,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 1030,
+            "cache_read_input_tokens": 51019,
+            "cache_creation_input_tokens": 6719,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 6719
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "satisfied": true
+    }
+  ],
+  "inputs": {
+    "required": [
+      "product/prd.md",
+      "product/backlog.md",
+      "architecture.md",
+      "lld.md",
+      "decisions.md",
+      "data-model.md",
+      "integration-specs.md",
+      "requirements/clarifications.md",
+      "scope/estimate.md",
+      "scope/scope.md",
+      "requirements/register.md"
+    ],
+    "read": [
+      "product/prd.md",
+      "product/backlog.md",
+      "architecture.md",
+      "lld.md",
+      "decisions.md",
+      "data-model.md",
+      "integration-specs.md",
+      "requirements/clarifications.md",
+      "scope/estimate.md",
+      "scope/scope.md",
+      "requirements/register.md"
+    ],
+    "not_read": []
+  },
+  "agent_reply": "I wrote `risk-register.md` and `dependency-map.md` in `/outputs/clinic-test-2/`, both based on architecture v1. I haven't run the validator. I read all eleven inputs. `requests.md` does not exist in this project folder, so I worked without it.\n\n**Risks:** 38 in total (RSK-001 to RSK-038), all open.\n- **Rating:** 1 Critical, 9 High, 25 Medium and 3 Low.\n- **HLD risks:** RSK-001 to RSK-010 keep their ids and meaning. I re-scored RSK-001 from 3\u00d74 to 4\u00d74, because Q-014 says the clinic has no accounts and no provider is chosen.\n- **Top three:**\n  1. **RSK-001 (Critical):** SMS and WhatsApp registration is late. Without SMS there is no sign-in, so no go-live.\n  2. **RSK-011 and RSK-012 (High):** The high estimate leaves about 3 weeks of spare time against a firm date, and MOD-07 was sized before the design added adapters, webhooks and reconciliation.\n  3. **RSK-004, RSK-020 and RSK-022 (High):** Reminders depend on a dispatcher inside the API. A lost receipt, a slow provider, or a hosting runtime that throttles CPU outside requests can lose reminders without anyone noticing.\n\n**Dependencies:** 34 rows.\n- Scope DEP-001 to DEP-006 keep their ids; new ones start at DEP-007.\n- Each HLD relationship (rel-001 to rel-010) and each container has a row.\n- The graph has 15 nodes, including the managed platform services the HLD names without ids.\n\n**Single points of failure:** 9.\n- The SMS provider on the sign-in path.\n- The clinic-owned provider registration (DEP-001).\n- The Clinic API with the dispatcher inside it.\n- The database primary.\n- The edge.\n- The secret store.\n- The first manager account.\n- The practice manager as the only source of hours and sign-off.\n- The client-owned domain.\n\n**Build order:** provider choice and accounts in week 1 (critical path), then foundations, scheduling and staff sign-in, SMS adapter and `send_code`, patient sign-in, booking, full messaging (critical path), reception, web screens in parallel, then provider integration test, load and restore tests, UAT and go-live, with R2 after.\n\n**Upstream issues** (recorded as risks; I changed no earlier document):\n1. A WhatsApp or SMS message with no receipt stays `sent` and is never repaired, so a lost reminder goes unnoticed (RSK-020). Needs a change request.\n2. The receptionist searching all patients (ASM-011) conflicts with NFR-006, \"own clinic only\" (RSK-026).\n3. `ent-idempotency-key` has no purge job (RSK-031).\n4. The HLD says the appointment's personal link is removed; the data model keeps the row (RSK-007, RSK-036).\n5. The HLD lists 13 entities and the data model has 15 (RSK-036).\n6. Integration specs say failover returns \"503 INTERNAL_ERROR\", but the LLD maps INTERNAL_ERROR to 500 (RSK-036).\n7. rel-005's operation count disagrees with the contract's 50 (RSK-036).\n8. WhatsApp STOP is unspecified, which affects NFR-011 (RSK-021).\n9. Design elements outside the scope baseline, such as the erasure screen and clinic and dentist edits, risk scope creep (RSK-013).\n10. The backlog and estimate disagree on the R1/R2 split and on how long R2 takes, and the client hasn't confirmed the split (RSK-018).\n11. ADR-0005's \"serverless container runtime\" may not suit a dispatcher loop that must run outside requests (RSK-022).\n12. The PRD has no privacy-notice story, and there is no staff password reset (RSK-027, RSK-037).",
+  "loops": 1,
+  "status": "success",
+  "verified": true,
+  "verdict": {
+    "satisfied": true,
+    "status_so_far": "success",
+    "gaps": [
+      "minor: 2: RSK-001 cites Q-014 as the source of 'no accounts, no provider chosen'. Q-014 is answered in clarifications.md, not open. The citation is fine as evidence, but the wording could say 'answered: no accounts'.",
+      "minor: 1: requests.md does not exist in the project folder. The HLD refers to 'request 1 of requests.md'. The register says so openly. The task's statement that requests.md holds the requests could not be checked against anything.",
+      "minor: 9: the graph has no separate node for the HLD's 'secret store' dependency row DEP-019 labels. The label is 'Secret store' (plat_secrets), which matches, but there is no edge from the container service to the secret store. This is cosmetic."
+    ],
+    "summary": "I checked both files against the HLD, scope, estimate, backlog, clarifications and the earlier Phase 3B documents. I found no blocking gap. RSK-001 to RSK-010 keep the HLD ids and meanings, with RSK-001 re-scored and the reason given. All 38 scores, ratings and heat-map cells check out and the totals (1 Critical, 9 High, 25 Medium, 3 Low) are right. Every High and Critical risk is in section 4. The dependency rows cover the HLD's rel-001 to rel-010, every container and external system, and the platform services. Scope DEP-001 to DEP-006 keep their ids, and the open Q-007, Q-008, Q-009 and Q-015 each have a dependency row and a risk. The flowchart matches the rows and its syntax is valid. The build order marks the critical path, the estimate's 7\u201313 weeks against the 16 available is covered by RSK-011 and RSK-012, and no vendor SLA or price is invented."
+  },
+  "elapsed_seconds": 319.6,
+  "cost_usd_equivalent": 1.3367,
+  "finished_at": "2026-11-10T15:16:19+00:00"
+}

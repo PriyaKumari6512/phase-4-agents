@@ -1,0 +1,25 @@
+# Skill taxonomy (spec 9.3). Agents 1 and 3 may only use these tags.
+# aliases: words that map to the tag; paths: glob-ish fragments (extension or folder) used by git mining.
+skills:
+  backend-python:   {aliases: [python, fastapi, django, flask, pydantic], paths: [".py"]}
+  backend-node:     {aliases: [node, nodejs, express, nestjs, typescript backend], paths: ["server/", ".mjs"]}
+  backend-java:     {aliases: [java, spring, quarkus, kotlin], paths: [".java", ".kt"]}
+  backend-go:       {aliases: [go, golang], paths: [".go"]}
+  api-design:       {aliases: [api, rest, openapi, graphql, endpoint, contract], paths: ["openapi", "contracts/", ".graphql"]}
+  frontend-react:   {aliases: [react, jsx, tsx, next.js, nextjs, frontend, ui component], paths: [".jsx", ".tsx"]}
+  frontend-css:     {aliases: [css, tailwind, styling, layout, responsive], paths: [".css", ".scss"]}
+  mobile:           {aliases: [ios, android, react native, flutter, swift], paths: [".swift", ".dart"]}
+  postgres:         {aliases: [postgres, postgresql, sql, database, schema, migration], paths: [".sql", "migrations/"]}
+  data-modeling:    {aliases: [data model, entity, orm, sqlalchemy, prisma], paths: ["models/", "entities/"]}
+  redis:            {aliases: [redis, cache, caching], paths: []}
+  messaging:        {aliases: [queue, kafka, sqs, nats, rabbitmq, pubsub, event], paths: ["consumers/", "events/"]}
+  auth-security:    {aliases: [auth, authentication, authorization, oauth, jwt, login, security, rbac], paths: ["auth/", "security/"]}
+  payments:         {aliases: [payment, billing, stripe, checkout, invoice], paths: ["payments/", "billing/"]}
+  qa-automation:    {aliases: [test, testing, pytest, jest, e2e, playwright, cypress, qa], paths: ["tests/", "test/", ".spec.", ".test."]}
+  devops-ci:        {aliases: [ci, cd, pipeline, github actions, workflow, build], paths: [".github/workflows/", "ci/"]}
+  kubernetes:       {aliases: [kubernetes, k8s, helm, argo, deployment manifest], paths: ["k8s/", "helm/", "charts/"]}
+  terraform:        {aliases: [terraform, opentofu, iac, infrastructure], paths: [".tf", ".tofu"]}
+  observability:    {aliases: [logging, metrics, tracing, monitoring, opentelemetry, prometheus, grafana, alert], paths: ["observability/"]}
+  ux-design:        {aliases: [ux, ui design, figma, accessibility, a11y], paths: []}
+  docs:             {aliases: [documentation, readme, docs, guide], paths: [".md", "docs/"]}
+  ml-ai:            {aliases: [llm, ml, machine learning, embedding, model inference, ai], paths: ["ml/", "models/ai"]}

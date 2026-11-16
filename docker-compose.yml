@@ -1,0 +1,15 @@
+# Optional services for the Phase 4 agents. The engine itself runs on the host (`uv run agent-engine ...`).
+services:
+  # Work Allocation: forked Timefold task-assigning service (capacity constraint added, see FORK.md).
+  # Without it, PHASE4_ALLOCATION_SOLVER_MODE=auto falls back to the local CP-SAT model.
+  allocation-solver:
+    build: ./services/allocation-solver
+    image: phase4/allocation-solver:dev
+    ports: ["8080:8080"]
+
+  # Infra & Pipeline: the IaC check tools (tofu, tflint, trivy, checkov, actionlint, helm, kubeconform, gitleaks,
+  # conftest). Build once; the agent runs it per check with `docker run`. Not a long-running service.
+  iac-sandbox:
+    build: ./services/iac-sandbox
+    image: phase4/iac-sandbox:dev
+    profiles: ["build-only"]

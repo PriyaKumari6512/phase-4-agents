@@ -1,0 +1,1011 @@
+openapi: 3.0.3
+info:
+  title: Clinic API
+  version: 1.1.0
+  description: >
+    Contract api-clinic-api-v1 of ctr-clinic-api (Clinic Booking System).
+    JSON over HTTPS, snake_case fields, UTC ISO 8601 timestamps.
+    Every list is paginated with page and page_size (default 50, max 100).
+servers:
+  - url: /
+    description: Root path. The major version is in the contract file name and info.version, not in the path, so GET /health stays at /health
+tags:
+  - name: Health
+  - name: Auth
+  - name: Patients
+  - name: Dentists
+  - name: Appointments
+  - name: Schedule
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Liveness and database check
+      security: []
+      responses:
+        '200':
+          description: Service and database are reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: registerPatient
+      summary: Patient self-registration (creates account and patient profile)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account and patient created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Log in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Signed token valid for 60 minutes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /patients/{patient_id}:
+    parameters:
+      - $ref: '#/components/parameters/PatientId'
+    get:
+      tags: [Patients]
+      operationId: getPatient
+      summary: Read own contact details (patient only, own record)
+      responses:
+        '200':
+          description: Patient profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      tags: [Patients]
+      operationId: updatePatientContact
+      summary: Update own mobile number (patient only, own record)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContactRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+    delete:
+      tags: [Patients]
+      operationId: erasePatient
+      summary: Erase a patient (patient for self, or receptionist)
+      description: >
+        Cancels the patient's future appointments, anonymises name and mobile,
+        deletes the account, in one transaction (BR-016). Past appointments stay.
+      responses:
+        '204':
+          description: Patient erased
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /dentists:
+    get:
+      tags: [Dentists]
+      operationId: listDentists
+      summary: List active dentists
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of dentists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DentistPage'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /dentists/{dentist_id}/slots:
+    parameters:
+      - $ref: '#/components/parameters/DentistId'
+    get:
+      tags: [Dentists]
+      operationId: listOpenSlots
+      summary: List open slots of a dentist (window of at most 14 days)
+      parameters:
+        - name: date_from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of open 30-minute slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotPage'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /dentists/{dentist_id}/working-hours:
+    parameters:
+      - $ref: '#/components/parameters/DentistId'
+    get:
+      tags: [Dentists]
+      operationId: listWorkingHours
+      summary: List a dentist's weekly working-hours rules and blocked periods (receptionist)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of availability rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityPage'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+    put:
+      tags: [Dentists]
+      operationId: setWorkingHours
+      summary: Replace a dentist's weekly working-hours rules (receptionist)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetWorkingHoursRequest'
+      responses:
+        '200':
+          description: The new rules (first page, at most 100 rules per request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityPage'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /dentists/{dentist_id}/blocked-periods:
+    parameters:
+      - $ref: '#/components/parameters/DentistId'
+    post:
+      tags: [Dentists]
+      operationId: blockPeriod
+      summary: Block a period when a dentist is unavailable (receptionist)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockPeriodRequest'
+      responses:
+        '201':
+          description: Blocked period created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments:
+    post:
+      tags: [Appointments]
+      operationId: bookAppointment
+      summary: Book an appointment (patient for self, receptionist for any patient)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookAppointmentRequest'
+      responses:
+        '201':
+          description: Appointment booked (also returned for a repeated Idempotency-Key with the same data)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+    get:
+      tags: [Appointments]
+      operationId: listAppointments
+      summary: List one patient's appointments (patient own records, receptionist any)
+      parameters:
+        - name: patient_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of appointments, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentPage'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments/{appointment_id}/cancel:
+    post:
+      tags: [Appointments]
+      operationId: cancelAppointment
+      summary: Cancel an appointment (patient until 2 hours before, receptionist until the start)
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+      responses:
+        '200':
+          description: Appointment with status cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments/{appointment_id}/reschedule:
+    post:
+      tags: [Appointments]
+      operationId: rescheduleAppointment
+      summary: Move an appointment to a new slot (old one cancelled in the same transaction)
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RescheduleRequest'
+      responses:
+        '200':
+          description: The new appointment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments/{appointment_id}/no-show:
+    post:
+      tags: [Schedule]
+      operationId: markNoShow
+      summary: Mark a started appointment as no-show (receptionist)
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+      responses:
+        '200':
+          description: Appointment with status no_show
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /schedule/day:
+    get:
+      tags: [Schedule]
+      operationId: getDaySchedule
+      summary: Day schedule per dentist (receptionist)
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Day in the clinic time zone
+          schema:
+            type: string
+            format: date
+        - name: dentist_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of dentists, each with the day's appointments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DentistDayPage'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Signed JWT from POST /auth/login, valid 60 minutes. Carries account id, role and patient id.
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    PatientId:
+      name: patient_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DentistId:
+      name: dentist_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AppointmentId:
+      name: appointment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-generated unique key (max 100 characters). A retry with the same key and data returns the first result.
+      schema:
+        type: string
+        maxLength: 100
+  responses:
+    Error401:
+      description: UNAUTHENTICATED or INVALID_CREDENTIALS
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error403:
+      description: FORBIDDEN
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error404:
+      description: NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error409:
+      description: EMAIL_TAKEN, SLOT_TAKEN, LIMIT_REACHED, TOO_LATE_TO_CHANGE or INVALID_STATE
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error422:
+      description: VALIDATION_ERROR (including a reminder_channel not offered), SLOT_NOT_BOOKABLE or IDEMPOTENCY_CONFLICT
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error429:
+      description: RATE_LIMITED or ACCOUNT_LOCKED. Retry-After header gives the seconds to wait.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error500:
+      description: INTERNAL_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error503:
+      description: DEPENDENCY_UNAVAILABLE. Retry with the same Idempotency-Key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [code, message, timestamp, correlation_id]
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHENTICATED
+            - INVALID_CREDENTIALS
+            - ACCOUNT_LOCKED
+            - FORBIDDEN
+            - NOT_FOUND
+            - EMAIL_TAKEN
+            - SLOT_NOT_BOOKABLE
+            - SLOT_TAKEN
+            - LIMIT_REACHED
+            - TOO_LATE_TO_CHANGE
+            - INVALID_STATE
+            - IDEMPOTENCY_CONFLICT
+            - RATE_LIMITED
+            - DEPENDENCY_UNAVAILABLE
+            - INTERNAL_ERROR
+        message:
+          type: string
+          description: Human-readable text, never contains personal data
+        timestamp:
+          type: string
+          format: date-time
+        correlation_id:
+          type: string
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    Page:
+      type: object
+      required: [page, page_size, total]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+          description: Total number of items over all pages
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name, mobile]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        mobile:
+          type: string
+          pattern: '^\+[1-9][0-9]{7,14}$'
+          description: E.164 mobile number
+    RegisterResponse:
+      type: object
+      required: [account_id, patient_id]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          writeOnly: true
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, expires_at, role]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_at:
+          type: string
+          format: date-time
+        role:
+          type: string
+          enum: [patient, receptionist]
+        patient_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set for patients, null for receptionists
+    Patient:
+      type: object
+      required: [id, full_name, mobile]
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        mobile:
+          type: string
+    UpdateContactRequest:
+      type: object
+      required: [mobile]
+      properties:
+        mobile:
+          type: string
+          pattern: '^\+[1-9][0-9]{7,14}$'
+    Dentist:
+      type: object
+      required: [id, display_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+    DentistPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Dentist'
+    Slot:
+      type: object
+      required: [dentist_id, start_at, end_at]
+      properties:
+        dentist_id:
+          type: string
+          format: uuid
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+    SlotPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Slot'
+    WorkingHoursRule:
+      type: object
+      required: [weekday, start_time, end_time]
+      properties:
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 is Monday
+        start_time:
+          type: string
+          example: '09:00'
+          description: Local clinic time HH:MM, on a 30-minute boundary
+        end_time:
+          type: string
+          example: '17:00'
+        valid_from:
+          type: string
+          format: date
+          nullable: true
+        valid_to:
+          type: string
+          format: date
+          nullable: true
+    SetWorkingHoursRequest:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/WorkingHoursRule'
+    BlockPeriodRequest:
+      type: object
+      required: [from_at, to_at]
+      properties:
+        from_at:
+          type: string
+          format: date-time
+        to_at:
+          type: string
+          format: date-time
+    Availability:
+      type: object
+      required: [id, dentist_id, blocked]
+      properties:
+        id:
+          type: string
+          format: uuid
+        dentist_id:
+          type: string
+          format: uuid
+        blocked:
+          type: boolean
+        weekday:
+          type: integer
+          nullable: true
+        start_time:
+          type: string
+          nullable: true
+        end_time:
+          type: string
+          nullable: true
+        valid_from:
+          type: string
+          format: date
+          nullable: true
+        valid_to:
+          type: string
+          format: date
+          nullable: true
+        blocked_from_at:
+          type: string
+          format: date-time
+          nullable: true
+        blocked_to_at:
+          type: string
+          format: date-time
+          nullable: true
+    AvailabilityPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Availability'
+    BookAppointmentRequest:
+      type: object
+      required: [patient_id, dentist_id, start_at]
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        dentist_id:
+          type: string
+          format: uuid
+        start_at:
+          type: string
+          format: date-time
+          description: Start of an open slot, UTC
+        reminder_channel:
+          $ref: '#/components/schemas/ReminderChannel'
+    ReminderChannel:
+      type: string
+      enum: [sms, whatsapp]
+      default: sms
+      description: >
+        Channel of the reminder 24 hours before the visit (added in 1.1.0, optional, default sms).
+        whatsapp is accepted only while the clinic has enabled it, otherwise 422 VALIDATION_ERROR.
+        Choosing whatsapp counts as the patient's opt-in. A reschedule keeps the channel.
+    RescheduleRequest:
+      type: object
+      required: [new_start_at]
+      properties:
+        new_start_at:
+          type: string
+          format: date-time
+    Appointment:
+      type: object
+      required: [id, patient_id, dentist_id, start_at, end_at, status, reminder_channel, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        dentist_id:
+          type: string
+          format: uuid
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [booked, cancelled, no_show]
+        reminder_channel:
+          $ref: '#/components/schemas/ReminderChannel'
+        changed_by:
+          type: string
+          format: uuid
+          nullable: true
+        changed_at:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+    AppointmentPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Appointment'
+    DayAppointment:
+      type: object
+      required: [appointment, patient_name, patient_mobile]
+      properties:
+        appointment:
+          $ref: '#/components/schemas/Appointment'
+        patient_name:
+          type: string
+        patient_mobile:
+          type: string
+    DentistDay:
+      type: object
+      required: [dentist_id, dentist_name, appointments]
+      properties:
+        dentist_id:
+          type: string
+          format: uuid
+        dentist_name:
+          type: string
+        appointments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayAppointment'
+    DentistDayPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/DentistDay'

@@ -1,0 +1,25 @@
+# Task Breakdown (PDLC Phase 4, agent 1): prd.md + architecture.md -> spec-kit specs -> estimated backlog.
+description = "Task Breakdown: turns prd.md and architecture.md into spec-kit specs and an estimated, dependency-checked backlog."
+model = "strong"
+filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+tools = ["phase4-speckit", "phase4-backlog"]
+skills = "skills"
+verifier = "task-breakdown/validator"
+max_fix_loops = 2
+request_history = "agent"
+
+[input]
+description = "prd.md (from the prd agent), architecture.md, and phase4/project.json (team, Definition of Done, story point scale, repos, deadlines). Optional: phase4/history.json (resolved tickets, for estimation by analogy)."
+files = ["prd.md", "architecture.md", "phase4/project.json"]
+
+[output]
+description = "backlog/backlog.json (epics, stories, tasks with acceptance criteria, estimates, skills, dependencies, PRD coverage) and backlog/backlog.md for the P4-G1 review; spec-kit specs under specs/."
+files = ["backlog/backlog.json", "backlog/backlog.md"]
+
+[subagents.speckit-feature]
+description = "Runs github spec-kit (specify, plan, tasks, analyze) for ONE feature. Task description must give: the project name, the feature_directory (specs/NNN-name), the feature title and its full description with the prd.md requirement ids it covers and the architecture components involved."
+prompt = "subagents/speckit-feature.md"
+
+[subagents.backlog-enricher]
+description = "Enriches ONE epic in backlog/backlog.json: story estimates by analogy, task acceptance criteria, skills, AI-eligibility proposals. Task description must give: the project name and the epic id (E-NNN)."
+prompt = "subagents/backlog-enricher.md"

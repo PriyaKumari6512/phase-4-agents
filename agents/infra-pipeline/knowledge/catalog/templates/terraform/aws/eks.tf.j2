@@ -1,0 +1,26 @@
+module "eks" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  name               = "${var.project}-${var.environment}"
+  kubernetes_version = var.kubernetes_version
+  vpc_id             = module.network.vpc_id
+  subnet_ids         = module.network.private_subnets
+
+  endpoint_public_access                   = false
+  enable_irsa                              = true
+  enable_cluster_creator_admin_permissions = true
+
+  eks_managed_node_groups = {
+    default = {
+      instance_types = ["{{ size.node_instance }}"]
+      min_size       = {{ size.nodes_min }}
+      max_size       = {{ size.nodes_max }}
+      desired_size   = {{ size.nodes_min }}
+    }
+  }
+}
+
+output "cluster_name" {
+  value = module.eks.cluster_name
+}

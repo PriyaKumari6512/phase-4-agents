@@ -1,0 +1,14 @@
+# PRD Writer: turns a client requirement into a PRD.
+description = "PRD Writer: turns a client requirement into a product requirements document."
+model = "strong"
+filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+verifier = "prd/validator"
+max_fix_loops = 2
+
+[input]
+description = "The client requirement in plain text, or client feedback on an earlier PRD."
+files = []
+
+[output]
+description = "A product requirements document with user stories and functional requirements."
+files = ["prd.md"]

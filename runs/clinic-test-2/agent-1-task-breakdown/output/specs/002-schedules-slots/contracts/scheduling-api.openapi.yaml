@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: BrightSmile Clinic API - scheduling (feature 002)
+  version: 1.0.0
+  description: >
+    Treatment types, weekly hours, leave and free slots. Part of api-clinic-api-v1.
+    Instants are ISO 8601 UTC; weekly hours and breaks are IST wall-clock "HH:MM".
+servers:
+  - url: /api
+paths:
+  /treatment-types:
+    get:
+      summary: List treatment types (patients see active online types only)
+      parameters:
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}, description: Manager only}
+      responses:
+        "200": {description: List, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/TreatmentType"}}}}}
+        "401": {description: Not signed in}
+    post:
+      summary: Add a treatment type (manager)
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/TreatmentTypeInput"}}}
+      responses:
+        "201": {description: Created, content: {application/json: {schema: {$ref: "#/components/schemas/TreatmentType"}}}}
+        "403": {description: Not the practice manager}
+        "409": {description: Name already exists}
+        "422": {description: Invalid duration or name}
+  /treatment-types/{id}:
+    patch:
+      summary: Edit or switch off a treatment type (manager)
+      parameters: [{name: id, in: path, required: true, schema: {type: integer}}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/TreatmentTypePatch"}}}
+      responses:
+        "200": {description: Updated, content: {application/json: {schema: {$ref: "#/components/schemas/TreatmentType"}}}}
+        "403": {description: Not the practice manager}
+        "404": {description: Not found}
+        "409": {description: Name already exists}
+        "422": {description: Invalid duration or name}
+  /dentists/{dentist_id}/working-hours:
+    get:
+      summary: Weekly hours of a dentist at all clinics (manager)
+      parameters: [{name: dentist_id, in: path, required: true, schema: {type: integer}}]
+      responses:
+        "200": {description: Hours, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/WorkingHours"}}}}}
+        "403": {description: Not the practice manager}
+        "404": {description: Unknown dentist}
+  /dentists/{dentist_id}/clinics/{clinic_id}/working-hours:
+    put:
+      summary: Replace the weekly hours of a dentist at a clinic (manager)
+      parameters:
+        - {name: dentist_id, in: path, required: true, schema: {type: integer}}
+        - {name: clinic_id, in: path, required: true, schema: {type: integer}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/WorkingHoursInput"}}}}
+      responses:
+        "200": {description: Saved, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/WorkingHours"}}}}}
+        "403": {description: Not the practice manager}
+        "404": {description: Unknown dentist or clinic}
+        "409": {description: Overlaps the dentist's hours at another clinic}
+        "422": {description: End not after start, break outside the day or overlapping breaks}
+  /dentists/{dentist_id}/leave:
+    get:
+      summary: List leave of a dentist (manager)
+      parameters:
+        - {name: dentist_id, in: path, required: true, schema: {type: integer}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+      responses:
+        "200": {description: Leave, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/Leave"}}}}}
+        "403": {description: Not the practice manager}
+    post:
+      summary: Record leave (manager)
+      parameters: [{name: dentist_id, in: path, required: true, schema: {type: integer}}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LeaveInput"}}}
+      responses:
+        "201": {description: Created with the appointments to move, content: {application/json: {schema: {$ref: "#/components/schemas/LeaveWithConflicts"}}}}
+        "403": {description: Not the practice manager}
+        "409": {description: Overlaps other leave of the dentist}
+        "422": {description: End not after start}
+  /leave/{leave_id}:
+    patch:
+      summary: Change leave (manager)
+      parameters: [{name: leave_id, in: path, required: true, schema: {type: integer}}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LeaveInput"}}}
+      responses:
+        "200": {description: Updated, content: {application/json: {schema: {$ref: "#/components/schemas/LeaveWithConflicts"}}}}
+        "403": {description: Not the practice manager}
+        "404": {description: Not found}
+        "409": {description: Overlaps other leave}
+        "422": {description: End not after start}
+    delete:
+      summary: Delete leave (manager)
+      parameters: [{name: leave_id, in: path, required: true, schema: {type: integer}}]
+      responses:
+        "204": {description: Deleted}
+        "403": {description: Not the practice manager}
+        "404": {description: Not found}
+  /leave/{leave_id}/appointments-to-move:
+    get:
+      summary: Booked appointments inside the leave, calculated now (manager; receptionist for own clinic)
+      parameters: [{name: leave_id, in: path, required: true, schema: {type: integer}}]
+      responses:
+        "200": {description: List, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/AppointmentToMove"}}}}}
+        "403": {description: Role not allowed}
+        "404": {description: Not found}
+  /clinics/{clinic_id}/slots:
+    get:
+      summary: Free slots of one clinic for a date range and a treatment type
+      parameters:
+        - {name: clinic_id, in: path, required: true, schema: {type: integer}}
+        - {name: treatment_type_id, in: query, required: true, schema: {type: integer}}
+        - {name: dentist_id, in: query, schema: {type: integer}, description: Omit for all the clinic's dentists}
+        - {name: from, in: query, required: true, schema: {type: string, format: date}, description: IST date}
+        - {name: to, in: query, required: true, schema: {type: string, format: date}, description: IST date, at most 31 days after from}
+      responses:
+        "200": {description: Slots in time order, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/FreeSlot"}}}}}
+        "401": {description: Not signed in}
+        "403": {description: Other clinic, or treatment not bookable online for a patient}
+        "404": {description: Unknown clinic, dentist or treatment}
+        "422": {description: Range longer than 31 days or end before start}
+  /clinics/{clinic_id}/slots/first-available:
+    get:
+      summary: The 10 earliest free slots across the clinic's dentists
+      parameters:
+        - {name: clinic_id, in: path, required: true, schema: {type: integer}}
+        - {name: treatment_type_id, in: query, required: true, schema: {type: integer}}
+      responses:
+        "200": {description: Up to 10 slots in time order, content: {application/json: {schema: {type: array, maxItems: 10, items: {$ref: "#/components/schemas/FreeSlot"}}}}}
+        "401": {description: Not signed in}
+        "403": {description: Other clinic, or treatment not bookable online for a patient}
+        "404": {description: Unknown clinic or treatment}
+components:
+  schemas:
+    TreatmentType:
+      type: object
+      required: [id, name, duration_minutes, online_bookable, active]
+      properties:
+        id: {type: integer}
+        name: {type: string, maxLength: 80}
+        duration_minutes: {type: integer, enum: [30, 60, 90]}
+        online_bookable: {type: boolean}
+        active: {type: boolean}
+    TreatmentTypeInput:
+      type: object
+      required: [name, duration_minutes, online_bookable]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        duration_minutes: {type: integer, enum: [30, 60, 90]}
+        online_bookable: {type: boolean}
+    TreatmentTypePatch:
+      type: object
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        duration_minutes: {type: integer, enum: [30, 60, 90]}
+        online_bookable: {type: boolean}
+        active: {type: boolean}
+    TimeRange:
+      type: object
+      required: [start, end]
+      properties:
+        start: {type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"}
+        end: {type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"}
+    WorkingHoursInput:
+      type: object
+      required: [weekday, start, end]
+      properties:
+        weekday: {type: integer, minimum: 1, maximum: 7}
+        start: {type: string}
+        end: {type: string}
+        breaks: {type: array, items: {$ref: "#/components/schemas/TimeRange"}}
+    WorkingHours:
+      allOf:
+        - $ref: "#/components/schemas/WorkingHoursInput"
+        - type: object
+          required: [id, dentist_id, clinic_id]
+          properties:
+            id: {type: integer}
+            dentist_id: {type: integer}
+            clinic_id: {type: integer}
+    LeaveInput:
+      type: object
+      required: [start_at, end_at, whole_day]
+      properties:
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+        whole_day: {type: boolean}
+        note: {type: string, maxLength: 200}
+    Leave:
+      allOf:
+        - $ref: "#/components/schemas/LeaveInput"
+        - type: object
+          required: [id, dentist_id]
+          properties:
+            id: {type: integer}
+            dentist_id: {type: integer}
+    AppointmentToMove:
+      type: object
+      required: [appointment_id, clinic_id, start_at, end_at, treatment_name, patient_name, patient_phone]
+      properties:
+        appointment_id: {type: integer}
+        clinic_id: {type: integer}
+        dentist_id: {type: integer}
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+        treatment_name: {type: string}
+        patient_name: {type: string}
+        patient_phone: {type: string}
+    LeaveWithConflicts:
+      type: object
+      required: [leave, appointments_to_move]
+      properties:
+        leave: {$ref: "#/components/schemas/Leave"}
+        appointments_to_move: {type: array, items: {$ref: "#/components/schemas/AppointmentToMove"}}
+    FreeSlot:
+      type: object
+      required: [clinic_id, dentist_id, dentist_name, start_at, end_at, treatment_type_id]
+      properties:
+        clinic_id: {type: integer}
+        dentist_id: {type: integer}
+        dentist_name: {type: string}
+        start_at: {type: string, format: date-time}
+        end_at: {type: string, format: date-time}
+        treatment_type_id: {type: integer}

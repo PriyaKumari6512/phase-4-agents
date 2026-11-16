@@ -1,0 +1,17 @@
+# Infrastructure & Pipeline Setup (PDLC Phase 4, agent 4): architecture.md -> validated IaC, GitOps and CI as a PR.
+description = "Infra & Pipeline: turns architecture.md into validated OpenTofu, GitOps and CI files from the golden-path catalog."
+model = "strong"
+filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+tools = ["phase4-infra"]
+knowledge = "knowledge"
+verifier = "infra-pipeline/validator"
+max_fix_loops = 2
+request_history = "agent"
+
+[input]
+description = "architecture.md (components, cloud, regions, environments, SLOs, budget) and phase4/project.json (infra_repo, code_repos, team for CODEOWNERS, AI agents for the Claude workflow)."
+files = ["architecture.md", "phase4/project.json"]
+
+[output]
+description = "infra/intent.json, generated files under infra/repo/ (OpenTofu per environment, Argo CD, Helm values, ExternalSecrets, alerts, Atlantis, drift check, CODEOWNERS) and infra/ci/<repo>/ (CI workflows), infra/checks.json, infra/manifest.json and infra/PR.md for the P4-G4 review."
+files = ["infra/intent.json", "infra/manifest.json", "infra/checks.json", "infra/PR.md"]

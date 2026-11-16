@@ -1,0 +1,67 @@
+# Fragment to merge into contracts/clinic-api-v1.openapi.yaml (repo brightsmile/clinic-api). Additive: minor version bump.
+openapi: 3.0.3
+info:
+  title: Clinic API v1 - reminders failed fragment
+  version: 1.1.0
+paths:
+  /api/reception/reminders-failed:
+    get:
+      operationId: listRemindersFailedTomorrow
+      summary: Tomorrow's appointments of the caller's clinic whose reminder failed
+      description: >
+        Receptionist only. The clinic is taken from the caller's access context, never from a request
+        parameter. "Tomorrow" is the next calendar day in IST. Returns booked appointments only,
+        ordered by start time, one row per appointment.
+      tags: [reception]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: The list, possibly empty
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [date, items]
+                properties:
+                  date:
+                    type: string
+                    format: date
+                    description: Tomorrow in IST
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReminderFailedItem"
+        "401":
+          description: Not signed in
+        "403":
+          description: Caller is not a receptionist
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+  schemas:
+    ReminderFailedItem:
+      type: object
+      required: [appointment_id, start_time, patient_name, patient_phone, dentist_name, treatment_name, failed_at]
+      properties:
+        appointment_id:
+          type: string
+          format: uuid
+        start_time:
+          type: string
+          format: date-time
+          description: ISO 8601 with the +05:30 offset
+        patient_name:
+          type: string
+        patient_phone:
+          type: string
+        dentist_name:
+          type: string
+        treatment_name:
+          type: string
+        failed_at:
+          type: string
+          format: date-time

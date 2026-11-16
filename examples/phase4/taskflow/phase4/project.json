@@ -1,0 +1,136 @@
+{
+  "project_name": "TaskFlow",
+  "tracker": {
+    "kind": "local"
+  },
+  "code_repos": [
+    "acme/taskflow-api",
+    "acme/taskflow-web"
+  ],
+  "infra_repo": "acme/taskflow-infra",
+  "team": [
+    {
+      "member_id": "m-alice",
+      "display_name": "Alice",
+      "email": "alice@acme.dev",
+      "tracker_account_id": "alice",
+      "github_login": "alice-acme",
+      "role": "backend",
+      "declared_skills": [
+        "backend-python",
+        "postgres",
+        "api-design",
+        "qa-automation"
+      ]
+    },
+    {
+      "member_id": "m-bob",
+      "display_name": "Bob",
+      "email": "bob@acme.dev",
+      "tracker_account_id": "bob",
+      "github_login": "bob-acme",
+      "role": "frontend",
+      "declared_skills": [
+        "frontend-react",
+        "frontend-css",
+        "qa-automation",
+        "docs"
+      ]
+    },
+    {
+      "member_id": "m-carol",
+      "display_name": "Carol",
+      "email": "carol@acme.dev",
+      "tracker_account_id": "carol",
+      "github_login": "carol-acme",
+      "role": "fullstack",
+      "declared_skills": [
+        "backend-python",
+        "frontend-react",
+        "data-modeling",
+        "postgres",
+        "observability",
+        "docs"
+      ]
+    },
+    {
+      "member_id": "m-dave",
+      "display_name": "Dave",
+      "email": "dave@acme.dev",
+      "tracker_account_id": "dave",
+      "github_login": "dave-acme",
+      "role": "devops",
+      "allocation_pct": 50,
+      "declared_skills": [
+        "devops-ci",
+        "kubernetes",
+        "terraform",
+        "observability",
+        "backend-python"
+      ]
+    }
+  ],
+  "ai_agents": [
+    {
+      "agent_id": "claude-code",
+      "provider": "claude_code_action",
+      "skills": [
+        "backend-python",
+        "qa-automation",
+        "docs",
+        "frontend-react"
+      ]
+    },
+    {
+      "agent_id": "copilot",
+      "provider": "copilot_cloud_agent",
+      "skills": [
+        "backend-python",
+        "frontend-react",
+        "qa-automation",
+        "docs"
+      ]
+    }
+  ],
+  "calendar": {
+    "sprint_length_days": 14,
+    "first_sprint_start": "2026-11-09",
+    "planning_horizon_sprints": 4,
+    "holidays": [
+      "2026-11-26",
+      "2026-12-25"
+    ],
+    "ceremony_hours_per_sprint": 6
+  },
+  "definition_of_done": [
+    "Code reviewed by one other engineer",
+    "Unit and integration tests pass in CI",
+    "Acceptance criteria verified",
+    "Documentation updated",
+    "No new HIGH security findings"
+  ],
+  "story_point_scale": [
+    1,
+    2,
+    3,
+    5,
+    8,
+    13
+  ],
+  "hours_per_story_point": 6,
+  "maintenance_capacity_pct": 20,
+  "max_story_points_per_story": 13,
+  "deadlines": [
+    {
+      "ref_id": "DL-1",
+      "name": "Beta for pilot customers",
+      "due_date": "2026-12-18",
+      "requirement_ids": [
+        "FR-1",
+        "FR-2"
+      ],
+      "hard": false
+    }
+  ],
+  "ai_min_recorded_outcomes": 0
+}

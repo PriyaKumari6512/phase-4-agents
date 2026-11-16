@@ -1,0 +1,10 @@
+# Backlog Validator: read-only judge of the Task Breakdown agent's backlog.
+description = "Backlog Validator: checks backlog.json against prd.md, architecture.md and every request."
+model = "strong"
+filesystem = ["ls", "read_file", "glob", "grep"]
+tools = ["phase4-backlog-check"]
+returns = "verdict"
+
+[input]
+description = "The backlog, the specs it came from, prd.md, architecture.md and the agent's request history."
+files = ["backlog/backlog.json", "backlog/backlog.md", "prd.md", "architecture.md", "phase4/project.json"]

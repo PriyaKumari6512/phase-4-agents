@@ -1,0 +1,203 @@
+{
+  "features": [
+    {
+      "feature_key": "F01",
+      "feature_dir": "specs/001-platform-identity",
+      "title": "Platform, sign-in, roles and clinics (MOD-01, Release 1)",
+      "summary": "Clinics and dentists data, patient phone-code sign-in, staff password sign-in, role-based visibility, staff account management, erasure on request.",
+      "requirement_ids": [
+        "FR-001",
+        "FR-002",
+        "FR-003",
+        "FR-004",
+        "FR-005",
+        "NFR-006",
+        "NFR-007",
+        "NFR-009"
+      ],
+      "component_ids": [
+        "cmp-identity",
+        "cmp-scheduling",
+        "ctr-clinic-api",
+        "ctr-db",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-api"
+    },
+    {
+      "feature_key": "F02",
+      "feature_dir": "specs/002-schedules-slots",
+      "title": "Dentist schedules, treatments and free slots (MOD-02, Release 1)",
+      "summary": "Weekly hours and breaks, leave with to-move list, treatment types, free-slot calculation.",
+      "requirement_ids": [
+        "FR-007",
+        "FR-008",
+        "FR-009",
+        "FR-010",
+        "NFR-003"
+      ],
+      "component_ids": [
+        "cmp-scheduling",
+        "ctr-clinic-api",
+        "ctr-db",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-api"
+    },
+    {
+      "feature_key": "F03",
+      "feature_dir": "specs/003-online-booking",
+      "title": "Online booking by patients (MOD-03, Release 1)",
+      "summary": "Patient books clinic, online treatment, dentist or first available, free slot within 30 days; no double booking.",
+      "requirement_ids": [
+        "FR-011",
+        "FR-012",
+        "NFR-001",
+        "NFR-002",
+        "NFR-010"
+      ],
+      "component_ids": [
+        "cmp-booking",
+        "cmp-scheduling",
+        "ctr-clinic-api",
+        "ctr-db",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-web"
+    },
+    {
+      "feature_key": "F04",
+      "feature_dir": "specs/004-patient-appointments",
+      "title": "Patient appointments: view, reschedule, cancel (MOD-04, Release 1)",
+      "summary": "My appointments list, reschedule and cancel until 4 hours before, freed slot, change messages.",
+      "requirement_ids": [
+        "FR-015",
+        "FR-016",
+        "FR-017",
+        "FR-018"
+      ],
+      "component_ids": [
+        "cmp-booking",
+        "cmp-messaging",
+        "ctr-clinic-api",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-web"
+    },
+    {
+      "feature_key": "F05",
+      "feature_dir": "specs/005-reception-day",
+      "title": "Reception day view, check-in, no-shows and dentist day (MOD-05, Release 1)",
+      "summary": "Reception day view, book/reschedule/cancel for patients, patient search/create, arrived, no-show and undo, dentist own day, status history.",
+      "requirement_ids": [
+        "FR-019",
+        "FR-020",
+        "FR-021",
+        "FR-022",
+        "FR-023",
+        "FR-024"
+      ],
+      "component_ids": [
+        "cmp-reception",
+        "cmp-booking",
+        "cmp-identity",
+        "ctr-clinic-api",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-web"
+    },
+    {
+      "feature_key": "F06",
+      "feature_dir": "specs/006-reminders-messages",
+      "title": "Confirmations, reminders and opt-out via SMS and WhatsApp (MOD-07, Release 1)",
+      "summary": "Channel choice, booking confirmation, 24-hour reminder with quiet hours, skip rules, reminder content with link, STOP opt-out, DLT/template compliance.",
+      "requirement_ids": [
+        "FR-013",
+        "FR-014",
+        "FR-027",
+        "FR-028",
+        "FR-030",
+        "FR-031",
+        "NFR-005",
+        "NFR-008",
+        "NFR-011"
+      ],
+      "component_ids": [
+        "cmp-messaging",
+        "cmp-channel-adapters",
+        "cmp-identity",
+        "ctr-clinic-api",
+        "ctr-db"
+      ],
+      "repo": "brightsmile/clinic-api"
+    },
+    {
+      "feature_key": "F07",
+      "feature_dir": "specs/007-family-members",
+      "title": "Family members on a patient account (MOD-01, Release 2)",
+      "summary": "Patient adds up to 5 family members and books for any of them.",
+      "requirement_ids": [
+        "FR-006"
+      ],
+      "component_ids": [
+        "cmp-identity",
+        "cmp-booking",
+        "ctr-clinic-api",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-api"
+    },
+    {
+      "feature_key": "F08",
+      "feature_dir": "specs/008-noshow-block",
+      "title": "Repeat no-show block (MOD-06, Release 2)",
+      "summary": "Two no-shows in 6 months block online booking and rescheduling; reception sees and lifts the block.",
+      "requirement_ids": [
+        "FR-025",
+        "FR-026"
+      ],
+      "component_ids": [
+        "cmp-noshow-policy",
+        "cmp-reception",
+        "cmp-booking",
+        "ctr-clinic-api",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-api"
+    },
+    {
+      "feature_key": "F09",
+      "feature_dir": "specs/009-sms-fallback-failed-list",
+      "title": "WhatsApp to SMS fallback and reminders-failed list (MOD-07, Release 2)",
+      "summary": "Undelivered WhatsApp falls back once to SMS behind a switch; reminder failed state; reception list of tomorrow's failed reminders.",
+      "requirement_ids": [
+        "FR-029",
+        "FR-033"
+      ],
+      "component_ids": [
+        "cmp-messaging",
+        "cmp-channel-adapters",
+        "cmp-reception",
+        "ctr-clinic-api",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-api"
+    },
+    {
+      "feature_key": "F10",
+      "feature_dir": "specs/010-noshow-report",
+      "title": "No-show report per clinic and month (MOD-08, Release 2)",
+      "summary": "Manager sees no-shows and rate per clinic for the last 12 months, on screen.",
+      "requirement_ids": [
+        "FR-032"
+      ],
+      "component_ids": [
+        "cmp-reporting",
+        "cmp-booking",
+        "ctr-clinic-api",
+        "ctr-web"
+      ],
+      "repo": "brightsmile/clinic-api"
+    }
+  ]
+}

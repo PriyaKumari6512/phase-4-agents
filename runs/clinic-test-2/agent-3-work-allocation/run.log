@@ -1,0 +1,79 @@
+Sprint 1 is allocated, but 16 of the 79 tasks are unassigned.
+
+The output is in `/outputs/clinic-test-2/allocation/assignments.json`, with the readable version in `assignments.md`. The solver was the local CP-SAT fallback, because the Timefold service was not used. There were no pins, vetoes or block-AI requests.
+
+**Hours against capacity**
+
+| Worker | Planned h | Capacity h |
+|---|---|---|
+| Arjun | 38.0 | 48.6 |
+| Meera | 25.5 | 48.6 |
+| Sanjay | 26.0 | 48.6 |
+| Priya | 32.0 | 48.6 |
+| Kavya | 26.0 | 48.6 |
+| Rohan | 0 | 24.3 |
+| Neha | 0 | 27.0 |
+| Vikram | 0 | 12.2 |
+| Claude Code | 6.0 | 36.0 |
+| Copilot | 7.0 | 36.0 |
+
+**AI agent tasks (5)**
+- Claude Code: 005-T001 and 001-T062.
+- Copilot: 002-T001, 001-T064 and 001-T070.
+
+Of the 24 tasks that passed the hard rules, I judged 11 AI-eligible and 13 not. The 13 were the authorisation and personal-data tasks, the erasure UI, and the tasks with unclear scope or facts not in the repo.
+
+The solver gave three of the eligible tasks to humans on cost and load: 001-T008, 001-T013 and 001-T010. 001-T014 and 001-T005 also went to humans. Moving them to an AI agent would free about 5 to 6 hours of human time.
+
+**Unassigned (16)**
+
+The solver could not find one worker, human or AI, holding every skill tag these tasks require.
+- **Devops and CI tasks:** 001-T001, 001-T003 and 001-T004 need devops-ci plus backend-python or frontend-react. Vikram has devops-ci but neither of those.
+- **Auth and QA tasks:** 001-T020, 001-T023, 001-T036, 001-T037, 001-T044, 001-T045 and 001-T050 need auth-security together with qa-automation or docs. No single person has both.
+- **Postgres and QA tasks:** 001-T012, 001-T019 and 001-T068 need qa-automation together with postgres. No one has both.
+- **Observability tasks:** 003-T008 and 001-T009 need observability plus backend-python. Vikram has observability but not backend-python, and no AI agent has it.
+- **Messaging and docs:** 006-T003 needs docs plus messaging. No one has both, and I judged it not AI-eligible because it needs provider facts that are not in the repo.
+
+The solver treats these as hard skill rules, so a skill gap and a capacity shortfall are different things here. The tool reported `skill_gaps` and `capacity_shortfall` as empty, because every single skill exists in the team.
+
+**For the delivery manager**
+- Pair or split the unassigned tasks, for example Arjun with Kavya or Priya on the auth QA tasks, and Vikram with a backend developer on the observability tasks. Alternatively, relax the tag combinations, for example by dropping postgres from the QA tasks.
+- Three people have no work at all: Rohan, Neha and Vikram. Vikram is the natural owner of the devops tasks.
+- The ownership score is 0 for every assignment because no commit history was available.
+- Many sprint tasks, mostly in clinic-web, are human-only because CI for the repo is not approved at gate P4-G4. Approving it would let AI agents take more of them.
+- The task dependencies were not part of the solve, so check the order of work in the sprint. For example, 001-T068 depends on 001-T064.
+
+=== work-allocation/validator verdict (attempt 1): partial ===
+`allocation_check` reports ok with no problems. Only sprint 1 was requested and the 63 assigned tasks plus 16 unassigned cover all 79 tasks. Hard AI exclusions appear to be respected, the AI-assigned tasks have specific reasons, and the planned hours match the load percentages quoted. But the reply leaves 16 tasks unassigned, including the foundational skeleton and CI tasks, with only a generic fix. It reports no skill gaps or capacity shortfall, leaves three workers idle, and gives a false CI reason for clinic-api tasks, so it is not ready for P4-G3 approval.
+  - The reply does not surface skill gaps or capacity as the request needs. `problem.json` has `skill_gaps: []` and `capacity_shortfall: {}`, yet 16 tasks are unassigned as `no_skill_match`. `assignments.md` has no skill-gap or capacity section. Add a section that names the missing skills and the people who could cover them.
+  - 16 tasks are unassigned with the same generic fix, 'pair two people or split the task'. Name a concrete pairing or owner for each, and why it would work. Examples: 001-T001, 001-T003 and 001-T004 need devops-ci, which only Vikram has, paired with a backend-python or frontend-react person. 001-T036, 001-T037, 001-T044, 001-T045, 001-T020 and 001-T023 need qa-automation plus auth-security. Arjun has auth-security and Kavya or Priya have qa-automation. 001-T012, 001-T019 and 001-T068 need qa-automation plus postgres. 001-T009 and 003-T008 need observability, which only Vikram has.
+  - 001-T001 (project skeleton), 001-T003 (clinic-api CI) and 001-T004 (clinic-web CI) are unassigned. They are foundational and gate CI approval (P4-G4), so most of sprint 1 depends on them. The reply does not flag this blocking risk or say who should take them first.
+  - Vikram (12.2 h), Rohan (24.3 h) and Neha (27 h) have 0 planned hours while 16 tasks sit unassigned. Vikram's devops-ci, observability and postgres skills match several of those tasks. The reply does not explain the idle capacity, and the tasks are not split or paired to use it. The unassigned reasons also list a pseudo-skill 'human' that no worker has, as in 'Nobody has all of backend-python, devops-ci, human'. This is misleading and should be fixed or explained.
+  - The 'human-only because repo CI is not approved' explanations are false for clinic-api tasks. `ci_ready_repos` includes brightsmile/clinic-api. 004-T003 is labelled '(repo: clinic-api)' and 003-T001, 003-T006, 004-T001 and 004-T007 appear to be clinic-api work (`app/booking/...`, `app/modules/booking/...`). The source `hard_rule_failed` text names clinic-web CI for these tasks. Correct the explanations, or re-check their AI eligibility against the clinic-api CI-ready status.
+  - The plan says sprint 1 is over P85 capacity (35 SP committed vs 28.4). With 16 tasks also unassigned, the reply should say whether the sprint is deliverable. It should list the first things to slip and the fix, such as a human pairing or moving a task to AI.
+  - Several explanations hold up poorly. 001-T005 and 001-T014 are AI-eligible but kept with humans. The reply offers 'swap if the manager wants' but does not say whether the swap would pass the AI rules, which it must. 001-T070 starts a scheduler in `main.py` and `config.py`, which is borderline infrastructure. Its AI reason ('no secrets or migrations') does not address that.
+
+=== work-allocation/validator verdict (attempt 2): partial ===
+allocation_check returned no hard problems. The 63 assigned tasks look sound: AI work is limited to small, self-contained test and skeleton tasks with named files, and the skill and capacity figures in the explanations match the data. However, 16 tasks (about 44 h) are unassigned, including the three that gate everything else, and the pairings that would fix them exist only as a proposal. Many explanations are also too long and technical for a manager to read in one sentence, so the output is not ready for P4-G3 approval.
+  - 16 of 79 sprint 1 tasks have no assignee: 001-T001, 001-T003, 001-T004, 001-T009, 001-T012, 001-T019, 001-T020, 001-T023, 001-T036, 001-T037, 001-T044, 001-T045, 001-T050, 001-T068, 003-T008, 006-T003. That is about 44 h, and it includes the three tasks (001-T001, T003, T004) that the plan itself says gate everything else. The owner/pair table is only a proposal and is not in assignments.json. Re-run with those owners as pins, or split the tasks per skill, so every task has an assignee or a real, final reason for being unassigned.
+  - The unassigned reasons are a solver artefact. The message `Nobody has all of … human together` treats `human` as a skill and requires every skill on one person. These are not real skill gaps. Replace the generic `no_skill_match` text in assignments.json with the actual cause and fix, per task, or resolve the cause so the tasks get assigned.
+  - The summary says 16 unassigned tasks, but allocation_check's warning lists only 15. It omits 001-T023, which is in assignments.json and assignments.md. Reconcile the count, and make sure every unassigned task is surfaced.
+  - 001-T013 is AI-eligible and the explanation itself says a swap to Claude Code would pass every rule, yet it stays with Kavya 'only on cost balance'. Assign it to the AI agent, or give a real reason for keeping it human.
+  - The 'Why' text on many tasks is not readable by a manager in one sentence. It uses phrases such as 'by my rules', 'the tool's clinic-web CI rule is a mislabel', 'would pass the AI rules after the mapping is fixed' and 'for now …'. 004-T006, 003-T001, 004-T004, 004-T005, 004-T007 and 004-T008 are examples. Rewrite them as one plain sentence each on why this person and the runner-up. Move the tool-mapping discussion into a single note.
+  - Five tasks (003-T001, 004-T004, 004-T005, 004-T006, 004-T007) are clinic-api work that the agent says would qualify for AI. They were blocked by the eligibility tool's clinic-web CI rule. The reply flags this but does not resolve it. Either get the repo mapping fixed and re-run, or ask the approver for an explicit override.
+  - Capacity is not fully resolved in the saved plan. Vikram, Rohan and Neha have 0 planned hours. The solver's loads for Arjun, Kavya and Priya exclude the proposed pair and review hours, which the narrative says would take them to about 81–86%. Sprint 1 is 35 SP against P85 28.4, and the agent suggests dropping S-001-US6 and S-001-US7 but does not decide this. The approver cannot approve a coherent plan without a re-run that reflects the final owners.
+
+=== work-allocation/validator verdict (attempt 3): success ===
+allocation_check returned ok with no problems. Its only warnings were Priya and Kavya over solver capacity, which the pinned hours cause. assignments.md reconciles this: they are at 80% and 85% of full capacity. All 79 sprint-1 tasks are assigned. The request was only "Assign the tasks of sprint 1", and the sprint index and plan hash match. The 17 pins were set by the agent rather than requested, but they are disclosed and explained. The six AI tasks (001-T008, 001-T013, 002-T001, 001-T064, 005-T001, 001-T062) are single-purpose tasks with concrete criteria, at most 4 files, and no auth, migrations, infrastructure or secrets. The explanations match the score breakdowns and runner-ups. I confirmed the repo mis-tag the agent reports: 004-T003 is tagged clinic-web in backlog.json, which is why the tool blocks it from AI. The reply also surfaces the skill-pair gaps, the key-person risks, the 35 SP scope against a P85 of 28.4, and what would fix each.
+
+Status: success  |  time: 870.6s
+Pass write  work-allocation  strong anthropic:claude-sonnet-5-5
+Pass verify work-allocation/validator strong anthropic:claude-sonnet-5-5
+Pass fix    work-allocation  strong anthropic:claude-sonnet-5-5
+Pass verify work-allocation/validator strong anthropic:claude-sonnet-5-5
+Pass fix    work-allocation  strong anthropic:claude-sonnet-5-5
+Pass verify work-allocation/validator strong anthropic:claude-sonnet-5-5
+Tokens claude-sonnet-5-5: input=3218025 output=101225 total=3319250
+Report: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\outputs\clinic-test-2\report.json
+Run history: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\outputs\clinic-test-2\runs\20261113-183006-9d5f89
+Job log: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\outputs\clinic-test-2\logs\20261113-183006-9d5f89.log  |  transcript: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\logs\deepagent.log  |  app log: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\logs\app.log

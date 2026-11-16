@@ -1,0 +1,35 @@
+# Human approval gates. Each gate names the project files a human approves
+# together. Record a decision with
+#
+#   uv run agent-engine gate G1 --project-name gym-app --decision approved \
+#       --approver "Name" --approver-role "Delivery Manager" --submitted-by "Name"
+#
+# An agent that must wait for a gate lists "gates/<gate>.approved.json" in its
+# [input] files. It can't run until the gate is approved, nor after an
+# approved file has changed.
+#
+# One table per gate; the team that owns the gate adds it here:
+#
+# [G1]
+# description = "Scope: the requirements and scope documents"
+# files = ["requirements/register.md", "scope/scope.md"]
+
+# --- PDLC Phase 4: Task, Sprint & Environment Setup --------------------------
+# After each approval, `agent-engine phase4 publish ...` pushes the approved
+# file to the tracker / GitHub; it refuses while the gate is not approved.
+
+[P4-G1]
+description = "Backlog: epics, stories and tasks from the Task Breakdown agent (product owner / tech lead)"
+files = ["backlog/backlog.json"]
+
+[P4-G2]
+description = "Sprint plan from the Sprint Planning agent (delivery manager)"
+files = ["sprint/sprint-plan.json"]
+
+[P4-G3]
+description = "Task assignments for one sprint from the Work Allocation agent (engineering manager)"
+files = ["allocation/assignments.json"]
+
+[P4-G4]
+description = "Infrastructure, GitOps and CI change set from the Infra & Pipeline agent (platform engineer)"
+files = ["infra/intent.json", "infra/manifest.json"]

@@ -1,0 +1,327 @@
+{
+  "schema_version": "1.0.0",
+  "project": "clinic-test-2",
+  "intent_sha256": "a3254a5b5de95ed3a9d2f50b5dd7c5264aef94b3a5c1f21e66c4085eec33de0e",
+  "infra_repo": "brightsmile/clinic-infra",
+  "environments": [
+    "dev",
+    "stg",
+    "prod"
+  ],
+  "files": [
+    {
+      "path": "repo/.github/workflows/drift.yml",
+      "sha256": "10acc92f06873ec522198322e15c0bad3f7851e88d742da2e661302cef28ae2e",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "10acc92f06873ec522198322e15c0bad3f7851e88d742da2e661302cef28ae2e"
+    },
+    {
+      "path": "repo/.trivyignore",
+      "sha256": "e70f72f68316b898c6acaeb262524690f0496db59b95fdbb5ec3ba7105141d86",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "e70f72f68316b898c6acaeb262524690f0496db59b95fdbb5ec3ba7105141d86"
+    },
+    {
+      "path": "repo/CODEOWNERS",
+      "sha256": "8d835abd2f9e4d5ebcad7fbbcd8cbca982fbe1a74b37d7ca6a574ff1ff61517b",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "8d835abd2f9e4d5ebcad7fbbcd8cbca982fbe1a74b37d7ca6a574ff1ff61517b"
+    },
+    {
+      "path": "repo/atlantis.yaml",
+      "sha256": "83aceeb22f04e3a34f6b500493272d440dbe90db68f2d19bb59d49ef28c028c0",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "83aceeb22f04e3a34f6b500493272d440dbe90db68f2d19bb59d49ef28c028c0"
+    },
+    {
+      "path": "repo/envs/dev/core/main.tf",
+      "sha256": "8707706330061c97902381450ee6b954a9dc56891651d1ec9bff24f25063b81c",
+      "origin": "agent_edited",
+      "template_ref": "aws-core",
+      "rendered_sha256": "fee74b5c0e780aae3199d4b65c2d34130634cfb07bb448bdba8438fc8ae9f35f"
+    },
+    {
+      "path": "repo/envs/prod/core/main.tf",
+      "sha256": "ec9902ec1c482275be29b1b85d21ce58fb55546469ead93407f36b43c98677d5",
+      "origin": "agent_edited",
+      "template_ref": "aws-core",
+      "rendered_sha256": "ba936480570932008bd64ccf76dd0f4de916f640b39e27acc083f0714982516e"
+    },
+    {
+      "path": "repo/envs/stg/core/main.tf",
+      "sha256": "1125b70b0a002cc7ff020e8102c04f4a68f8d688315bb77f85ee72bb318dae6a",
+      "origin": "agent_edited",
+      "template_ref": "aws-core",
+      "rendered_sha256": "709b37bff0d478ecce12aaf983932665af55a4ac67902f08e67e78b0c31b9dd2"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-dev.yaml",
+      "sha256": "154d5fa96470b81229306ae2e48ed1413aa9e1ac2ef0f94ee6ebd3d75dcb0d90",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "154d5fa96470b81229306ae2e48ed1413aa9e1ac2ef0f94ee6ebd3d75dcb0d90"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-prod.yaml",
+      "sha256": "2637f77c062f99d009cafee40d57c35bacc03de594995cad3e8059c7081ccb5b",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "2637f77c062f99d009cafee40d57c35bacc03de594995cad3e8059c7081ccb5b"
+    },
+    {
+      "path": "repo/gitops/applicationsets/clinic-test-2-stg.yaml",
+      "sha256": "2292b6a62cf179c41554567229006a8f9c019ed8b7b55e9027a1d40a0b9c9794",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "2292b6a62cf179c41554567229006a8f9c019ed8b7b55e9027a1d40a0b9c9794"
+    },
+    {
+      "path": "repo/gitops/apps/clinic-api/dev/externalsecret.yaml",
+      "sha256": "148eca61573d32ab47698f1c62a04ad814b1f6dabf829cc484a72ab9dbfcf11b",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "148eca61573d32ab47698f1c62a04ad814b1f6dabf829cc484a72ab9dbfcf11b"
+    },
+    {
+      "path": "repo/gitops/apps/clinic-api/dev/values.yaml",
+      "sha256": "ec9fc6ae29d7c8d4651f541f45e6053e45a8afbcd8adcc7956950ddeca10ffab",
+      "origin": "agent_edited",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "3c9631e12cfccaf9e73b890c99820f9f432dbb1bbc0e424c02e8682fe802e961"
+    },
+    {
+      "path": "repo/gitops/apps/clinic-api/prod/externalsecret.yaml",
+      "sha256": "971a214d879a21efa3184cc749fbc4161069b7411199b98299f15a1a92c70c09",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "971a214d879a21efa3184cc749fbc4161069b7411199b98299f15a1a92c70c09"
+    },
+    {
+      "path": "repo/gitops/apps/clinic-api/prod/values.yaml",
+      "sha256": "6bb9c5e31730921e3605b31f078ba7a0ea5167b389d8902e2367948d8a06f59e",
+      "origin": "agent_edited",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "28fd6cc69641d65d6ade370d336a171c1e2d463233e4fc03e436a4b22be7e04b"
+    },
+    {
+      "path": "repo/gitops/apps/clinic-api/stg/externalsecret.yaml",
+      "sha256": "4cc58ba36387821fb477270905362afb832a96d21f904e4fdfc31b77619dab10",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "4cc58ba36387821fb477270905362afb832a96d21f904e4fdfc31b77619dab10"
+    },
+    {
+      "path": "repo/gitops/apps/clinic-api/stg/values.yaml",
+      "sha256": "72b48ae5d025e120ce418e3db625e4917d291a85546f02455cb653f1f0b2507d",
+      "origin": "agent_edited",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "c26f8fb0a10d673b272a4d87e4ce8cf315df3b3212de0eaf92b410cc5880b0d3"
+    },
+    {
+      "path": "repo/gitops/charts/app/Chart.yaml",
+      "sha256": "c1902eb8f8fa54a25943387ab7200500536852a45f74d0121dd7847efdd9d48e",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "c1902eb8f8fa54a25943387ab7200500536852a45f74d0121dd7847efdd9d48e"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/deployment.yaml",
+      "sha256": "e342bc24ef9ceb061ea4e9e1b3609725a8e1b539bceaf6beee2fbed74034a642",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "e342bc24ef9ceb061ea4e9e1b3609725a8e1b539bceaf6beee2fbed74034a642"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/ingress.yaml",
+      "sha256": "d2f5aae33020e9b2f80b2a775474bee87a55ffa20fd850d25f9d00962c4a4ddd",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d2f5aae33020e9b2f80b2a775474bee87a55ffa20fd850d25f9d00962c4a4ddd"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/service.yaml",
+      "sha256": "d1d70fe8601070588c2be17d151fc4da51e9300cf574284628277a0b71606694",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d1d70fe8601070588c2be17d151fc4da51e9300cf574284628277a0b71606694"
+    },
+    {
+      "path": "repo/gitops/charts/app/values.yaml",
+      "sha256": "25db7b0c210e62eb505c5b5e2168f1fa27f9d7d842e2f5f2681effc7b883dbb3",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "25db7b0c210e62eb505c5b5e2168f1fa27f9d7d842e2f5f2681effc7b883dbb3"
+    },
+    {
+      "path": "repo/gitops/platform/alerts/clinic-api-dev.yaml",
+      "sha256": "41accfacd7a8c4a480d92922cf326c11d37a162ff3fbb5a2092c1045c643bdd9",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "41accfacd7a8c4a480d92922cf326c11d37a162ff3fbb5a2092c1045c643bdd9"
+    },
+    {
+      "path": "repo/gitops/platform/alerts/clinic-api-prod.yaml",
+      "sha256": "785ea851f4613f9ce550c6c698f41b40e03c3325ee9db46151ba931ef3b27fa4",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "785ea851f4613f9ce550c6c698f41b40e03c3325ee9db46151ba931ef3b27fa4"
+    },
+    {
+      "path": "repo/gitops/platform/alerts/clinic-api-stg.yaml",
+      "sha256": "38c1d074dfbf4aae7d09a023b5bddcd7f49baf616c34ca3a24b2cf19100fb270",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "38c1d074dfbf4aae7d09a023b5bddcd7f49baf616c34ca3a24b2cf19100fb270"
+    },
+    {
+      "path": "repo/gitops/platform/clustersecretstore.yaml",
+      "sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f"
+    },
+    {
+      "path": "ci/brightsmile__clinic-api/.github/workflows/ci-clinic-api.yml",
+      "sha256": "75c28f4bb594c2f82ff088b0d28be89c158819b785e5b63be90592495958df9c",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "75c28f4bb594c2f82ff088b0d28be89c158819b785e5b63be90592495958df9c"
+    },
+    {
+      "path": "ci/brightsmile__clinic-api/.github/workflows/phase4-claude.yml",
+      "sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c"
+    }
+  ],
+  "ci_repos": [
+    "brightsmile/clinic-api"
+  ],
+  "secrets_refs": [
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/clinic-api/DATABASE_URL"
+    },
+    {
+      "name": "SMS_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/clinic-api/SMS_PROVIDER_API_KEY"
+    },
+    {
+      "name": "WHATSAPP_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/clinic-api/WHATSAPP_PROVIDER_API_KEY"
+    },
+    {
+      "name": "SMS_WEBHOOK_HMAC_SECRET",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/clinic-api/SMS_WEBHOOK_HMAC_SECRET"
+    },
+    {
+      "name": "WHATSAPP_WEBHOOK_HMAC_SECRET",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/clinic-api/WHATSAPP_WEBHOOK_HMAC_SECRET"
+    },
+    {
+      "name": "JWT_SIGNING_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/dev/clinic-api/JWT_SIGNING_KEY"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/clinic-api/DATABASE_URL"
+    },
+    {
+      "name": "SMS_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/clinic-api/SMS_PROVIDER_API_KEY"
+    },
+    {
+      "name": "WHATSAPP_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/clinic-api/WHATSAPP_PROVIDER_API_KEY"
+    },
+    {
+      "name": "SMS_WEBHOOK_HMAC_SECRET",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/clinic-api/SMS_WEBHOOK_HMAC_SECRET"
+    },
+    {
+      "name": "WHATSAPP_WEBHOOK_HMAC_SECRET",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/clinic-api/WHATSAPP_WEBHOOK_HMAC_SECRET"
+    },
+    {
+      "name": "JWT_SIGNING_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/stg/clinic-api/JWT_SIGNING_KEY"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/clinic-api/DATABASE_URL"
+    },
+    {
+      "name": "SMS_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/clinic-api/SMS_PROVIDER_API_KEY"
+    },
+    {
+      "name": "WHATSAPP_PROVIDER_API_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/clinic-api/WHATSAPP_PROVIDER_API_KEY"
+    },
+    {
+      "name": "SMS_WEBHOOK_HMAC_SECRET",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/clinic-api/SMS_WEBHOOK_HMAC_SECRET"
+    },
+    {
+      "name": "WHATSAPP_WEBHOOK_HMAC_SECRET",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/clinic-api/WHATSAPP_WEBHOOK_HMAC_SECRET"
+    },
+    {
+      "name": "JWT_SIGNING_KEY",
+      "store": "aws_secrets_manager",
+      "path": "/clinic-test-2/prod/clinic-api/JWT_SIGNING_KEY"
+    }
+  ],
+  "stateful_resources": [
+    "dev:aws-rds-postgres:Database",
+    "dev:aws-s3:Web app",
+    "stg:aws-rds-postgres:Database",
+    "stg:aws-s3:Web app",
+    "prod:aws-rds-postgres:Database",
+    "prod:aws-s3:Web app"
+  ],
+  "gaps": [
+    "bootstrap: create the remote state bucket 'clinic-test-2-tfstate' (versioned, encrypted) once per account",
+    "Web app: no catalog template for 'cdn' (left for human follow-up)",
+    "Clinic API is public: set ingress.host and ingress.certificateArn in gitops/apps/clinic-api/<env>/values.yaml; the AWS Load Balancer Controller and DNS come from the platform bootstrap",
+    "platform add-ons (external-secrets operator, kube-prometheus-stack, OpenTelemetry Collector) are installed by the platform team's cluster bootstrap; their chart versions are not pinned here",
+    "module terraform-aws-modules/eks/aws ~> 21.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/ecr/aws ~> 2.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/rds/aws ~> 6.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/s3-bucket/aws ~> 5.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "image promotion is not generated: CI builds and pushes images, and a new tag reaches gitops/apps/<component>/<env>/values.yaml through a PR to the infra repo (or Argo CD Image Updater, installed by the platform team)"
+  ],
+  "checks_passed": false,
+  "checks_skipped": [],
+  "risk_score": 90,
+  "risk_reasons": [
+    "6 stateful resources (databases, caches, buckets)",
+    "public endpoints: Clinic API, Web app",
+    "includes prod",
+    "failing checks: tofu_validate",
+    "6 files edited by the agent after rendering"
+  ],
+  "generated_at": "2026-11-13T07:13:45Z"
+}

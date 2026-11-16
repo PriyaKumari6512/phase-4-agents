@@ -1,0 +1,12 @@
+module "queue_{{ name }}" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  name                    = "${var.project}-${var.environment}-{{ component }}"
+  sqs_managed_sse_enabled = true
+
+  create_dlq = true
+  redrive_policy = {
+    maxReceiveCount = 5
+  }
+}

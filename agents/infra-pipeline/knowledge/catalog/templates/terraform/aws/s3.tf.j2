@@ -1,0 +1,22 @@
+module "bucket_{{ name }}" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  bucket        = "${var.project}-${var.environment}-{{ component }}"
+  force_destroy = false
+
+  versioning = {
+    enabled = true
+  }
+  server_side_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm = "aws:kms"
+      }
+    }
+  }
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}

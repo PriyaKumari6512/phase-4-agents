@@ -1,0 +1,17 @@
+# Runs the test suite on every pull request and on every push to main.
+# The tests need no API key and make no model calls.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run python -m pytest -q

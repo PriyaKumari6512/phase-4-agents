@@ -1,0 +1,16 @@
+# Work Allocation (PDLC Phase 4, agent 3): approved sprint -> who does each task (people or AI coding agents).
+description = "Work Allocation: assigns one sprint's tasks to people and AI coding agents by skill, ownership and capacity."
+model = "strong"
+filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+tools = ["phase4-allocation"]
+verifier = "work-allocation/validator"
+max_fix_loops = 2
+request_history = "agent"
+
+[input]
+description = "sprint/sprint-plan.json approved at gate P4-G2, backlog/backlog.json, and phase4/project.json (team, skills, AI agents). Optional: phase4/skill-profiles.json (git-mined skills and code ownership), phase4/agent-outcomes.json (AI agent track record), the infra manifest approved at P4-G4 (CI-ready repos), and the sprint number plus approver pins/vetoes in the request."
+files = ["sprint/sprint-plan.json", "gates/P4-G2.approved.json", "backlog/backlog.json", "phase4/project.json"]
+
+[output]
+description = "allocation/assignments.json (assignee per task with score breakdown, runner-up and explanation; unassigned tasks with reasons; AI eligibility) and allocation/assignments.md for the P4-G3 review."
+files = ["allocation/assignments.json", "allocation/assignments.md"]

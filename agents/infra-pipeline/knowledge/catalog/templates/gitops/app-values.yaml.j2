@@ -1,0 +1,26 @@
+# {{ component }} ({{ environment }}) - values for gitops/charts/app
+name: {{ component }}
+image:
+  repository: "{{ image_repository }}"
+  tag: "0.0.0"   # set when a built image is promoted to this environment
+{%- if args %}
+args: {{ args }}  # TODO set the command this component runs with (it shares the {{ image_name }} image)
+{%- endif %}
+replicas: {{ replicas }}
+http: {{ "true" if http else "false" }}
+port: 8080
+healthPath: /healthz
+autoscaling:
+  enabled: true
+  minReplicas: {{ replicas }}
+  maxReplicas: {{ max_replicas }}
+  targetCPU: 70
+{%- if public %}
+ingress:
+  enabled: true
+  host: ""             # TODO public DNS name for {{ environment }}
+  certificateArn: ""   # TODO ACM certificate ARN for HTTPS
+{%- endif %}
+envFromSecret: "{{ secret_name }}"
+env:
+  APP_ENV: "{{ environment }}"

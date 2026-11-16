@@ -1,0 +1,16 @@
+# Sprint Planning (PDLC Phase 4, agent 2): approved backlog -> capacity -> CP-SAT sprint plan with goals.
+description = "Sprint Planning: packs the approved backlog into sprints by value, capacity, dependencies and deadlines."
+model = "strong"
+filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+tools = ["phase4-sprint"]
+verifier = "sprint-planning/validator"
+max_fix_loops = 2
+request_history = "agent"
+
+[input]
+description = "backlog/backlog.json approved at gate P4-G1, and phase4/project.json (team, calendar, holidays, PTO, deadlines, maintenance share). Optional: phase4/history.json (closed sprints for velocity), a previous sprint/sprint-plan.json (kept stable), and approver pins or a chosen option in the request."
+files = ["backlog/backlog.json", "gates/P4-G1.approved.json", "phase4/project.json"]
+
+[output]
+description = "sprint/sprint-plan.json (sprints with stories, goals, P50/P85 capacity, deferrals with reasons, forecast, solver report, options when infeasible) and sprint/sprint-plan.md for the P4-G2 review."
+files = ["sprint/sprint-plan.json", "sprint/sprint-plan.md"]

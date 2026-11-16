@@ -1,0 +1,8 @@
+
+ERROR: run failed: SUBSCRIPTION_RATE_LIMITED: Anthropic subscription rate-limited (429), resets in 8703s (~2.4h); not waiting (cap 60s).
+
+Status: fail  |  time: 1.4s
+Pass write  sprint-planning  strong anthropic:claude-sonnet-5-5  FAILED
+Report: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\outputs\clinic-test-2\report.json
+Run history: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\outputs\clinic-test-2\runs\20261113-144455-143d0f
+Job log: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\outputs\clinic-test-2\logs\20261113-144455-143d0f.log  |  transcript: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\logs\deepagent.log  |  app log: C:\Users\admin\Desktop\agent-sprint-planner\phase4-agent-engine\logs\app.log

@@ -1,0 +1,204 @@
+openapi: 3.0.3
+info:
+  title: Online booking (feature 003) - additions to api-clinic-api-v1
+  version: 1.0.0
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+paths:
+  /booking/options:
+    get:
+      summary: Clinics, online treatment types and dentists a patient can choose from
+      operationId: getBookingOptions
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingOptions'
+        '401':
+          description: Not signed in
+  /booking/slots:
+    get:
+      summary: Free slots for a clinic and treatment; omit dentist_id for "first available"
+      operationId: getFreeSlots
+      parameters:
+        - name: clinic_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: treatment_type_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: dentist_id
+          in: query
+          required: false
+          description: A named dentist. Omit for first available (top 10, earliest first).
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          required: false
+          description: Day in IST. Required with dentist_id; ignored for first available. Must be today up to today plus the horizon.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Free slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotList'
+        '401':
+          description: Not signed in
+        '422':
+          description: Date outside the horizon, treatment not bookable online, or dentist not at the clinic
+  /appointments:
+    post:
+      summary: Book an appointment for the signed-in patient
+      operationId: bookAppointment
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: New UUID for each confirm attempt; a repeat returns the first result.
+          schema: { type: string, format: uuid }
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+      responses:
+        '201':
+          description: Booked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '200':
+          description: Same retry key seen before; the original appointment is returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          description: Not signed in
+        '403':
+          description: patient_id is not the signed-in patient's own person, or the patient is blocked from online booking
+        '409':
+          description: Slot taken or no longer available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotTaken'
+        '422':
+          description: Invalid request (outside the horizon, wrong treatment, key reused with a different body)
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+  schemas:
+    BookingOptions:
+      type: object
+      required: [clinics, treatment_types, horizon_days, patient]
+      properties:
+        horizon_days: { type: integer, example: 30 }
+        patient:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            default_channel: { type: string, enum: [sms, whatsapp] }
+        clinics:
+          type: array
+          items:
+            type: object
+            required: [id, name, phone, dentists]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              phone: { type: string }
+              dentists:
+                type: array
+                items:
+                  type: object
+                  required: [id, name]
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+        treatment_types:
+          type: array
+          items:
+            type: object
+            required: [id, name, duration_minutes]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              duration_minutes: { type: integer, example: 30 }
+    Slot:
+      type: object
+      required: [dentist_id, dentist_name, start_at, end_at]
+      properties:
+        dentist_id: { type: string, format: uuid }
+        dentist_name: { type: string }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+    SlotList:
+      type: object
+      required: [slots]
+      properties:
+        slots:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/Slot'
+        next_free_date:
+          type: string
+          format: date
+          nullable: true
+          description: Set when a named dentist has no free slot on the asked day
+    BookingRequest:
+      type: object
+      required: [clinic_id, treatment_type_id, dentist_id, start_at, patient_id, channel]
+      properties:
+        clinic_id: { type: string, format: uuid }
+        treatment_type_id: { type: string, format: uuid }
+        dentist_id: { type: string, format: uuid }
+        start_at: { type: string, format: date-time }
+        patient_id:
+          type: string
+          format: uuid
+          description: The person the visit is for. Release 1 accepts only the signed-in patient's own person.
+        channel: { type: string, enum: [sms, whatsapp] }
+    Appointment:
+      type: object
+      required: [id, clinic, dentist, treatment, start_at, end_at, status, channel]
+      properties:
+        id: { type: string, format: uuid }
+        clinic: { type: object, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        dentist: { type: object, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        treatment: { type: object, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        status: { type: string, enum: [booked] }
+        channel: { type: string, enum: [sms, whatsapp] }
+    SlotTaken:
+      type: object
+      required: [code, next_slots]
+      properties:
+        code: { type: string, enum: [slot_taken] }
+        message: { type: string }
+        next_slots:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/Slot'

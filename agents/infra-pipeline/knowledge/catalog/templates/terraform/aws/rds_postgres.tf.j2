@@ -1,0 +1,42 @@
+resource "aws_security_group" "db_{{ name }}" {
+  name_prefix = "${var.project}-${var.environment}-{{ component }}-db-"
+  description = "Postgres access for {{ component }} from private subnets only"
+  vpc_id      = module.network.vpc_id
+
+  ingress {
+    description = "Postgres from private subnets"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = module.network.private_subnets_cidr_blocks
+  }
+}
+
+module "db_{{ name }}" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  identifier           = "${var.project}-${var.environment}-{{ component }}"
+  engine               = "postgres"
+  engine_version       = "16"
+  family               = "postgres16"
+  major_engine_version = "16"
+  instance_class       = "{{ size.db_instance }}"
+
+  allocated_storage     = 20
+  max_allocated_storage = 200
+  storage_encrypted     = true
+
+  db_name  = "{{ db_name }}"
+  username = "app"
+  # Master password is created and rotated in AWS Secrets Manager; never written to code or outputs.
+  manage_master_user_password = true
+
+  db_subnet_group_name   = module.network.database_subnet_group_name
+  vpc_security_group_ids = [aws_security_group.db_{{ name }}.id]
+
+  multi_az                = var.environment == "prod"
+  deletion_protection     = true
+  backup_retention_period = var.environment == "prod" ? 14 : 3
+  skip_final_snapshot     = var.environment != "prod"
+}
