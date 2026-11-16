@@ -18,7 +18,8 @@ import hashlib
 import json
 import logging
 import re
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
+from functools import wraps
 from typing import Any
 
 from agent_engine import perf
@@ -34,10 +35,11 @@ from agent_engine.phase4.contracts import (
     WorkItem,
 )
 from agent_engine.phase4.trackers.base import ExtObj, TrackerAdapter, TrackerError
+from agent_engine.runtime import project_lock
 
 log = logging.getLogger(__name__)
 EXTERNAL_IDS = "publish/external-ids.json"
-OWNED_FIELDS = ("title", "body_md", "story_points", "hours")
+OWNED_FIELDS = ("title", "body_md", "story_points", "hours", "labels", "parent_id")
 ORDER = {"epic": 0, "story": 1, "task": 2}
 GATE_FOR = {"backlog": "P4-G1", "sprint": "P4-G2", "assignments": "P4-G3", "infra": "P4-G4"}
 
@@ -48,6 +50,8 @@ class PublishError(RuntimeError):
 
 # ============================================================================ gate
 def require_gate(project: str, what: str) -> dict:
+    for parent in {"sprint": ("backlog",), "assignments": ("backlog", "sprint")}.get(what, ()):
+        require_gate(project, parent)
     gate = GATE_FOR[what]
     gates = load_gates()
     if gate not in gates:
@@ -58,7 +62,29 @@ def require_gate(project: str, what: str) -> dict:
     stale = stale_approvals(files.project_dir(project), [approval])
     if stale:
         raise PublishError("; ".join(stale) + f". Get {gate} approved again.")
-    return files.read_json(project, approval)
+    record = files.read_json(project, approval)
+    if "NOT a human sign-off" in str((record.get("approver") or {}).get("role", "")):
+        raise PublishError("automated test approvals cannot authorize publication")
+    if what == "backlog":
+        backlog = files.read_json(project, files.BACKLOG, Backlog)
+        for rel, digest in backlog.sources.items():
+            if not files.exists(project, rel) or files.file_sha(project, rel) != digest:
+                raise PublishError(f"backlog source {rel} changed; rebuild and approve again")
+    if what in ("sprint", "assignments"):
+        plan = files.read_json(project, files.SPRINT_PLAN, SprintPlan)
+        if plan.solver.status not in ("OPTIMAL", "FEASIBLE") or plan.backlog_sha256 != files.file_sha(project, files.BACKLOG):
+            raise PublishError("cannot publish a non-feasible or stale sprint plan")
+    return record
+
+
+def serialized(fn):
+    @wraps(fn)
+    def call(project, *args, **kwargs):
+        if blocked := perf.publication_blocked():
+            raise PublishError(blocked)
+        with project_lock(files.project_dir(project)):
+            return fn(project, *args, **kwargs)
+    return call
 
 
 # ============================================================================ exactly-once mapping
@@ -68,12 +94,20 @@ class ExternalIds:
     def __init__(self, project: str) -> None:
         self.project = project
         self.data: dict = files.read_json(project, EXTERNAL_IDS) if files.exists(project, EXTERNAL_IDS) else {}
+        settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+        self.destination = _sha(settings.tracker.model_dump())[:16]
+        self.kind = settings.tracker.kind.value
+
+    def namespace(self, system):
+        # A dispatch belongs to the project/task, with its actual repo/provider
+        # stored in the payload. Editing a tracker destination must not redispatch it.
+        return system if system.startswith(("local", "dispatch")) else f"{system}:{self.destination}"
 
     def get(self, system: str, local_id: str) -> dict | None:
-        return self.data.get(system, {}).get(local_id)
+        return self.data.get(self.namespace(system), {}).get(local_id)
 
     def put(self, system: str, local_id: str, ext_id: str, key: str | None, payload: dict) -> None:
-        self.data.setdefault(system, {})[local_id] = {"id": ext_id, "key": key, "payload_sha256": _sha(payload),
+        self.data.setdefault(self.namespace(system), {})[local_id] = {"id": ext_id, "key": key, "payload_sha256": _sha(payload),
                                                        "last_payload": payload}
         self.save()               # saved after every write, so a crash never loses a mapping already created
 
@@ -90,6 +124,8 @@ def marker(project: str, local_id: str) -> str:
 
 
 def _norm(v: Any) -> Any:
+    if isinstance(v, list):
+        return sorted(v)
     if isinstance(v, str):
         return " ".join(v.split())
     if isinstance(v, float) and v.is_integer():
@@ -105,7 +141,7 @@ def three_way(current: dict, last: dict, new: dict, comparable=None) -> tuple[di
         if f not in new:
             continue
         cur, prev, nxt = _norm(current.get(f)), _norm(cmp(f, last.get(f))), _norm(cmp(f, new.get(f)))
-        if f in last and cur != prev:
+        if f not in last or cur != prev:
             if cur != nxt:
                 kept.append(f)
             continue
@@ -129,14 +165,34 @@ def ensure(adapter: TrackerAdapter, ids: ExternalIds, project: str, local_id: st
             to_write, kept = three_way(current, row.get("last_payload") or {}, payload, getattr(adapter, "comparable", None))
             if to_write:
                 adapter.update(row["id"], to_write | {"level": payload.get("level")})
-            merged = dict(payload)
-            for f in kept:
-                merged[f] = current.get(f)
-            ids.put(system, local_id, row["id"], row["key"], merged)
+            # The baseline is the engine's desired payload, never a human override.
+            ids.put(system, local_id, row["id"], row["key"], payload)
         return {"id": row["id"], "key": row["key"], "created": False, "kept_human_edits": kept}
+    pending = f"{system}_pending"
+    if ids.get(pending, local_id):
+        raise PublishError(f"ambiguous previous create for {local_id}; reconcile the destination marker before retrying")
+    ids.put(pending, local_id, "pending", None, {"marker": marker(project, local_id)})
     created = adapter.create(payload | {"_marker": marker(project, local_id)})
     ids.put(system, local_id, created.id, created.key, payload)
     return {"id": created.id, "key": created.key, "created": True, "kept_human_edits": []}
+
+
+def _once(ids, system, key, action):
+    """Durable outbox: an ambiguous response is never silently replayed."""
+    row = ids.get(system, key)
+    if row:
+        if row["id"] == "pending":
+            raise PublishError(f"ambiguous {system} operation {key}; reconcile with the remote before retrying")
+        return row
+    ids.put(system, key, "pending", None, {})
+    result = action()
+    ext_id = result.id if isinstance(result, ExtObj) else str(result or "done")
+    ids.put(system, key, ext_id, result.key if isinstance(result, ExtObj) else None, {})
+    return ids.get(system, key)
+
+
+def _comment(tracker, ids, issue, text):
+    return _once(ids, tracker.system + "_comment", _sha([issue, text]), lambda: tracker.add_comment(issue, text))
 
 
 # ============================================================================ local tracker (files)
@@ -179,13 +235,23 @@ class LocalTracker(TrackerAdapter):
         return ExtObj(id=key, key=key)
 
     def update(self, external_id: str, fields: dict) -> None:
-        self._with_item(external_id, lambda i: i.update({k: v for k, v in fields.items() if k in OWNED_FIELDS}))
+        def apply(i):
+            updates = {k: v for k, v in fields.items() if k in OWNED_FIELDS and k != "parent_id"}
+            if "labels" in updates:
+                updates["labels"] = updates["labels"] + [x for x in i.get("labels", []) if re.fullmatch(r"p4-[0-9a-f]{8}", x)]
+            i.update(updates)
+            if "parent_id" in fields:
+                i["parent_key"] = fields["parent_id"]
+        self._with_item(external_id, apply)
 
     def get_fields(self, external_id: str) -> dict:
         i = next((x for x in self._items() if x["key"] == external_id), None)
         if i is None:
             raise TrackerError(f"local item {external_id} not found")
-        return {f: i.get(f) for f in OWNED_FIELDS}
+        result = {f: i.get(f) for f in OWNED_FIELDS}
+        result["parent_id"] = i.get("parent_key")
+        result["labels"] = [x for x in i.get("labels", []) if not re.fullmatch(r"p4-[0-9a-f]{8}", x)]
+        return result
 
     def find_by_marker(self, marker_label: str, level: str | None = None) -> ExtObj | None:
         for i in self._items():
@@ -201,6 +267,12 @@ class LocalTracker(TrackerAdapter):
 
     def blocks_of(self, issue_id: str) -> list[str]:
         return [b for a, b in self._load("links") if a == issue_id]
+
+    def remove_blocks(self, blocker_id: str, blocked_id: str) -> None:
+        self._save("links", [edge for edge in self._load("links") if edge != [blocker_id, blocked_id]])
+
+    def reopen_item(self, issue_id: str) -> None:
+        self._with_item(issue_id, lambda i: i.update(status="open"))
 
     def add_comment(self, issue_id: str, text: str) -> None:
         self._with_item(issue_id, lambda i: i["comments"].append(text))
@@ -285,6 +357,7 @@ def payload_for(item: WorkItem, parent_external: str | None) -> dict:
     return p
 
 
+@serialized
 def publish_backlog(project: str) -> dict:
     require_gate(project, "backlog")
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
@@ -296,12 +369,25 @@ def publish_backlog(project: str) -> dict:
     report = {"tracker": tracker.system, "created": 0, "updated_or_unchanged": 0, "kept_human_edits": {},
               "links": 0, "closed": 0}
     for item in sorted(backlog.items, key=lambda i: (ORDER[i.level], i.item_id)):
+        closed_key = ids.get(f"{tracker.system}_closed", item.item_id)
+        if closed_key is not None:
+            tracker.reopen_item(closed_key["id"])
+            ids.data[ids.namespace(f"{tracker.system}_closed")].pop(item.item_id)
+            ids.save()
         res = ensure(tracker, ids, project, item.item_id, payload_for(item, ext.get(item.parent_id) if item.parent_id else None))
         ext[item.item_id] = res["id"]
         report["created" if res["created"] else "updated_or_unchanged"] += 1
         if res["kept_human_edits"]:
             report["kept_human_edits"][item.item_id] = res["kept_human_edits"]
     link_sys = f"{tracker.system}_link"
+    wanted_links = {f"{d.on_id}->{item.item_id}" for item in backlog.items for d in item.dependencies
+                    if d.on_id in ext and items[d.on_id].level == item.level}
+    for key, row in list(ids.data.get(ids.namespace(link_sys), {}).items()):
+        if key not in wanted_links:
+            source, target = row["id"].split("->", 1)
+            tracker.remove_blocks(source, target)
+            ids.data[ids.namespace(link_sys)].pop(key)
+            ids.save()
     for item in backlog.items:
         if item.level == "epic":
             continue
@@ -311,7 +397,7 @@ def publish_backlog(project: str) -> dict:
                 ids.put(link_sys, f"{d.on_id}->{item.item_id}", f"{ext[d.on_id]}->{ext[item.item_id]}", None, {})
                 report["links"] += 1
     closed_sys = f"{tracker.system}_closed"
-    for local_id, row in list(ids.data.get(tracker.system, {}).items()):
+    for local_id, row in list(ids.data.get(ids.namespace(tracker.system), {}).items()):
         if local_id not in items and ids.get(closed_sys, local_id) is None:
             tracker.close_item(row["id"], "removed from the backlog by a requirement change (won't do)")
             ids.put(closed_sys, local_id, row["id"], row.get("key"), {})
@@ -321,6 +407,7 @@ def publish_backlog(project: str) -> dict:
 
 
 # ============================================================================ sprint
+@serialized
 def publish_sprint(project: str) -> dict:
     require_gate(project, "sprint")
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
@@ -341,10 +428,9 @@ def publish_sprint(project: str) -> dict:
         if not sp.story_ids:
             continue
         row = ids.get(sprint_sys, f"sprint:{sp.start.isoformat()}")
-        if row is None:
-            obj = tracker.create_sprint(sp.name, sp.start, sp.end, sp.goal)
-            ids.put(sprint_sys, f"sprint:{sp.start.isoformat()}", obj.id, obj.key, {"name": sp.name})
-            sid = obj.id
+        if row is None or row.get("id") == "pending":
+            row = _once(ids, sprint_sys, f"sprint:{sp.start.isoformat()}", lambda: tracker.create_sprint(sp.name, sp.start, sp.end, sp.goal))
+            sid = row["id"]
         else:
             sid = row["id"]
         report["sprints"] += 1
@@ -366,6 +452,7 @@ def publish_sprint(project: str) -> dict:
 
 
 # ============================================================================ assignments + AI dispatch
+@serialized
 def publish_assignments(project: str) -> dict:
     from agent_engine.phase4 import dispatch
 
@@ -380,6 +467,26 @@ def publish_assignments(project: str) -> dict:
     agents = {a.agent_id: a for a in settings.ai_agents}
     features = {f.feature_dir.split("/")[1][:3]: f for f in backlog.features}
     report = {"tracker": tracker.system, "assigned": 0, "dispatched": [], "missing_in_tracker": []}
+    from agent_engine.phase4.allocation import ci_ready_repos, _task_graph, check
+    if any(a.worker_kind == "ai_agent" for a in ap.assignments) and get_settings().phase4_pr_mode == "github":
+        from agent_engine.phase4.readiness import check_ci, reconcile
+        check_ci(project)  # Re-read the actual repository head immediately before dispatch.
+        reconcile(project)
+        ids = ExternalIds(project)  # reconciliation updates durable dispatch state
+    problems = json.loads(check(project))["problems"]
+    if problems:
+        raise PublishError("assignment checks failed: " + "; ".join(problems))
+    plan = files.read_json(project, files.SPRINT_PLAN, SprintPlan)
+    slot = next(s for s in plan.sprints if s.sprint_index == ap.sprint_index)
+    graph = _task_graph([by[a.task_id] for a in ap.assignments] + [by[u.task_id] for u in ap.unassigned], by)
+    ready = ci_ready_repos(project)
+    active = {}
+    for task_id, row in ids.data.get(ids.namespace("dispatch"), {}).items():
+        payload = row.get("last_payload") or {}
+        if payload.get("status", "queued") not in ("failed", "cancelled", "timed_out") and not payload.get("merged"):
+            worker = payload.get("worker_id")
+            active[worker] = active.get(worker, 0) + 1
+    report["deferred_dispatches"] = []
     for a in ap.assignments:
         row = ids.get(tracker.system, a.task_id)
         if row is None:
@@ -391,7 +498,7 @@ def publish_assignments(project: str) -> dict:
                 continue                                  # already assigned to the same person
             tracker.assign(row["id"], accounts.get(a.worker_id))
             if a.explanation:
-                tracker.add_comment(row["id"], f"Assigned by PDLC Phase 4 (approved at P4-G3): {a.explanation}")
+                _comment(tracker, ids, row["id"], f"Assigned by PDLC Phase 4 (approved at P4-G3): {a.explanation}")
             ids.put(f"{tracker.system}_assign", a.task_id, a.worker_id, None, {})
             report["assigned"] += 1
             continue
@@ -403,14 +510,32 @@ def publish_assignments(project: str) -> dict:
         if agent is None or repo is None:
             report["dispatched"].append({"task_id": a.task_id, "error": "unknown AI agent or repository"})
             continue
+        reasons = []
+        if repo not in ready:
+            reasons.append("no current operational CI evidence; run phase4 check-ci after workflows are merged")
+        not_before = datetime.combine(slot.start, datetime.min.time(), tzinfo=timezone.utc) + timedelta(minutes=a.planned_start_minute)
+        if datetime.now(timezone.utc) < not_before:
+            reasons.append(f"planned start is {not_before.isoformat()}")
+        if active.get(a.worker_id, 0) >= agent.max_concurrent_tasks:
+            reasons.append("worker concurrency limit reached; run phase4 reconcile")
+        for predecessor in graph.predecessors(a.task_id):
+            pred_row = ids.get(tracker.system, predecessor)
+            if not pred_row or not tracker.item_done(pred_row["id"]):
+                reasons.append(f"predecessor {predecessor} is not complete")
+        if reasons:
+            report["deferred_dispatches"].append({"task_id": a.task_id, "reasons": reasons})
+            continue
         feature = features.get(a.task_id[:3])
         brief = dispatch.brief_for(task, by.get(task.parent_id), feature.feature_dir if feature else None, row.get("key"))
         adapter = dispatch.adapter_for(agent.provider, files.path(project, f"{files.PUBLISH_DIR}/dispatch", write=True))
+        if ids.get("dispatch_pending", a.task_id):
+            raise PublishError(f"ambiguous previous dispatch for {a.task_id}; reconcile provider state before retrying")
+        ids.put("dispatch_pending", a.task_id, "pending", None, {"repo": repo, "provider": agent.provider})
         with perf.span("dispatch", agent.provider, adapter=type(adapter).__name__, operation="dispatch"):
             handle = adapter.start(repo=repo, base_ref="main", task_id=a.task_id, brief=brief)
-        ids.put("dispatch", a.task_id, handle, None, {"provider": agent.provider, "repo": repo})
-        tracker.add_comment(row["id"], f"Dispatched to {agent.agent_id} ({agent.provider}): {handle}. "
-                                       f"{a.explanation}")
+        ids.put("dispatch", a.task_id, handle, None, {"provider": agent.provider, "repo": repo, "worker_id": a.worker_id, "status": "queued"})
+        active[a.worker_id] = active.get(a.worker_id, 0) + 1
+        _comment(tracker, ids, row["id"], f"Dispatched to {agent.agent_id} ({agent.provider}): {handle}. {a.explanation}")
         report["dispatched"].append({"task_id": a.task_id, "agent": agent.agent_id, "handle": handle})
     if report["missing_in_tracker"]:
         report["hint"] = "publish the backlog first: agent-engine phase4 publish backlog"
@@ -419,25 +544,36 @@ def publish_assignments(project: str) -> dict:
 
 
 # ============================================================================ infra + CI pull requests
+@serialized
 def publish_infra(project: str) -> dict:
     from agent_engine.phase4.github_api import open_pr
 
     approval = require_gate(project, "infra")
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
     manifest = files.read_json(project, files.INFRA_MANIFEST, InfraManifest)
+    from agent_engine.phase4.infra import check
+    checked = json.loads(check(project))
+    if not checked["ok"] or manifest.validation_complete is not True:
+        raise PublishError("infrastructure is not fully validated: " + "; ".join(checked.get("problems", [])))
+    snapshot = {}
+    for f in manifest.files:
+        data = files.path(project, f"infra/{f.path}").read_bytes()
+        if hashlib.sha256(data).hexdigest() != f.sha256:
+            raise PublishError(f"{f.path} changed after validation; publish refused")
+        snapshot[f.path] = data.decode("utf-8")
     if not settings.infra_repo:
         raise PublishError("set infra_repo in phase4/project.json")
     short = manifest.intent_sha256[:8]
     local_root = files.path(project, f"{files.PUBLISH_DIR}/prs", write=True)
     pr_body = files.read_text(project, files.INFRA_PR) + (
         f"\n\nApproved at P4-G4 by {approval.get('approver', {}).get('name', '?')} on {approval.get('decided_at', '?')}.\n")
-    repo_files = {f.path.removeprefix("repo/"): files.read_text(project, f"infra/{f.path}")
+    repo_files = {f.path.removeprefix("repo/"): snapshot[f.path]
                   for f in manifest.files if f.path.startswith("repo/")}
     prs = [open_pr(settings.infra_repo, f"phase4/infra-{short}", repo_files,
                    f"Phase 4 infrastructure ({', '.join(manifest.environments)})", pr_body, local_root).__dict__]
     for repo in manifest.ci_repos:
         prefix = f"ci/{repo.replace('/', '__')}/"
-        ci_files = {f.path.removeprefix(prefix): files.read_text(project, f"infra/{f.path}")
+        ci_files = {f.path.removeprefix(prefix): snapshot[f.path]
                     for f in manifest.files if f.path.startswith(prefix)}
         prs.append(open_pr(repo, f"phase4/ci-{short}", ci_files, "Phase 4 CI pipeline",
                            "CI workflows generated by PDLC Phase 4 from the approved infrastructure change set "

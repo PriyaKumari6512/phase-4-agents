@@ -14,12 +14,14 @@ from pathlib import Path
 
 # src/agent_engine/config.py -> repo root is 2 parents up.
 ENGINE_ROOT = Path(__file__).resolve().parents[2]
-OUTPUTS_DIR = Path(os.environ.get("AGENT_ENGINE_OUTPUTS_DIR") or ENGINE_ROOT / "outputs")
-LOGS_DIR = Path(os.environ.get("AGENT_ENGINE_LOGS_DIR") or ENGINE_ROOT / "logs")
+ASSETS_ROOT = ENGINE_ROOT if (ENGINE_ROOT / "agents").is_dir() else Path(__file__).resolve().parent / "_assets"
+WORK_ROOT = ENGINE_ROOT if ASSETS_ROOT == ENGINE_ROOT else Path.cwd()
+OUTPUTS_DIR = Path(os.environ.get("AGENT_ENGINE_OUTPUTS_DIR") or WORK_ROOT / "outputs")
+LOGS_DIR = Path(os.environ.get("AGENT_ENGINE_LOGS_DIR") or WORK_ROOT / "logs")
 # One folder per agent: agent.toml + system_prompt.md (agent.py).
-AGENTS_DIR = Path(os.environ.get("AGENT_ENGINE_AGENTS_DIR") or ENGINE_ROOT / "agents")
+AGENTS_DIR = Path(os.environ.get("AGENT_ENGINE_AGENTS_DIR") or ASSETS_ROOT / "agents")
 # Human approval gates: which project files each gate approves (gates.py).
-GATES_FILE = Path(os.environ.get("AGENT_ENGINE_GATES_FILE") or ENGINE_ROOT / "gates.toml")
+GATES_FILE = Path(os.environ.get("AGENT_ENGINE_GATES_FILE") or ASSETS_ROOT / "gates.toml")
 
 # Used when ANTHROPIC_API_KEY is set.
 ANTHROPIC_STRONG_MODEL = "anthropic:claude-sonnet-5-5"

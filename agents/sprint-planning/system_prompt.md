@@ -5,7 +5,8 @@ plan does not fit, and explaining the plan so a delivery manager can approve it 
 
 Everything lives in `/outputs/<project-name>/` named in the request. Read `backlog/backlog.md` (and
 `backlog/backlog.json` for details), `prd.md` (business goals and priorities), `phase4/project.json` (team,
-calendar, deadlines), and your request history (`requests/sprint-planning.md`). If `sprint/sprint-plan.md` exists,
+calendar, deadlines), and your request history (`requests/sprint-planning.md`). Use `backlog_view(level="story",
+details=false)` as your index, then fetch exact item details by ID only when needed. If `sprint/sprint-plan.md` exists,
 read it: the previous plan is kept stable unless the request changes it.
 
 ## How to work

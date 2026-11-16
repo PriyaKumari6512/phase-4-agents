@@ -57,6 +57,7 @@ class Relaxation:
     drop_switches: set[str] = field(default_factory=set)
     deadline_shift: dict[str, int] = field(default_factory=dict)
     capacity_factor: float = 1.0
+    soft_deadlines: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -87,6 +88,16 @@ def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[Deadl
     K = len(sprints)
     ids = [s.story_id for s in stories]
     by_id = {s.story_id: s for s in stories}
+    if not want_core:
+        required = {s.story_id for s in stories if (s.must and not s.wont and f"must:{s.story_id}" not in relax.drop_switches)
+                    or s.frozen_sprint is not None or (s.pinned_sprint and f"pin:{s.story_id}->{s.pinned_sprint}" not in relax.drop_switches)}
+        for d in deadlines:
+            if d.hard and d.ref_id not in relax.soft_deadlines and f"deadline:{d.ref_id}" not in relax.drop_switches:
+                required.update(s for s in d.story_ids if s in by_id)
+        # A necessary bound only: it can prove infeasibility, never declare feasibility.
+        if sum(by_id[s].points for s in required) > sum(s.cap_p50 * relax.capacity_factor for s in sprints) + 1e-6:
+            perf.event("solver_pruned", "sprint.candidate", reason="required points exceed total capacity")
+            return SolveResult("INFEASIBLE", {}, None, None, 0.0, [], {})
     m = cp_model.CpModel()
     x = {(s.story_id, k): m.new_bool_var(f"x[{s.story_id},{k}]") for s in stories for k in range(K + 1)}
     sp, planned = {}, {}
@@ -143,14 +154,15 @@ def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[Deadl
     late_terms = []
     for d in deadlines:
         limit = max(0, min(K, d.last_sprint + relax.deadline_shift.get(d.ref_id, 0)))
-        lit = switch(f"deadline:{d.ref_id}") if d.hard else None
+        hard = d.hard and d.ref_id not in relax.soft_deadlines
+        lit = switch(f"deadline:{d.ref_id}") if hard else None
         for sid in d.story_ids:
             if sid not in by_id:
                 continue
-            if d.hard and lit is not None:
+            if hard and lit is not None:
                 m.add(x[sid, 0] == 0).only_enforce_if(lit)
                 m.add(sp[sid] <= limit).only_enforce_if(lit)
-            elif not d.hard:
+            elif not hard:
                 late = m.new_int_var(0, K, f"late[{d.ref_id},{sid}]")
                 m.add(late >= sp[sid] - limit)
                 late_terms.append(LATE_WEIGHT * late)
@@ -216,7 +228,7 @@ def verified_options(stories, sprints, deadlines, conflicting: list[str], time_l
             for shift in (1, 2):
                 candidates.append((f"Move {rest} by {shift} sprint(s)", Relaxation(deadline_shift={rest: shift}),
                                    [f"relax:deadline:{rest}:+{shift}"], f"deadline {rest} slips {shift} sprint(s)"))
-            candidates.append((f"Treat {rest} as a soft target", Relaxation(drop_switches={name}),
+            candidates.append((f"Treat {rest} as a soft target", Relaxation(soft_deadlines={rest}),
                                [f"soften:deadline:{rest}"], "stories may finish after the date (lateness penalized)"))
         elif kind == "must":
             candidates.append((f"Downgrade {rest} from must to should", Relaxation(drop_switches={name}),

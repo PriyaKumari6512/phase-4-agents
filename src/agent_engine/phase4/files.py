@@ -14,11 +14,13 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from pathlib import PurePosixPath
 from typing import TypeVar
 
 from pydantic import BaseModel
 
 from agent_engine import config
+from agent_engine.runtime import active_project, active_inputs, atomic_text
 
 PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 M = TypeVar("M", bound=BaseModel)
@@ -62,9 +64,13 @@ def new_id() -> str:
 
 
 def project_dir(project: str) -> Path:
+    if active_project.get() not in (None, project):
+        raise ProjectError(f"this run is bound to project {active_project.get()!r}, not {project!r}")
     if not PROJECT_RE.fullmatch(project or ""):
         raise ProjectError(f"invalid project name {project!r}: use the <project-name> from /outputs/<project-name>/")
     path = Path(config.OUTPUTS_DIR) / project
+    if path.is_symlink() or path.resolve().parent != Path(config.OUTPUTS_DIR).resolve():
+        raise ProjectError("project directory must be inside the configured outputs directory")
     if not path.is_dir():
         raise ProjectError(f"project folder /outputs/{project}/ does not exist")
     return path
@@ -72,16 +78,24 @@ def project_dir(project: str) -> Path:
 
 def _rel(rel: str, *, write: bool) -> str:
     rel = rel.replace("\\", "/").strip("/")
+    if ".." in rel.split("/"):
+        raise ProjectError(f"invalid project path {rel!r}")
+    rel = str(PurePosixPath(rel))
     parts = rel.split("/")
     if not rel or ".." in parts or rel.startswith("~"):
         raise ProjectError(f"invalid project path {rel!r}")
-    if write and parts[0] in config.READ_ONLY_PROJECT_DIRS:
+    if write and (parts[0] in config.READ_ONLY_PROJECT_DIRS or parts[0].startswith(".engine-")
+                  or rel in active_inputs.get() or rel == "report.json"):
         raise ProjectError(f"{rel!r} is in a read-only project folder")
     return rel
 
 
 def path(project: str, rel: str, *, write: bool = False) -> Path:
-    return project_dir(project) / _rel(rel, write=write)
+    root = project_dir(project).resolve()
+    target = root / _rel(rel, write=write)
+    if not target.resolve().is_relative_to(root):
+        raise ProjectError(f"path escapes project: {rel!r}")
+    return target
 
 
 def virtual(project: str, rel: str) -> str:
@@ -114,7 +128,10 @@ def read_json(project: str, rel: str, model: type[M] | None = None):
     if model is None:
         return data
     try:
-        return model.model_validate(data)
+        parsed = model.model_validate(data)
+        if hasattr(parsed, "project") and parsed.project != project:
+            raise ProjectError(f"artifact belongs to project {parsed.project!r}, not {project!r}")
+        return parsed
     except Exception as e:  # pydantic.ValidationError, reported to the model verbatim
         raise ProjectError(f"/outputs/{project}/{rel} does not match its schema: {e}") from e
 
@@ -123,7 +140,7 @@ def write_text(project: str, rel: str, text: str) -> Path:
     p = path(project, rel, write=True)
     p.parent.mkdir(parents=True, exist_ok=True)
     # LF on every OS: generated repository files must not change (or change their hash) on Windows
-    p.write_text(text, encoding="utf-8", newline="\n")
+    atomic_text(p, text)
     return p
 
 

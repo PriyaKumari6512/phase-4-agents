@@ -48,10 +48,22 @@ public class TaskAssigningModelConvertor implements
 
         Map<String, Task> taskMap = modelInput.tasks().stream()
                 .collect(Collectors.toMap(TaskInputDTO::id,
-                        dto -> new Task(dto.id(), require(taskTypeMap, dto.taskTypeCode(), "task type"),
-                                dto.indexInTaskType(), require(customerMap, dto.customerId(), "customer"),
-                                dto.minStartTimeInMinutes(), dto.priority()),
+                        dto -> {
+                            var task = new Task(dto.id(), require(taskTypeMap, dto.taskTypeCode(), "task type"),
+                                    dto.indexInTaskType(), require(customerMap, dto.customerId(), "customer"),
+                                    dto.minStartTimeInMinutes(), dto.priority());
+                            task.setPredecessorIds(dto.predecessorIds());
+                            return task;
+                        },
                         (left, right) -> left, LinkedHashMap::new));
+        for (var task : taskMap.values()) {
+            for (String id : task.getPredecessorIds()) {
+                require(taskMap, id, "predecessor");
+                if (id.equals(task.getId())) {
+                    throw new IllegalArgumentException("A task cannot depend on itself: " + id);
+                }
+            }
+        }
 
         List<Employee> employees = new ArrayList<>(modelInput.employees().size());
         for (EmployeeInputDTO dto : modelInput.employees()) {

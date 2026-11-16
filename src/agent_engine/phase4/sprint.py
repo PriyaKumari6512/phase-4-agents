@@ -232,21 +232,26 @@ def solve(project: str, business_values: dict[str, int], pins: dict[str, int] | 
             code, why = "capacity", "Capacity in the horizon is used by higher-value, deadline or must-have stories."
         deferred.append(Deferral(story_id=s.story_id, reason_code=code, explanation=why))
     with perf.span("phase", "sprint.forecast"):
-        p50_k, p85_k = cap.forecast(sum(s.points for s in stories if not s.wont), windows, hist)
+        censored = []
+        p50_k, p85_k = cap.forecast(sum(s.points for s in stories if not s.wont), windows, hist, censored_out=censored)
+        if censored and censored[0]:
+            assumptions.append(f"Forecast censored: {censored[0]}/2000 samples did not finish within 60 sprints; boundary dates are not completion guarantees.")
     L = settings.calendar.sprint_length_days
     end_of = lambda k: windows[0].start + timedelta(days=k * L - 1)  # noqa: E731
     pts = {s.story_id: s.points for s in stories}
     slots = []
     for w in windows:
         ids = sorted([sid for sid, k in placement.items() if k == w.index], key=lambda i: -values.get(i, 0))
+        effective = next(s for s in sprints if s.index == w.index)
         slots.append(SprintSlot(sprint_index=w.index, number=w.number, name=f"{settings.project_name} Sprint {w.number}",
                                 start=w.start, end=w.end, story_ids=ids,
-                                committed_points=int(round(sum(pts[i] for i in ids))), capacity_p50=w.cap_p50,
-                                capacity_p85=w.cap_p85, maintenance_reserved_points=w.reserved,
+                                committed_points=int(round(sum(pts[i] for i in ids))), capacity_p50=effective.cap_p50,
+                                capacity_p85=effective.cap_p85, maintenance_reserved_points=w.reserved,
                                 available_person_days=w.person_days))
     plan = SprintPlan(
         plan_id=prev.plan_id if prev else files.new_id(), version=(prev.version + 1) if prev else 1, project=project,
-        backlog_sha256=files.file_sha(project, files.BACKLOG), as_of=as_of_d, sprints=slots, deferred=deferred,
+        backlog_sha256=files.file_sha(project, files.BACKLOG), settings_sha256=files.file_sha(project, files.PROJECT_SETTINGS),
+        as_of=as_of_d, sprints=slots, deferred=deferred,
         forecast=Forecast(p50_last_sprint=first + p50_k - 1, p85_last_sprint=first + p85_k - 1,
                           p50_date=end_of(p50_k), p85_date=end_of(p85_k)),
         solver=SolverReport(status=res.status, objective=res.objective, best_bound=res.best_bound,
@@ -300,9 +305,18 @@ def check(project: str) -> str:
     backlog = files.read_json(project, files.BACKLOG, Backlog)
     by = backlog.by_id()
     problems, warnings = [], []
+    if plan.settings_sha256 != files.file_sha(project, files.PROJECT_SETTINGS):
+        problems.append("sprint plan settings provenance is missing or stale; re-run sprint_solve")
     if plan.backlog_sha256 != files.file_sha(project, files.BACKLOG):
         problems.append("sprint-plan.json was built from an older backlog.json; re-run sprint_solve")
     placed = {sid: s.sprint_index for s in plan.sprints for sid in s.story_ids}
+    story_ids = {s.item_id for s in backlog.stories()}
+    all_placed = [sid for s in plan.sprints for sid in s.story_ids]
+    deferred_ids = [d.story_id for d in plan.deferred]
+    if len(all_placed) != len(set(all_placed)) or len(deferred_ids) != len(set(deferred_ids)):
+        problems.append("a story is placed or deferred more than once")
+    if set(all_placed) & set(deferred_ids) or (set(all_placed) | set(deferred_ids)) - story_ids:
+        problems.append("planned/deferred stories overlap or contain unknown story IDs")
     accounted = set(placed) | {d.story_id for d in plan.deferred}
     missing = [s.item_id for s in backlog.stories() if s.item_id not in accounted]
     if missing:

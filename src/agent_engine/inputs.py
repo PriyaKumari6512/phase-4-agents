@@ -120,7 +120,8 @@ def _make_readable(path: Path) -> AddedInput:
 
 def _is_text(path: Path) -> bool:
     try:
-        path.read_bytes()[:65536].decode("utf-8")
+        with path.open("rb") as source:
+            source.read(65536).decode("utf-8")
     except UnicodeDecodeError:
         return False
     return True
@@ -146,9 +147,20 @@ def _xlsx(path: Path) -> str:
     sections = []
     try:
         for sheet in workbook.worksheets:
-            rows = [["" if v is None else str(v) for v in row] for row in sheet.iter_rows(values_only=True)]
-            rows = [r for r in rows if any(cell.strip() for cell in r)]
-            sections.append(f"## Sheet: {sheet.title}\n\n" + (_markdown_table(rows) if rows else "(empty)"))
+            rows, omitted, width = [], 0, 0
+            for row in sheet.iter_rows(values_only=True):
+                values = ["" if v is None else str(v) for v in row]
+                if not any(cell.strip() for cell in values):
+                    continue
+                width = max(width, len(values))
+                if len(rows) <= XLSX_MAX_ROWS_PER_SHEET:
+                    rows.append(values)
+                else:
+                    omitted += 1
+            text = _markdown_table([r + [""] * (width - len(r)) for r in rows]) if rows else "(empty)"
+            if omitted:
+                text += f"\n({omitted} more rows not shown)"
+            sections.append(f"## Sheet: {sheet.title}\n\n{text}")
     finally:
         workbook.close()
     return "\n\n".join(sections)

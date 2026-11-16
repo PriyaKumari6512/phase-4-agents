@@ -8,6 +8,7 @@ Validators get the read-only `*-check` sets.
 from __future__ import annotations
 
 import logging
+import json
 from typing import Callable
 
 from langchain_core.tools import tool
@@ -54,6 +55,42 @@ def speckit_script(project: str, script: str, script_args: str = "", feature_dir
 
 
 # ============================================================================ backlog (Agent 1)
+@tool
+def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: list[str] | None = None,
+                 offset: int = 0, limit: int = 100, details: bool = True) -> str:
+    """Read exact backlog records scoped to one epic, level or item IDs. Paginated; never silently truncates.
+    Use details=false for a compact planning index; details=true includes every field of selected items.
+    This avoids repeatedly reading the complete backlog JSON for one feature's work."""
+    def view():
+        from agent_engine.phase4.contracts import Backlog
+        b = files.read_json(project, files.BACKLOG, Backlog)
+        if offset < 0 or not 1 <= limit <= 200 or level not in ("", "epic", "story", "task"):
+            raise files.ProjectError("offset must be >=0, limit 1..200, level epic/story/task or empty")
+        children = {i.item_id for i in b.items if i.parent_id == epic_id}
+        rows = [i for i in b.items if (not epic_id or i.item_id == epic_id or i.parent_id == epic_id or i.parent_id in children)
+                and (not level or i.level == level) and (not item_ids or i.item_id in item_ids)]
+        page = rows[offset:offset + limit]
+        compact = ("item_id", "level", "parent_id", "title", "priority", "moscow", "estimate", "dependencies", "source_refs", "open_questions")
+        return json.dumps({"backlog_sha256": files.file_sha(project, files.BACKLOG), "total": len(rows),
+                           "next_offset": offset + limit if offset + limit < len(rows) else None,
+                           "items": [i.model_dump(mode="json") if details else i.model_dump(mode="json", include=set(compact)) for i in page]})
+    return _run("backlog_view", view)
+
+
+@tool
+def speckit_check_feature(project: str, feature_directory: str) -> str:
+    """Check one feature's spec-kit spec.md/tasks.md format before joining the global backlog. Read only."""
+    def check_feature():
+        from agent_engine.phase4.speckit_parse import parse_spec_md, parse_tasks_md
+        from agent_engine.phase4.speckit import FEATURE_DIR_RE
+        if not FEATURE_DIR_RE.fullmatch(feature_directory):
+            raise files.ProjectError("invalid feature directory")
+        spec = parse_spec_md(files.read_text(project, feature_directory + "/spec.md"))
+        tasks = parse_tasks_md(files.read_text(project, feature_directory + "/tasks.md"))
+        return json.dumps({"feature_directory": feature_directory, "stories": len(spec.stories), "tasks": len(tasks), "format_valid": True})
+    return _run("speckit_check_feature", check_feature)
+
+
 @tool
 def backlog_set_features(project: str, features: list[dict]) -> str:
     """Record how prd.md splits into features, before running spec-kit. Each feature: feature_key ("F01"),
@@ -234,7 +271,7 @@ def infra_check(project: str) -> str:
     return _run("infra_check", lambda: infra.check(project))
 
 
-_ALL = [speckit_init, speckit_script, backlog_set_features, backlog_build, backlog_find_similar, backlog_update,
+_ALL = [backlog_view, speckit_check_feature, speckit_init, speckit_script, backlog_set_features, backlog_build, backlog_find_similar, backlog_update,
         backlog_validate, backlog_check, sprint_capacity, sprint_solve, sprint_annotate, sprint_check,
         allocation_prepare, allocation_solve, allocation_annotate, allocation_check, infra_set_intent, infra_render,
         infra_validate, infra_registry_versions, infra_check]
@@ -248,12 +285,12 @@ for _t in _ALL:
     _t.handle_tool_error = True
 
 TOOL_FACTORIES: dict[str, Callable[[], list]] = {
-    "phase4-speckit": lambda: [speckit_init, speckit_script],
-    "phase4-backlog": lambda: [backlog_set_features, backlog_build, backlog_find_similar, backlog_update, backlog_validate],
-    "phase4-backlog-check": lambda: [backlog_check],
-    "phase4-sprint": lambda: [sprint_capacity, sprint_solve, sprint_annotate],
+    "phase4-speckit": lambda: [speckit_init, speckit_script, speckit_check_feature],
+    "phase4-backlog": lambda: [backlog_view, backlog_set_features, backlog_build, backlog_find_similar, backlog_update, backlog_validate],
+    "phase4-backlog-check": lambda: [backlog_view, backlog_check],
+    "phase4-sprint": lambda: [backlog_view, sprint_capacity, sprint_solve, sprint_annotate],
     "phase4-sprint-check": lambda: [sprint_check],
-    "phase4-allocation": lambda: [allocation_prepare, allocation_solve, allocation_annotate],
+    "phase4-allocation": lambda: [backlog_view, allocation_prepare, allocation_solve, allocation_annotate],
     "phase4-allocation-check": lambda: [allocation_check],
     "phase4-infra": lambda: [infra_set_intent, infra_render, infra_validate, infra_registry_versions],
     "phase4-infra-check": lambda: [infra_check, infra_registry_versions],

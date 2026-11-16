@@ -34,6 +34,8 @@ class LinearTracker(TrackerAdapter):
         r = self.http.post("/graphql", json={"query": query, "variables": variables or {}}).json()
         if r.get("errors"):   # Linear can return HTTP 200 with errors
             raise TrackerError(f"Linear GraphQL error: {r['errors']}")
+        if any(isinstance(value, dict) and value.get("success") is False for value in (r.get("data") or {}).values()):
+            raise TrackerError("Linear mutation returned success=false")
         return r["data"]
 
     @staticmethod
@@ -53,6 +55,8 @@ class LinearTracker(TrackerAdapter):
             inp["parentId"] = payload["parent_id"]
         if payload.get("story_points") is not None:
             inp["estimate"] = int(round(payload["story_points"]))
+        if payload.get("labels"):
+            inp["labelIds"] = self._label_ids(payload["labels"])
         d = self.gql("mutation($i:IssueCreateInput!){ issueCreate(input:$i){ success issue{ id identifier } } }", {"i": inp})
         issue = d["issueCreate"]["issue"]
         return ExtObj(id=issue["id"], key=issue["identifier"])
@@ -65,14 +69,49 @@ class LinearTracker(TrackerAdapter):
             inp["description"] = fields["body_md"]
         if fields.get("story_points") is not None:
             inp["estimate"] = int(round(fields["story_points"]))
+        if "parent_id" in fields:
+            inp["parentId"] = fields["parent_id"]
+        if "labels" in fields:
+            inp["labelIds"] = self._label_ids(fields["labels"])
         if inp:
             self.gql("mutation($id:String!,$i:IssueUpdateInput!){ issueUpdate(id:$id,input:$i){ success } }",
                      {"id": external_id, "i": inp})
 
     def get_fields(self, external_id: str) -> dict:
-        i = self.gql("query($id:String!){ issue(id:$id){ title description estimate } }", {"id": external_id})["issue"]
+        i = self.gql("query($id:String!){ issue(id:$id){ title description estimate parent{id} } }", {"id": external_id})["issue"]
+        labels, after = [], None
+        while True:
+            page = self.gql("""query($id:String!,$after:String){issue(id:$id){labels(first:100,after:$after){
+                nodes{name} pageInfo{hasNextPage endCursor}}}}""", {"id": external_id, "after": after})["issue"]["labels"]
+            labels.extend(x["name"] for x in page["nodes"])
+            if not page["pageInfo"]["hasNextPage"]:
+                break
+            after = page["pageInfo"]["endCursor"]
         return {"title": i["title"], "body_md": i.get("description") or "", "story_points": i.get("estimate"),
-                "hours": None}
+                "hours": None, "parent_id": (i.get("parent") or {}).get("id"), "labels": labels}
+
+    @cached_property
+    def label_map(self):
+        labels, after = {}, None
+        while True:
+            page = self.gql("""query($after:String){issueLabels(first:100,after:$after){pageInfo{hasNextPage endCursor}
+                nodes{id name team{id}}}}""", {"after": after})["issueLabels"]
+            for label in page["nodes"]:
+                if not label.get("team") or label["team"]["id"] == self.cfg.linear_team_id:
+                    labels[label["name"]] = label["id"]
+            if not page["pageInfo"]["hasNextPage"]:
+                return labels
+            after = page["pageInfo"]["endCursor"]
+
+    def _label_ids(self, names):
+        out = []
+        for name in names:
+            if name not in self.label_map:
+                label = self.gql("""mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){success issueLabel{id}}}""",
+                                 {"i": {"name": name, "teamId": self.cfg.linear_team_id, "color": "#777777"}})["issueLabelCreate"]["issueLabel"]
+                self.label_map[name] = label["id"]
+            out.append(self.label_map[name])
+        return out
 
     def find_by_marker(self, marker: str, level: str | None = None) -> ExtObj | None:
         try:
@@ -86,9 +125,29 @@ class LinearTracker(TrackerAdapter):
                  {"i": {"issueId": blocker_id, "relatedIssueId": blocked_id, "type": "blocks"}})
 
     def blocks_of(self, issue_id: str) -> list[str]:
-        i = self.gql("query($id:String!){ issue(id:$id){ relations{ nodes{ type relatedIssue{ id } } } } }",
-                     {"id": issue_id})["issue"]
-        return [n["relatedIssue"]["id"] for n in i["relations"]["nodes"] if n["type"] == "blocks"]
+        return [n["relatedIssue"]["id"] for n in self._relations(issue_id) if n["type"] == "blocks"]
+
+    def _relations(self, issue_id):
+        out, after = [], None
+        while True:
+            page = self.gql("""query($id:String!,$after:String){issue(id:$id){relations(first:100,after:$after){
+                pageInfo{hasNextPage endCursor} nodes{id type relatedIssue{id}}}}}""", {"id": issue_id, "after": after})["issue"]["relations"]
+            out.extend(page["nodes"])
+            if not page["pageInfo"]["hasNextPage"]:
+                return out
+            after = page["pageInfo"]["endCursor"]
+
+    def remove_blocks(self, blocker_id: str, blocked_id: str) -> None:
+        for relation in self._relations(blocker_id):
+            if relation["type"] == "blocks" and relation["relatedIssue"]["id"] == blocked_id:
+                self.gql("mutation($id:String!){issueRelationDelete(id:$id){success}}", {"id": relation["id"]})
+
+    def reopen_item(self, issue_id: str) -> None:
+        state = next((s["id"] for s in self.team["states"]["nodes"] if s["type"] in ("backlog", "unstarted")), None)
+        if not state:
+            raise TrackerError("Linear team has no backlog/unstarted state")
+        self.gql("mutation($id:String!,$i:IssueUpdateInput!){issueUpdate(id:$id,input:$i){success}}",
+                 {"id": issue_id, "i": {"stateId": state}})
 
     def item_done(self, issue_id: str) -> bool:
         i = self.gql("query($id:String!){ issue(id:$id){ state{ type } } }", {"id": issue_id})["issue"]
@@ -107,10 +166,17 @@ class LinearTracker(TrackerAdapter):
 
     # ---- cycles ----
     def _cycles(self) -> list[dict]:
-        d = self.gql("""query($id:String!){ team(id:$id){ cycles(first:100){ nodes{ id number name startsAt endsAt
-                         completedAt isPast scopeHistory completedScopeHistory completedIssueCountHistory } } } }""",
-                     {"id": self.cfg.linear_team_id})
-        return d["team"]["cycles"]["nodes"]
+        out, after = [], None
+        while True:
+            d = self.gql("""query($id:String!,$after:String){ team(id:$id){ cycles(first:100,after:$after){
+                pageInfo{hasNextPage endCursor} nodes{ id number name startsAt endsAt
+                completedAt isPast scopeHistory completedScopeHistory completedIssueCountHistory } } } }""",
+                         {"id": self.cfg.linear_team_id, "after": after})
+            page = d["team"]["cycles"]
+            out.extend(page["nodes"])
+            if not page["pageInfo"]["hasNextPage"]:
+                return out
+            after = page["pageInfo"]["endCursor"]
 
     def create_sprint(self, name: str, start: date, end: date, goal: str) -> ExtObj:
         for c in self._cycles():   # teams with automatic cycles already have them: match by dates
@@ -125,8 +191,15 @@ class LinearTracker(TrackerAdapter):
 
     def _set_cycle(self, issue_ids: list[str], cycle_id: str | None) -> None:
         for iid in issue_ids:
-            kids = self.gql("query($id:String!){ issue(id:$id){ children{ nodes{ id } } } }", {"id": iid})["issue"]
-            for target in [iid] + [k["id"] for k in kids["children"]["nodes"]]:
+            children, after = [], None
+            while True:
+                kids = self.gql("""query($id:String!,$after:String){ issue(id:$id){ children(first:100,after:$after){
+                    pageInfo{hasNextPage endCursor} nodes{id} } } }""", {"id": iid, "after": after})["issue"]["children"]
+                children.extend(k["id"] for k in kids["nodes"])
+                if not kids["pageInfo"]["hasNextPage"]:
+                    break
+                after = kids["pageInfo"]["endCursor"]
+            for target in [iid] + children:
                 self.gql("mutation($id:String!,$i:IssueUpdateInput!){ issueUpdate(id:$id,input:$i){ success } }",
                          {"id": target, "i": {"cycleId": cycle_id}})
 

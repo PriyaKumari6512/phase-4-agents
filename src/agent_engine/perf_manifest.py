@@ -59,7 +59,8 @@ def tree_digest(root: Path) -> dict:
     if not root.is_dir():
         return {"exists": False}
     h, count, size = hashlib.sha256(), 0, 0
-    for p in sorted(x for x in root.rglob("*") if x.is_file() and "__pycache__" not in x.parts):
+    for p in sorted((x for x in root.rglob("*") if x.is_file() and "__pycache__" not in x.parts),
+                    key=lambda p: p.relative_to(root).as_posix()):
         data = p.read_bytes()
         h.update(p.relative_to(root).as_posix().encode() + b"\0" + hashlib.sha256(data).digest())
         count, size = count + 1, size + len(data)
@@ -142,7 +143,7 @@ def solver_settings() -> dict:
         "capacity_monte_carlo": {"samples": capacity.SAMPLES, "seed": _default(capacity.fill_capacity, "seed")},
         "forecast": {"seed": _default(capacity.forecast, "seed"), "runs": 2000},
         "allocation": {"mode": s.phase4_allocation_solver_mode, "timefold_spent_limit": s.phase4_allocation_time_limit,
-                       "timefold_poll_interval_s": 2, "timefold_deadline_s": 600,
+                       "timefold_poll_interval_s": 2, "timefold_deadline_s": "configured spent limit + 30s, checked per request",
                        "local_time_limit_s": _default(alloc_solver.solve_local, "time_limit_s"), "local_workers": 8},
     }
 

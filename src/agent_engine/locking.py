@@ -12,6 +12,7 @@ latency.
 from __future__ import annotations
 
 import asyncio
+import os
 import logging
 import time
 from typing import Any, Awaitable, Callable
@@ -24,6 +25,22 @@ from agent_engine import perf
 from agent_engine.config import FILE_LOCK_ACQUIRE_TIMEOUT_SECONDS, MUTATING_FILESYSTEM_TOOLS
 
 logger = logging.getLogger(__name__)
+
+
+class HelperLimitMiddleware(AgentMiddleware):
+    """Bound task fan-out without serializing ordinary reads."""
+    def __init__(self, limit: int | None = None):
+        limit = limit if limit is not None else int(os.environ.get("AGENT_ENGINE_HELPER_CONCURRENCY", "9"))
+        if limit < 1:
+            raise ValueError("AGENT_ENGINE_HELPER_CONCURRENCY must be >= 1")
+        self.slots = asyncio.Semaphore(limit)
+
+    async def awrap_tool_call(self, request, handler):
+        name = request.tool.name if request.tool else request.tool_call["name"]
+        if name == "task":
+            async with self.slots:
+                return await handler(request)
+        return await handler(request)
 
 # Module-level, not per-instance, so every subagent's own FileLockMiddleware
 # shares this one lock with the main agent.

@@ -7,6 +7,7 @@ credentials keep their usual names. Read at call time so tests can monkeypatch.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -43,6 +44,20 @@ class Settings:
     ms_graph_tenant_id: str
     ms_graph_client_id: str
     ms_graph_client_secret: str
+
+    def __post_init__(self):
+        if self.phase4_allocation_solver_mode not in ("auto", "timefold", "local"):
+            raise ValueError("PHASE4_ALLOCATION_SOLVER_MODE must be auto, timefold or local")
+        if self.phase4_iac_sandbox_mode not in ("auto", "off"):
+            raise ValueError("PHASE4_IAC_SANDBOX_MODE must be auto or off")
+        if self.phase4_pr_mode not in ("local", "github"):
+            raise ValueError("PHASE4_PR_MODE must be local or github")
+        if not 0 < self.phase4_ai_review_ratio <= 1:
+            raise ValueError("PHASE4_AI_REVIEW_RATIO must be > 0 and <= 1")
+        if not re.fullmatch(r"PT(?=.+)(?:\d+(?:\.\d+)?H)?(?:\d+(?:\.\d+)?M)?(?:\d+(?:\.\d+)?S)?", self.phase4_allocation_time_limit):
+            raise ValueError("PHASE4_ALLOCATION_TIME_LIMIT must be an ISO-8601 time duration, e.g. PT30S")
+        if sum(float(n) for n in re.findall(r"\d+(?:\.\d+)?", self.phase4_allocation_time_limit)) <= 0:
+            raise ValueError("PHASE4_ALLOCATION_TIME_LIMIT must be positive")
 
 
 def get_settings() -> Settings:

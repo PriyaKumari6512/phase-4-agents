@@ -251,7 +251,7 @@ def test_skipped_validation_is_reported_as_incomplete(proj):  # noqa: F811
     infra.set_intent(P, _intent())
     infra.render(P)
     v = json.loads(infra.validate(P))                    # PHASE4_IAC_SANDBOX_MODE=off in this fixture
-    assert v["checks_passed"] is True                    # the existing gate policy is unchanged ...
+    assert v["checks_passed"] is False                   # skipped checks cannot authorize publication
     assert v["validation_complete"] is False                                  # ... but it is never "complete"
     assert len([x for x in v["incomplete"] if not x.startswith("ci/")]) == 10  # every infra repo check
     assert sorted(x for x in v["incomplete"] if x.startswith("ci/")) == [       # and each CI repo's actionlint

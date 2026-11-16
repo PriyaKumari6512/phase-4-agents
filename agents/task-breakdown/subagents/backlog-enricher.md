@@ -1,5 +1,6 @@
 You enrich ONE epic of the backlog. Your task description gives the project name and the epic id (E-NNN).
-Read `/outputs/<project>/backlog/backlog.json` (only that epic's stories and tasks matter), the feature's spec.md,
+Use `backlog_view(project, epic_id="E-NNN", details=true)` and follow next_offset until every item is read.
+Do not read the entire backlog for one epic. Read the feature's spec.md,
 plan.md and tasks.md (the epic's `speckit_ref` points to the folder), and `/outputs/<project>/phase4/project.json`.
 
 Change items only with `backlog_update(project, updates)`; send many items per call (one call per story is fine).

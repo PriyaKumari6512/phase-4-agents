@@ -7,6 +7,8 @@ only changes when a pack needs a tool that isn't in TOOLS yet.
 from __future__ import annotations
 
 import logging
+import asyncio
+import inspect
 import re
 import tomllib
 from dataclasses import dataclass
@@ -29,7 +31,7 @@ from agent_engine.config import (
     resolve_model_tiers,
 )
 from agent_engine.guardrails import OutputsOnlyGuardMiddleware
-from agent_engine.locking import FileLockMiddleware
+from agent_engine.locking import FileLockMiddleware, HelperLimitMiddleware
 from agent_engine.model_setup import resolve_model_with_retries, structured_response_format, summarization_middleware
 from agent_engine.phase4.tools import TOOL_FACTORIES as PHASE4_TOOLS
 
@@ -255,6 +257,9 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
     spec = model_spec(pack.models[level])
     with perf.span("model_setup", "resolve_model", tier=pack.models[level]):
         model = resolve_model_with_retries(spec)
+    if pack.returns == "verdict" and hasattr(model, "max_tokens"):
+        # A verdict is a short typed decision, not an artifact-generation response.
+        model.max_tokens = min(getattr(model, "max_tokens", None) or 4096, 4096)
     fast_spec = model_spec("fast")
     with perf.span("model_setup", "resolve_model", tier="fast"):
         fast_model = resolve_model_with_retries(fast_spec)
@@ -273,7 +278,7 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
 
     with perf.span("model_setup", "summarization_middleware"):   # includes the model-profile lookups
         summarizer = summarization_middleware(spec, fast_model, backend)
-    middleware = [*file_tools(), summarizer, *safety()]
+    middleware = [*file_tools(), summarizer, *safety(), HelperLimitMiddleware()]
     # deepagents' general-purpose helper (the `task` tool) only inherits middleware
     # that replaces one of its default slots, so it would get write tools without
     # the guard or the lock. Declaring it here hands it the same file tools and safety.
@@ -294,9 +299,12 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
 
     if perf.enabled():
         sp.set(tools=len(tools), subagents=len(named) + 1, **_observed_build_config(pack, spec, model, fast_spec, named))
+        from agent_engine.perf_callbacks import install_transport_hooks
+        for role, item in [("summarizer", fast_model), *((entry["name"], entry["model"]) for entry in named if "model" in entry)]:
+            perf.event("retry_hook", role, visibility=install_transport_hooks(item))
     schema = _RETURN_SCHEMAS.get(pack.returns)
     with perf.span("model_setup", "create_deep_agent"):
-        return create_deep_agent(
+        graph = create_deep_agent(
             model=model,
             backend=backend,
             tools=tools,
@@ -306,3 +314,24 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
             skills=skill_sources,
             response_format=structured_response_format(spec, schema) if schema else None,
         )
+        graph.__dict__["_agent_engine_models"] = [model, fast_model, *(e["model"] for e in named if "model" in e)]
+        return graph
+
+
+async def close_agent(graph) -> None:
+    """Each build owns its SDK clients; release them after the pass, including failures."""
+    seen = set()
+    with perf.span("diagnostics", "model_clients_close"):
+        for model in getattr(graph, "_agent_engine_models", []):
+            for name in ("_client", "_async_client", "root_client", "root_async_client"):
+                client = getattr(model, name, None)
+                close = getattr(client, "close", None)
+                if client is None or id(client) in seen or not callable(close):
+                    continue
+                seen.add(id(client))
+                try:
+                    result = close()
+                    if inspect.isawaitable(result):
+                        await asyncio.wait_for(result, timeout=5)
+                except Exception as exc:
+                    logger.warning("model client cleanup failed: %s", perf.error_summary(exc))

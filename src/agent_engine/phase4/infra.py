@@ -81,7 +81,14 @@ def _catalog(path: str) -> dict:
 
 
 def load_catalog() -> dict:
-    return _catalog(str(catalog_dir()))
+    return yaml.safe_load((catalog_dir() / "catalog.yaml").read_text(encoding="utf-8"))
+
+
+def source_hashes(project):
+    from agent_engine.perf_manifest import tree_digest
+    return {files.ARCHITECTURE: files.file_sha(project, files.ARCHITECTURE),
+            files.PROJECT_SETTINGS: files.file_sha(project, files.PROJECT_SETTINGS),
+            "catalog": tree_digest(catalog_dir()).get("sha256", "missing")}
 
 
 def _jinja() -> Environment:
@@ -114,6 +121,14 @@ def set_intent(project: str, intent: dict) -> str:
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
     problems, warnings = [], []
     ids = [c.component_id for c in it.components]
+    names = [ident(c.name) for c in it.components]
+    if len(names) != len(set(names)):
+        problems.append("component names collide after Terraform/Kubernetes normalization")
+    if len(it.regions) != 1:
+        problems.append("this catalog supports exactly one region; multiple regions require an explicit topology")
+    architecture = files.read_text(project, files.ARCHITECTURE) if files.exists(project, files.ARCHITECTURE) else ""
+    if it.deploy_target == "kubernetes" and any("k8s_workload" in c.needs for c in it.components) and re.search(r"\b(?:no|not|without)\s+kubernetes\b", architecture, re.I):
+        problems.append("architecture explicitly excludes Kubernetes; do not substitute EKS for an unsupported managed-container target")
     if len(set(ids)) != len(ids):
         problems.append("component_id values must be unique")
     for c in it.components:
@@ -138,7 +153,9 @@ def set_intent(project: str, intent: dict) -> str:
         if r not in allowed:
             problems.append(f"region {r} is not on the org allow-list {sorted(allowed)}")
     if it.cloud != "aws":
-        warnings.append(f"cloud {it.cloud}: the catalog only has AWS entries; infrastructure will not be generated")
+        problems.append(f"cloud {it.cloud}: this catalog only implements AWS; no substitute topology will be generated")
+    if it.deploy_target != "kubernetes" and any(c.kind in ("service", "worker") for c in it.components):
+        problems.append(f"deploy_target {it.deploy_target} has no workload template in this catalog")
     if problems:
         raise files.ProjectError("intent rejected: " + "; ".join(problems))
     files.write_json(project, files.INFRA_INTENT, it)
@@ -198,6 +215,8 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
         for need in c.needs:
             if need in ("k8s_workload", "public_endpoint", "external"):
                 continue
+            if need == "container_registry" and env != it.environments[0]:
+                continue  # shared registry has one state owner, not one conflicting owner per environment
             e = _entry("aws", need)
             if e is None:
                 out.gaps.append(f"{c.name}: no catalog template for '{need}' (left for human follow-up)")
@@ -205,7 +224,7 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
             if "module" not in e:
                 continue
             blocks.append(j.get_template(e["template"]).render(module=e["module"], size=size_of[c.component_id],
-                                                                 name=name, component=c.name, db_name=name[:60]))
+                                                                 name=name, component=ident(c.name).replace("_", "-"), db_name=name[:60]))
             out.modules[e["id"]] = e["module"]
             if e.get("stateful"):
                 out.stateful.append(f"{env}:{e['id']}:{c.name}")
@@ -214,6 +233,11 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
     out.add(f"gitops/applicationsets/{project}-{env}.yaml",
             j.get_template("gitops/applicationset.yaml.j2").render(project=project, environment=env, repo_url=repo_url),
             "template", "k8s-workload")
+    out.add(f"gitops/applicationsets/{project}-{env}-platform.yaml",
+            j.get_template("gitops/platform-application.yaml.j2").render(project=project, environment=env, repo_url=repo_url),
+            "template", "observability")
+    out.add(f"gitops/platform/{env}/clustersecretstore.yaml",
+            j.get_template("gitops/clustersecretstore.yaml.j2").render(region=region), "template", "external-secrets")
     by_id = {c.component_id: c for c in it.components}
     for c in it.components:
         if "k8s_workload" not in c.needs:
@@ -249,7 +273,7 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
                     j.get_template("gitops/externalsecret.yaml.j2").render(
                         secret_name=secret_name, project=project, environment=env, secrets=secrets),
                     "template", "external-secrets")
-        out.add(f"gitops/platform/alerts/{name}-{env}.yaml",
+        out.add(f"gitops/platform/{env}/alerts/{name}.yaml",
                 j.get_template("gitops/prometheusrule.yaml.j2").render(
                     component=name, project=project, environment=env,
                     alert_prefix="".join(p.capitalize() for p in name.split("-")), http=c.exposes_http,
@@ -274,9 +298,8 @@ def render(project: str) -> str:
             if p.is_file():
                 out.add(f"gitops/charts/app/{p.relative_to(chart_dir).as_posix()}", p.read_text(encoding="utf-8"),
                         "template", "k8s-workload")
-        out.add("gitops/platform/clustersecretstore.yaml",
-                j.get_template("gitops/clustersecretstore.yaml.j2").render(region=it.regions[0]), "template",
-                "external-secrets")
+        out.gaps.append(f"bootstrap: register Argo CD clusters named {', '.join(project + '-' + e for e in it.environments)}; install platform CRDs before syncing platform applications")
+        out.gaps.append(f"shared container registries are owned only by {it.environments[0]}/core state; apply that state before image builds for other environments")
         owners = [m.github_login for m in settings.team if m.github_login and m.role.lower() in PLATFORM_ROLES]
         out.add(".trivyignore", (catalog_dir() / "templates" / "repo" / "trivyignore").read_text(encoding="utf-8"),
                 "template", None)
@@ -322,7 +345,7 @@ def render(project: str) -> str:
                            bytes=sum(len(c) for c in out.files.values()))
     with write_span:
         manifest_files = _write_rendered(project, out, ci)
-    manifest = InfraManifest(project=project, intent_sha256=files.file_sha(project, files.INFRA_INTENT),
+    manifest = InfraManifest(project=project, intent_sha256=files.file_sha(project, files.INFRA_INTENT), source_hashes=source_hashes(project),
                              infra_repo=settings.infra_repo, environments=it.environments, files=manifest_files,
                              ci_repos=sorted(ci), secrets_refs=out.secrets, stateful_resources=out.stateful,
                              gaps=list(dict.fromkeys(out.gaps)), generated_at=files.utcnow())
@@ -397,6 +420,8 @@ def _risk(manifest: InfraManifest, checks: list[CheckResult], it: InfraIntent) -
 
 def validate(project: str) -> str:
     manifest = files.read_json(project, files.INFRA_MANIFEST, InfraManifest)
+    if manifest.source_hashes != source_hashes(project):
+        raise files.ProjectError("infrastructure source inputs/catalog changed or lack provenance; re-render before validation")
     it = files.read_json(project, files.INFRA_INTENT, InfraIntent)
     with perf.span("fs", "infra.refresh_manifest_hashes", files=len(manifest.files)):
         gone = _refresh_manifest(project, manifest)
@@ -427,7 +452,7 @@ def validate(project: str) -> str:
                     secret_hits.append(f.path)
         sp.set(hits=len(secret_hits))
     files.write_json(project, files.INFRA_CHECKS, [c.model_dump(mode="json") for c in checks])
-    manifest.checks_passed = bool(checks) and all(c.passed or c.skipped for c in checks) and not secret_hits and not gone
+    manifest.checks_passed = bool(checks) and all(c.passed and not c.skipped for c in checks) and not ci_incomplete and not secret_hits and not gone
     manifest.checks_skipped = [c.tool for c in checks if c.skipped]
     manifest.checks_incomplete = sandbox.incomplete(checks) + ci_incomplete
     manifest.validation_complete = bool(checks) and not manifest.checks_incomplete
@@ -505,6 +530,8 @@ def check(project: str) -> str:
     manifest = files.read_json(project, files.INFRA_MANIFEST, InfraManifest)
     it = files.read_json(project, files.INFRA_INTENT, InfraIntent)
     problems, warnings = [], []
+    if manifest.source_hashes != source_hashes(project):
+        problems.append("architecture, project settings or catalog provenance is missing/stale; re-render and validate")
     if manifest.intent_sha256 != files.file_sha(project, files.INFRA_INTENT):
         problems.append("intent.json changed after rendering; re-run infra_render and infra_validate")
     for f in manifest.files:
@@ -517,6 +544,8 @@ def check(project: str) -> str:
         problems.append("infra/checks.json missing: infra_validate was not run")
     if not manifest.checks_passed:
         problems.append("checks did not all pass (see infra/checks.json)")
+    if manifest.validation_complete is not True:
+        problems.append("required static validation is incomplete")
     if manifest.checks_skipped:
         warnings.append(f"checks not run in this environment: {', '.join(manifest.checks_skipped)}")
     if manifest.checks_incomplete:

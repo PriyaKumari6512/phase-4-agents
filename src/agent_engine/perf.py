@@ -75,6 +75,7 @@ def utc_iso(wall: float | None = None) -> str:
 
 # ============================================================================ redaction
 _SECRET_PATTERNS = [re.compile(p) for p in (
+    r"(?i)[?&](?:sig|signature|x-amz-signature|x-amz-security-token|jwt|access_token)=[^&\s\"]+",
     r"sk-ant-[A-Za-z0-9_\-]{8,}", r"\bsk-[A-Za-z0-9_\-]{16,}", r"gh[pousr]_[A-Za-z0-9]{20,}", r"github_pat_[A-Za-z0-9_]{20,}",
     r"xox[abposr]-[A-Za-z0-9-]{10,}", r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", r"lin_api_[A-Za-z0-9]{16,}",
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
@@ -334,7 +335,13 @@ def init(command: str, *, force: bool | None = None, perf_dir: Path | None = Non
                                         "platform": sys.platform, "cpu_count": os.cpu_count(),
                                         "cpu_affinity": _affinity(), **startup})
     _current.set(_S.process_span.id)
-    interval = float(os.environ.get(ENV_SAMPLE_SECONDS) or DEFAULT_SAMPLE_SECONDS)
+    try:
+        interval = float(os.environ.get(ENV_SAMPLE_SECONDS) or DEFAULT_SAMPLE_SECONDS)
+        if not 0 <= interval <= 3600:
+            raise ValueError("sample interval outside 0..3600 seconds")
+    except ValueError:
+        interval = DEFAULT_SAMPLE_SECONDS
+        _mark_incomplete(f"invalid {ENV_SAMPLE_SECONDS}; using {DEFAULT_SAMPLE_SECONDS}s")
     if interval > 0:
         _S.sampler = _Sampler(interval)
     atexit.register(shutdown)

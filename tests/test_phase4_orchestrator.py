@@ -16,10 +16,8 @@ PROJECT = {
     "story_point_scale": [1, 2, 3], "hours_per_story_point": 6, "max_story_points_per_story": 3, "deadlines": [],
     "team": [{"id": "a", "name": "Asha"}], "calendar": {"sprint_length_days": 14},
 }
-OUTPUTS = {  # what each fake agent writes
-    "task-breakdown": ["backlog/backlog.json"], "infra-pipeline": ["infra/intent.json", "infra/manifest.json"],
-    "sprint-planning": ["sprint/sprint-plan.json"], "work-allocation": ["allocation/assignments.json"],
-}
+from agent_engine.agent import load_pack
+OUTPUTS = {s.agent: load_pack(s.agent).output_files for s in orch.STAGES}
 
 
 _RUNS = itertools.count(1)  # one counter for every fake agent, so a re-run always writes new content
@@ -90,14 +88,14 @@ def test_test_approve_runs_the_whole_chain_in_order(root):
     assert go(fake, test_approve=True) == orch.DONE and len(fake.calls) == 4  # nothing to do the second time
 
 
-def test_a_team_change_reruns_only_planning_and_allocation(root):
+def test_a_team_change_also_invalidates_infra_codeowners(root):
     go(FakeAgents(root), test_approve=True)
     project = json.loads((root / "phase4" / "project.json").read_text(encoding="utf-8"))
     project["team"].append({"id": "b", "name": "Bo"})
     (root / "phase4" / "project.json").write_text(json.dumps(project), encoding="utf-8")
     fake = FakeAgents(root)
     assert go(fake, test_approve=True) == orch.DONE
-    assert fake.calls == ["sprint-planning", "work-allocation"]  # not the backlog, not the infra
+    assert fake.calls == ["infra-pipeline", "sprint-planning", "work-allocation"]
 
 
 def test_a_prd_change_reruns_everything_that_depends_on_it(root):

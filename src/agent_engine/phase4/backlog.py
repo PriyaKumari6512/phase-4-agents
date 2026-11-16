@@ -42,7 +42,7 @@ from agent_engine.phase4.speckit_parse import REQ_ID_RE, SpeckitFormatError, par
 
 ENRICHMENTS = "backlog/enrichments.json"
 DUPLICATE_THRESHOLD = 0.92
-COVERAGE_PREFIXES = ("FR-", "US-", "DS-")
+COVERAGE_PREFIXES = ("FR-", "NFR-", "US-", "DS-")
 MIN_HISTORY = 10
 MIN_SIMILARITY = 0.2
 SPLIT_HOURS = 16.0
@@ -198,18 +198,31 @@ def build(project: str) -> str:
             items += feature_items
         by = {i.item_id: i for i in items}
         enrich = _load_enrichments(project)
-        # an enrichment only carries over while its item still exists with the same title
-        stale = [iid for iid, e in enrich.items() if iid not in by or by[iid].title != e.get("_title")]
+        # Retain split-child edits until the parent's topology has been recreated.
+        def reusable(iid, e):
+            item = by.get(iid)
+            if item is None and iid[-1:].isalpha():
+                parent = enrich.get(iid[:-1], {})
+                item = by.get(iid[:-1]) if "split_into" in parent else None
+                if item is None or not reusable(iid[:-1], parent):
+                    return False
+                return e.get("_source_sha") == _item_source(project, item)
+            return item is not None and item.title == e.get("_title") and e.get("_source_sha") == _item_source(project, item)
+        stale = [iid for iid, e in enrich.items() if not reusable(iid, e)]
         for item_id in stale:
             enrich.pop(item_id)
         reapplied = len(enrich)
         backlog = Backlog(backlog_id=_backlog_id(project), version=_next_version(project), project=project,
-                          sources={rel: files.file_sha(project, rel) for rel in (files.PRD, files.ARCHITECTURE,
-                                   files.PROJECT_SETTINGS, files.FEATURES) if files.exists(project, rel)},
+                          sources={rel: files.file_sha(project, rel) for rel in
+                                   [files.PRD, files.ARCHITECTURE, files.PROJECT_SETTINGS, files.FEATURES,
+                                    *(f"{f.feature_dir}/{n}" for f in features for n in ("spec.md", "tasks.md"))]
+                                   if files.exists(project, rel)},
                           features=features, items=items, generated_at=files.utcnow())
         with perf.span("compute", "backlog.enrichment_replay", reapplied=reapplied, dropped=len(stale)) as sp:
             replay_errors = _apply_all(backlog, enrich, settings)
             sp.set(errors=len(replay_errors))
+            if replay_errors:
+                raise files.ProjectError("enrichment replay failed; previous backlog preserved: " + "; ".join(replay_errors))
         _save(project, backlog, enrich)
         perf.event("backlog_counts", "build", features=len(features), epics=sum(i.level == "epic" for i in items),
                    stories=len(backlog.stories()), tasks=sum(i.level == "task" for i in backlog.items))
@@ -242,6 +255,35 @@ def _next_version(project: str) -> int:
 
 def _load_enrichments(project: str) -> dict:
     return files.read_json(project, ENRICHMENTS) if files.exists(project, ENRICHMENTS) else {}
+
+
+def _item_source(project: str, item: WorkItem) -> str:
+    feature_dir = (item.speckit_ref or "").split("#")[0].rsplit("/", 1)[0]
+    paths = [files.PRD, files.ARCHITECTURE, files.PROJECT_SETTINGS, files.FEATURES]
+    if feature_dir:
+        paths += [f"{feature_dir}/spec.md", f"{feature_dir}/tasks.md"]
+    return files.sha256_text(json.dumps({p: files.file_sha(project, p) for p in paths if files.exists(project, p)}, sort_keys=True))
+
+
+def _transaction(backlog: Backlog, item_id: str, patch: dict, settings: ProjectSettings, errors: list[str]) -> bool:
+    """Copy only records a patch may mutate; failed item updates leave no partial changes."""
+    impacted = {item_id} | {t.item_id for t in backlog.tasks_of(item_id)}
+    if "split_into" in patch:
+        impacted |= {i.item_id for i in backlog.items if any(d.on_id == item_id for d in i.dependencies)}
+    candidate = backlog.model_copy(update={"items": [i.model_copy(deep=True) if i.item_id in impacted else i for i in backlog.items]})
+    before = len(errors)
+    _apply(candidate, item_id, patch, settings, errors)
+    if len(errors) != before:
+        return False
+    try:
+        known = set(backlog.by_id())
+        candidate.items = [WorkItem.model_validate(i.model_dump()) if i.item_id in impacted or i.item_id not in known
+                           else i for i in candidate.items]
+        backlog.items = candidate.items
+    except ValueError as exc:
+        errors.append(f"{item_id}: {exc}")
+        return False
+    return True
 
 
 def _save(project: str, backlog: Backlog, enrich: dict) -> None:
@@ -382,12 +424,13 @@ def _split(backlog: Backlog, task: WorkItem, parts: list[dict]) -> None:
 
 def _apply_all(backlog: Backlog, enrich: dict, settings: ProjectSettings) -> list[str]:
     errors: list[str] = []
-    # stories first (their estimates roll down to tasks), then tasks, splits last
+    # Stories, ordinary parent tasks, split topology, then child enrichments.
     level = {i.item_id: i.level for i in backlog.items}
     rank = {"epic": 0, "story": 1, "task": 2}
-    order = sorted(enrich.items(), key=lambda kv: ("split_into" in kv[1], rank.get(level.get(kv[0], "task"), 2)))
+    order = sorted(enrich.items(), key=lambda kv: (3 if kv[0] not in level else
+                   2 if "split_into" in kv[1] else rank.get(level.get(kv[0], "task"), 2)))
     for item_id, e in order:
-        _apply(backlog, item_id, {k: v for k, v in e.items() if k != "_title"}, settings, errors)
+        _transaction(backlog, item_id, {k: v for k, v in e.items() if not k.startswith("_")}, settings, errors)
     return errors
 
 
@@ -405,9 +448,10 @@ def update(project: str, updates: list[dict]) -> str:
             item_id = str(u.pop("item_id", ""))
             before = len(errors)
             item = backlog.by_id().get(item_id)
-            _apply(backlog, item_id, u, settings, errors)
+            source_sha = _item_source(project, item) if item else None
+            _transaction(backlog, item_id, u, settings, errors)
             if len(errors) == before and item is not None:
-                merged = {**enrich.get(item_id, {}), **u, "_title": item.title}
+                merged = {**enrich.get(item_id, {}), **u, "_title": item.title, "_source_sha": source_sha}
                 enrich[item_id] = merged
                 applied.append(item_id)
         _save(project, backlog, enrich)
@@ -616,6 +660,8 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
                 if tasks[a].parent_id != tasks[b].parent_id and sim[a, b] >= DUPLICATE_THRESHOLD:
                     issue("duplicates", f"possible duplicates {tasks[a].item_id} / {tasks[b].item_id}",
                           [tasks[a].item_id, tasks[b].item_id], "warning")
+    elif len(tasks) > 1500:
+        issue("duplicate_scan_incomplete", "Duplicate similarity scanning was not run above 1500 tasks; review duplicate coverage separately.", [], "warning")
     sec.end()
     sec = perf.start_span("compute", "backlog.validate.waves_and_critical_path")
     questions = [i.item_id for i in items.values() if i.open_questions]
@@ -630,7 +676,13 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
             sg.nodes[n]["w"] = (items[n].estimate.story_points if items[n].estimate and items[n].estimate.story_points else 1)
         for u, v in sg.edges:
             sg.edges[u, v]["w"] = sg.nodes[v]["w"]
-        backlog.critical_path = nx.dag_longest_path(sg, weight="w")
+        # Dynamic programming over node weights includes the first story's effort.
+        lengths, paths = {}, {}
+        for n in nx.topological_sort(sg):
+            pred = max(sg.predecessors(n), key=lambda p: lengths[p], default=None)
+            lengths[n] = sg.nodes[n]["w"] + (lengths[pred] if pred is not None else 0)
+            paths[n] = (paths[pred] if pred is not None else []) + [n]
+        backlog.critical_path = paths[max(lengths, key=lengths.get)] if lengths else []
     else:
         issue("dependency_cycle", "story graph (with task-derived edges) has a cycle", [])
     sec.end(critical_path=len(backlog.critical_path), waves=len(backlog.story_waves))
@@ -641,7 +693,13 @@ def validate(project: str, *, write: bool = True) -> tuple[Backlog, list[Validat
     with _lock:
         settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
         backlog = files.read_json(project, files.BACKLOG, Backlog)
+        original = {i.item_id: i.model_dump() for i in backlog.items} if not write else None
         issues = _validate(backlog, settings, _prd_ids(project))
+        if original is not None:
+            changed = [i.item_id for i in backlog.items if original[i.item_id] != i.model_dump()]
+            if changed:
+                issues.append(ValidationIssue(rule="repair_required", severity="blocking", item_ids=changed,
+                                              message="saved backlog needs repair; run backlog_validate before review"))
         backlog.issues = issues
         perf.event("backlog_counts", "validate", blocking=sum(i.severity == "blocking" for i in issues),
                    warnings=sum(i.severity == "warning" for i in issues), stories=len(backlog.stories()),

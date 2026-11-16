@@ -43,6 +43,8 @@ class TrackerAdapter:
     def get_fields(self, external_id: str) -> dict: raise NotImplementedError
     def find_by_marker(self, marker: str, level: str | None = None) -> ExtObj | None: raise NotImplementedError
     def add_blocks(self, blocker_id: str, blocked_id: str) -> None: raise NotImplementedError
+    def remove_blocks(self, blocker_id: str, blocked_id: str) -> None: raise NotImplementedError
+    def reopen_item(self, issue_id: str) -> None: raise NotImplementedError
     def blocks_of(self, issue_id: str) -> list[str]: raise NotImplementedError  # ids this issue blocks
     def add_comment(self, issue_id: str, text: str) -> None: raise NotImplementedError
     def item_done(self, issue_id: str) -> bool: raise NotImplementedError
@@ -90,6 +92,12 @@ class HttpClient:
                 perf.event("http_attempt", "tracker.response", attempt=attempt + 1, status_code=resp.status_code)
                 if resp.status_code in (429, 500, 502, 503, 504) or (
                         resp.status_code == 403 and "rate limit" in resp.text.lower()):
+                    # Replaying an ambiguous create may duplicate an issue/comment/job.
+                    # GraphQL queries are read-only even though transported as POST.
+                    query = (kw.get("json") or {}).get("query", "") if isinstance(kw.get("json"), dict) else ""
+                    safe_post = query.lstrip().startswith("query") or bool((kw.get("headers") or {}).get("Idempotency-Key"))
+                    if method.upper() == "POST" and not safe_post:
+                        break
                     if attempt == self.max_retries:
                         break
                     ra = resp.headers.get("retry-after")
@@ -107,6 +115,7 @@ class HttpClient:
             return resp
 
     def get(self, url: str, **kw: Any) -> httpx.Response: return self.request("GET", url, **kw)
+    def close(self) -> None: self.client.close()
     def post(self, url: str, **kw: Any) -> httpx.Response: return self.request("POST", url, **kw)
     def put(self, url: str, **kw: Any) -> httpx.Response: return self.request("PUT", url, **kw)
     def patch(self, url: str, **kw: Any) -> httpx.Response: return self.request("PATCH", url, **kw)

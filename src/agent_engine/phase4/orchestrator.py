@@ -33,6 +33,7 @@ from typing import Callable
 from agent_engine import config, perf
 from agent_engine.gates import APPROVED_SUFFIX, Gate, load_gates, record_decision
 from agent_engine.history import file_digest
+from agent_engine.runtime import atomic_json, project_lock
 
 STATE_FILE = "phase4/orchestrator-state.json"
 PROJECT_FILE = "phase4/project.json"
@@ -110,6 +111,26 @@ def _input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
         manifest = root / "infra/manifest.json"
         if (root / f"gates/P4-G4{APPROVED_SUFFIX}").is_file() and manifest.is_file():  # CI-ready repos let AI take tasks
             digests["infra/manifest.json"] = file_digest(manifest)
+    if stage.agent == "infra-pipeline" and project.is_file():
+        digests[PROJECT_FILE] = _digest_json(json.loads(project.read_text(encoding="utf-8")))
+        from agent_engine.phase4.infra import catalog_dir
+        catalog = catalog_dir()
+        for p in sorted(catalog.rglob("*")):
+            if p.is_file():
+                digests["catalog:" + p.relative_to(catalog).as_posix()] = file_digest(p)
+    if stage.agent == "task-breakdown":
+        for p in sorted((root / "specs").rglob("*.md")):
+            digests[p.relative_to(root).as_posix()] = file_digest(p)
+    if stage.agent in ("sprint-planning", "work-allocation"):
+        digests["param:planning_date"] = datetime.now(timezone.utc).date().isoformat()
+        for rel in ("phase4/ci-readiness.json", "phase4/committed-work.json"):
+            if (root / rel).is_file():
+                digests[rel] = file_digest(root / rel)
+    for p in sorted((config.AGENTS_DIR / stage.agent).rglob("*")):
+        if p.is_file():
+            digests["pack:" + p.relative_to(config.AGENTS_DIR).as_posix()] = file_digest(p)
+    if Path(config.GATES_FILE).is_file():
+        digests["gates:contract"] = file_digest(Path(config.GATES_FILE))
     return digests
 
 
@@ -125,7 +146,9 @@ def gate_state(root: Path, gate: Gate) -> tuple[str, dict]:
     approval = root / gate.approval_file
     if approval.is_file():
         record = json.loads(approval.read_text(encoding="utf-8"))
-        held = all((root / f).is_file() and file_digest(root / f) == d for f, d in record.get("artifacts", {}).items())
+        held = (record.get("decision") == "approved" and record.get("gate") == gate.name
+                and record.get("project") == root.name and set(record.get("artifacts", {})) == set(gate.files)
+                and all((root / f).is_file() and file_digest(root / f) == d for f, d in record.get("artifacts", {}).items()))
         return ("approved" if held else "stale"), record
     if last.get("decision") == "rejected":
         return "rejected", last
@@ -145,7 +168,7 @@ def save_state(root: Path, state: dict) -> None:
     with perf.span("fs", "save_orchestrator_state"):
         path = root / STATE_FILE
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        atomic_json(path, state)
 
 
 @dataclass
@@ -180,7 +203,7 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None) 
             continue
         status, record = gate_state(root, gate)
         request = stage.request.format(sprint=sprint)
-        outputs_exist = all((root / f).is_file() for f in gate.files)
+        outputs_exist = all((root / f).is_file() for f in _outputs(stage))
         if not outputs_exist:
             steps.append(Step(stage, "run", "no output yet", request, status))
             continue
@@ -219,7 +242,12 @@ def _produced_by_earlier_stage(file: str, stage: Stage) -> bool:
 
 def _outputs(stage: Stage) -> tuple[str, ...]:
     gate = load_gates().get(stage.gate)
-    return tuple(gate.files) if gate else ()
+    from agent_engine.agent import load_pack
+    try:
+        declared = load_pack(stage.agent).output_files
+    except ValueError:
+        declared = []
+    return tuple(dict.fromkeys([*(gate.files if gate else []), *declared]))
 
 
 # --- running ----------------------------------------------------------------------------------------------------
@@ -342,7 +370,8 @@ def orchestrate(
             perf_manifest.write("pipeline", pipeline_id, project=project, packs=packs,
                                 execution_mode="publication_authorized" if publish else "generation_only",
                                 extra={"test_approve": test_approve, "sprint": sprint})
-        code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out)
+        with project_lock(_root(project), "orchestrator"):
+            code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out)
         sp.set(exit_code=code, outcome={DONE: "done", FAILED: "failed", WAITING: "waiting"}.get(code, str(code)))
         if code == FAILED:
             sp.set_status("failed", category="pipeline_outcome")
@@ -384,6 +413,9 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             out(f"\n>>> running {step.stage.agent}: {step.why}\n")
             digests = input_digests(step.stage, root, sprint)
             result = runner(step.stage.agent, step.request, project)
+            if step.stage.agent == "task-breakdown":
+                digests = {k: v for k, v in digests.items() if not k.startswith("specs/")}
+                digests.update({k: v for k, v in input_digests(step.stage, root, sprint).items() if k.startswith("specs/")})
             ran.append(step.stage.agent)
             if result.get("rate_limited"):
                 out(f"\nSTOP: the subscription rate limit stopped {step.stage.agent}. Run the same command after the "
@@ -436,7 +468,7 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
     if publish:
         from agent_engine.phase4.publish import PUBLISHERS
 
-        for what in ("backlog", "sprint", "assignments", "infra"):
+        for what in ("infra", "backlog", "sprint", "assignments"):
             out(f"\n>>> publish {what}")
             with perf.span("publish", what, project=project):
                 out(json.dumps(PUBLISHERS[what](project), indent=2, default=str))

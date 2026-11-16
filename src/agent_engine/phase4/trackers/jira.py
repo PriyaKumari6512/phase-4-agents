@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, time, timezone
 from functools import cached_property
 
@@ -61,6 +62,10 @@ class JiraTracker(TrackerAdapter):
             f[self.estimation_field] = payload["story_points"]
         if payload.get("hours") is not None:
             f["timetracking"] = {"originalEstimate": f"{max(1, round(payload['hours']))}h"}
+        if "parent_id" in payload:
+            f["parent"] = {"id": payload["parent_id"]} if payload["parent_id"] else None
+        if "labels" in payload:
+            f["labels"] = payload["labels"]
         return f
 
     def create(self, payload: dict) -> ExtObj:
@@ -69,12 +74,13 @@ class JiraTracker(TrackerAdapter):
             "issuetype": {"id": self.issue_types[payload["level"]]},
             "labels": [l.replace(" ", "-") for l in payload.get("labels", [])] + [payload["_marker"]],
         }
+        fields.pop("parent", None)
         if payload.get("parent_id"):
             fields["parent"] = {"id": payload["parent_id"]}
         try:
             r = self.http.post("/rest/api/3/issue", json={"fields": fields}).json()
         except TrackerError as exc:
-            if "timetracking" in str(exc):     # time tracking disabled in this project
+            if "timetracking" in str(exc) and re.search(r" -> (400|422):", str(exc)):
                 fields.pop("timetracking", None)
                 r = self.http.post("/rest/api/3/issue", json={"fields": fields}).json()
             else:
@@ -83,16 +89,20 @@ class JiraTracker(TrackerAdapter):
 
     def update(self, external_id: str, fields: dict) -> None:
         body = self._fields(fields)
+        if "labels" in body:
+            current = self.http.get(f"/rest/api/3/issue/{external_id}", params={"fields": "labels"}).json()["fields"]
+            body["labels"] += [x for x in current.get("labels", []) if re.fullmatch(r"p4-[0-9a-f]{8}", x)]
         if body:
             self.http.put(f"/rest/api/3/issue/{external_id}", json={"fields": body})
 
     def get_fields(self, external_id: str) -> dict:
-        names = ["summary", "description", "timetracking"] + ([self.estimation_field] if self.estimation_field else [])
+        names = ["summary", "description", "timetracking", "labels", "parent"] + ([self.estimation_field] if self.estimation_field else [])
         r = self.http.get(f"/rest/api/3/issue/{external_id}", params={"fields": ",".join(names)}).json()["fields"]
         est = (r.get("timetracking") or {}).get("originalEstimateSeconds")
         return {"title": r.get("summary"), "body_md": adf_to_text(r.get("description")),
                 "story_points": r.get(self.estimation_field) if self.estimation_field else None,
-                "hours": est / 3600 if est else None}
+                "hours": est / 3600 if est else None, "parent_id": (r.get("parent") or {}).get("id"),
+                "labels": [x for x in r.get("labels", []) if not re.fullmatch(r"p4-[0-9a-f]{8}", x)]}
 
     def comparable(self, field: str, value):
         if field == "body_md" and isinstance(value, str):
@@ -118,15 +128,31 @@ class JiraTracker(TrackerAdapter):
         return ExtObj(id=hits[0]["id"], key=hits[0]["key"]) if hits else None
 
     def add_blocks(self, blocker_id: str, blocked_id: str) -> None:
-        # Intended meaning: outwardIssue (blocker) "blocks" inwardIssue (blocked).
-        # Direction is UNVERIFIED in docs -> covered by tests/integration/test_tracker_links.py read-back.
+        # REST creation endpoints take the source of the outward verb as inwardIssue;
+        # GET(blocker).issuelinks must then expose blocked as outwardIssue.
+        # https://developer.atlassian.com/cloud/jira/platform/issue-linking-model/
         self.http.post("/rest/api/3/issueLink", json={"type": {"name": "Blocks"},
-                                                      "inwardIssue": {"id": blocked_id},
-                                                      "outwardIssue": {"id": blocker_id}})
+                                                      "inwardIssue": {"id": blocker_id},
+                                                      "outwardIssue": {"id": blocked_id}})
+        if blocked_id not in self.blocks_of(blocker_id):
+            raise TrackerError("Jira dependency read-back did not confirm blocker -> blocked; inspect the created link before retrying")
 
     def blocks_of(self, issue_id: str) -> list[str]:
         links = self.http.get(f"/rest/api/3/issue/{issue_id}", params={"fields": "issuelinks"}).json()["fields"]["issuelinks"]
         return [l["outwardIssue"]["id"] for l in links if l["type"]["name"] == "Blocks" and "outwardIssue" in l]
+
+    def remove_blocks(self, blocker_id: str, blocked_id: str) -> None:
+        links = self.http.get(f"/rest/api/3/issue/{blocker_id}", params={"fields": "issuelinks"}).json()["fields"]["issuelinks"]
+        for link in links:
+            if link["type"]["name"] == "Blocks" and (link.get("outwardIssue") or {}).get("id") == blocked_id:
+                self.http.delete(f"/rest/api/3/issueLink/{link['id']}")
+
+    def reopen_item(self, issue_id: str) -> None:
+        transitions = self.http.get(f"/rest/api/3/issue/{issue_id}/transitions").json().get("transitions", [])
+        opened = next((t for t in transitions if (t.get("to", {}).get("statusCategory") or {}).get("key") != "done"), None)
+        if not opened:
+            raise TrackerError(f"no reopen transition for {issue_id}")
+        self.http.post(f"/rest/api/3/issue/{issue_id}/transitions", json={"transition": {"id": opened["id"]}})
 
     def item_done(self, issue_id: str) -> bool:
         f = self.http.get(f"/rest/api/3/issue/{issue_id}", params={"fields": "status"}).json()["fields"]

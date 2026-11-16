@@ -30,6 +30,11 @@ workflows:
         # Phase 4 receiver: risk score, cost, plan summary (signed with HMAC-SHA256).
         - run:
             command: |
+              if [ -z "$PHASE4_PLAN_WEBHOOK_URL" ]; then
+                echo "Optional Phase 4 plan webhook is not configured; no receiver is bundled."
+                exit 0
+              fi
+              test -n "$PHASE4_PLAN_WEBHOOK_SECRET" || { echo "Webhook secret is required when URL is configured"; exit 1; }
               body=$(jq -c --arg pr "$PULL_NUM" --arg repo "$BASE_REPO_OWNER/$BASE_REPO_NAME" --arg dir "$REPO_REL_DIR" \
                 --slurpfile cost $DIR/infracost.json '{pull: ($pr|tonumber), repo: $repo, dir: $dir, plan: ., cost: $cost[0]}' $SHOWFILE)
               sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$PHASE4_PLAN_WEBHOOK_SECRET" | sed 's/^.* //')

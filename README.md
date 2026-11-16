@@ -404,7 +404,10 @@ Keep read and write tools separate, and give validators read tools only.
 - Agents run one at a time; there is no orchestrator chaining PRD → design →
   code. Gate decisions are recorded by hand with `agent-engine gate` until
   the UI's API does it, and re-running with feedback is manual.
-- No per-run token budget or hard stop; watch `report.json` / Langfuse.
+- No per-run token budget. Each graph pass has a configurable 1800-second
+  deadline; sandbox commands and validation have separate bounded budgets.
+  Watch `report.json` / Langfuse. Cancellation cannot forcibly stop an already
+  running Python worker thread.
 - An agent that makes many small edits re-sends its whole context each time,
   which is the main cost driver (see the escalation numbers above).
 
@@ -423,3 +426,10 @@ helpers, solvers, sandbox commands, HTTP, approvals) as JSON Lines outside the
 project folders; `agent-engine perf summarize --session <id>` turns it into a
 report offline. Off by default. See [docs/PERF_DIAGNOSTICS.md](docs/PERF_DIAGNOSTICS.md)
 and, for a benchmark of a real project, [docs/PERF_BENCHMARK_RUNBOOK.md](docs/PERF_BENCHMARK_RUNBOOK.md).
+
+The reliability fixes, validation evidence, remaining gaps, and checkout/run
+instructions are in [docs/FIXES_AND_VALIDATION.md](docs/FIXES_AND_VALIDATION.md).
+After generated workflows are merged and run, `agent-engine phase4 check-ci
+--project-name YOUR-PROJECT` records actual CI readiness. `agent-engine phase4
+reconcile --project-name YOUR-PROJECT` refreshes coding-agent outcomes. Neither
+command starts coding jobs or applies infrastructure.

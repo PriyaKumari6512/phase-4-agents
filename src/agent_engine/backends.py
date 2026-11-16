@@ -16,14 +16,48 @@ from __future__ import annotations
 from pathlib import Path
 
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
-from deepagents.backends.protocol import BackendProtocol
+from deepagents.backends.protocol import BackendProtocol, WriteResult, EditResult, FileUploadResponse
 
 from agent_engine.config import KNOWLEDGE_VIRTUAL_ROOT, OUTPUTS_DIR, OUTPUTS_VIRTUAL_PREFIX, SKILLS_VIRTUAL_ROOT
+from agent_engine.runtime import active_project, active_inputs, managed_outputs
+from agent_engine.config import READ_ONLY_PROJECT_DIRS
+
+
+class ProjectBackend(FilesystemBackend):
+    """Enforce reserved paths at the disk boundary as well as in middleware."""
+
+    def __init__(self, root_dir, bound=False):
+        super().__init__(root_dir=root_dir, virtual_mode=True)
+        self.bound = bound
+        self.inputs = active_inputs.get() | managed_outputs.get()
+
+    def _denied(self, path):
+        resolved = self._resolve_path(path)
+        parts = resolved.relative_to(self.cwd).parts
+        rel = parts if self.bound else parts[1:]
+        return bool(rel and (rel[0] in READ_ONLY_PROJECT_DIRS or rel[0] == "report.json"
+                             or rel[0].startswith(".engine-") or "/".join(rel) in self.inputs))
+
+    def write(self, file_path, content):
+        if self._denied(file_path):
+            return WriteResult(error="Read-only engine/input path")
+        return super().write(file_path, content)
+
+    def edit(self, file_path, old_string, new_string, replace_all=False):
+        if self._denied(file_path):
+            return EditResult(error="Read-only engine/input path")
+        return super().edit(file_path, old_string, new_string, replace_all)
+
+    def upload_files(self, files):
+        return [FileUploadResponse(path=p, error="permission_denied") if self._denied(p)
+                else super(ProjectBackend, self).upload_files([(p, data)])[0] for p, data in files]
 
 
 def build_backend(knowledge_dir: Path | None = None, skills_dir: Path | None = None) -> BackendProtocol:
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-    routes = {OUTPUTS_VIRTUAL_PREFIX: FilesystemBackend(root_dir=OUTPUTS_DIR, virtual_mode=True)}
+    project = active_project.get()
+    routes = ({f"{OUTPUTS_VIRTUAL_PREFIX}{project}/": ProjectBackend(OUTPUTS_DIR / project, bound=True)}
+              if project else {OUTPUTS_VIRTUAL_PREFIX: ProjectBackend(OUTPUTS_DIR)})
     if knowledge_dir is not None:
         routes[KNOWLEDGE_VIRTUAL_ROOT] = FilesystemBackend(root_dir=knowledge_dir, virtual_mode=True)
     if skills_dir is not None:

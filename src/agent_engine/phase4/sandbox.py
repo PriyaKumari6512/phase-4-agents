@@ -23,11 +23,19 @@ import logging
 import shutil
 import subprocess
 import uuid
+import contextvars
+import hashlib
+import os
+import re
+import shlex
+import time
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 from agent_engine import perf
+from agent_engine.runtime import project_lock
 from agent_engine.phase4.contracts import CheckResult, Finding
 from agent_engine.phase4.settings import get_settings
 
@@ -35,6 +43,7 @@ log = logging.getLogger(__name__)
 SEVERITY = {"CRITICAL": "critical", "HIGH": "high", "MEDIUM": "medium", "LOW": "low", "UNKNOWN": "info"}
 DISPLAY_CHARS = 20000          # what a finding message may quote; parsing always sees the complete output
 EXEC_FAILURE_CODES = (125, 126, 127)   # docker could not start the container / command not executable / not found
+_budget_deadline = contextvars.ContextVar("sandbox_deadline", default=None)
 # What each check covers, for diagnostics: none of them deploys or plans anything.
 SCOPE = {"tofu_fmt": "formatting", "tofu_validate": "static: tofu init + validate per environment (no plan, no credentials)",
          "tflint": "static lint", "trivy": "static misconfiguration scan", "checkov": "static misconfiguration scan",
@@ -83,18 +92,27 @@ def _exec(cmd: str, workdir: Path, use_docker: bool, timeout: int = 300, *, tool
     with perf.span("command", f"sandbox.{tool or category}", tool=tool, category=category, env=env, attempt=attempt,
                    executor="docker" if use_docker else "local", timeout_s=timeout,
                    validation_scope=SCOPE.get(tool)) as sp:
+        remaining = (_budget_deadline.get() or (time.monotonic() + timeout)) - time.monotonic()
+        if remaining <= 0:
+            sp.set_status("timeout", "overall validation budget exhausted", "timeout")
+            return CmdResult(124, "", "overall validation budget exhausted", timed_out=True)
+        timeout = min(timeout, max(1, int(remaining)))
         # Providers are downloaded once into a shared plugin cache, not again for every environment and every run.
         # In Docker the cache is a named volume: provider binaries cannot run from a Windows bind mount.
         if use_docker:
-            _ensure_cache_volume()
+            uid, gid = _sandbox_identity()
+            volume = _cache_volume(workdir)
+            _ensure_cache_volume(volume, uid, gid, get_settings().phase4_iac_sandbox_image)
             full = ["docker", "run", "--rm", "--name", name, "--network", "bridge", "-v", f"{workdir.resolve()}:/work",
-                    "-v", f"{CACHE_VOLUME}:/tofu-cache", "-e", "TF_PLUGIN_CACHE_DIR=/tofu-cache",
+                    "--user", f"{uid}:{gid}", "-e", "HOME=/tmp/phase4-home",
+                    "-v", f"{volume}:/tofu-cache", "-e", "TF_PLUGIN_CACHE_DIR=/tofu-cache",
                     "-e", "TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE=true",
-                    "-w", "/work", get_settings().phase4_iac_sandbox_image, "sh", "-c", cmd]
+                "-w", "/work", get_settings().phase4_iac_sandbox_image, "bash", "-o", "pipefail", "-c",
+                "mkdir -p /tmp/phase4-home && " + cmd]
         else:
             cache = Path(get_settings().phase4_iac_cache_dir) / "tofu-plugins"
             cache.mkdir(parents=True, exist_ok=True)
-            full = ["bash", "-c", f"export TF_PLUGIN_CACHE_DIR='{cache.resolve().as_posix()}' "
+            full = ["bash", "-o", "pipefail", "-c", f"export TF_PLUGIN_CACHE_DIR={shlex.quote(cache.resolve().as_posix())} "
                                   f"TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE=true; {cmd}"]
         try:
             p = subprocess.run(full, cwd=workdir, capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -124,17 +142,27 @@ def _run(cmd: str, workdir: Path, use_docker: bool, timeout: int = 300) -> tuple
     return (124, f"timeout after {timeout}s") if r.timed_out else (r.code, r.display())
 
 
-CACHE_VOLUME = "phase4-tofu-plugin-cache"
+def _sandbox_identity() -> tuple[int, int]:
+    # Match Linux bind-mount ownership; Docker Desktop maps the sandbox user's
+    # permissions on Windows/macOS. Never make host directories world-writable.
+    return (os.getuid(), os.getgid()) if sys.platform.startswith("linux") else (1000, 1000)
 
 
-@lru_cache(maxsize=1)
-def _ensure_cache_volume() -> None:
-    """A new named volume is owned by root; the sandbox runs as an unprivileged user."""
-    with perf.span("command", "sandbox.cache_volume_setup", category="cache_setup", volume=CACHE_VOLUME) as sp:
-        r = subprocess.run(["docker", "run", "--rm", "--user", "0", "-v", f"{CACHE_VOLUME}:/tofu-cache",
-                            get_settings().phase4_iac_sandbox_image, "sh", "-c", "chown $(stat -c %u /home/*/ | head -1) /tofu-cache"
-                            " 2>/dev/null || chmod 777 /tofu-cache"], capture_output=True, timeout=120)
+def _cache_volume(workdir: Path) -> str:
+    # OpenTofu's shared provider cache is not safe for concurrent writers.
+    # Validation holds the source-specific workspace lease across all envs.
+    key = hashlib.sha256(str(workdir.resolve()).encode()).hexdigest()[:20]
+    return f"phase4-tofu-{_sandbox_identity()[0]}-{key}"
+
+
+@lru_cache(maxsize=128)
+def _ensure_cache_volume(volume: str, uid: int, gid: int, image: str) -> None:
+    with perf.span("command", "sandbox.cache_volume_setup", category="cache_setup", volume=volume) as sp:
+        r = subprocess.run(["docker", "run", "--rm", "--user", "0", "-v", f"{volume}:/tofu-cache",
+                            image, "chown", f"{uid}:{gid}", "/tofu-cache"], capture_output=True, timeout=30)
         sp.set(exit_code=r.returncode)
+        if r.returncode:
+            raise RuntimeError("could not initialize the sandbox provider cache")
 
 
 def _network_failure(out: str) -> bool:
@@ -202,7 +230,14 @@ def run_checks(workdir: Path, envs: list[str], *, include_init: bool = True,
                            summary="sandbox disabled (PHASE4_IAC_SANDBOX_MODE=off)") for t in tools]
         use_docker = _docker_image_ok()
         sp.set(executor="docker" if use_docker else "local")
-        results = _run_checks(workdir, envs, tools, include_init, use_docker)
+        budget = float(os.environ.get("PHASE4_IAC_TOTAL_BUDGET_SECONDS", "900"))
+        if not 1 <= budget <= 7200:
+            raise ValueError("PHASE4_IAC_TOTAL_BUDGET_SECONDS must be between 1 and 7200")
+        token = _budget_deadline.set(time.monotonic() + budget)
+        try:
+            results = _run_checks(workdir, envs, tools, include_init, use_docker)
+        finally:
+            _budget_deadline.reset(token)
         sp.set(outcomes={r.tool: r.outcome for r in results})
         return results
 
@@ -243,34 +278,65 @@ def _run_checks(workdir: Path, envs: list[str], tools: list[str], include_init: 
 def _validate_envs(workdir: Path, envs: list[str], use_docker: bool) -> CheckResult:
     """tofu init + validate per environment. Needs the module registry: when it cannot be reached the check is
     reported as skipped (a network problem is not a finding in the generated code)."""
+    # Keep download state OUTSIDE generated/published files. Re-run validation every
+    # time; only downloaded modules/providers are reused on byte-identical inputs.
+    h = hashlib.sha256()
+    sources = [p for p in workdir.rglob("*") if p.is_file()
+               and not any(x in (".terraform", ".git") or x.startswith(".engine-") for x in p.relative_to(workdir).parts)]
+    for p in sorted(sources, key=lambda p: p.relative_to(workdir).as_posix()):
+        h.update(p.relative_to(workdir).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
+    cache = Path(get_settings().phase4_iac_cache_dir) / "validation" / h.hexdigest()
+    with project_lock(cache, "validation"):
+        for p in sources:
+            dest = cache / p.relative_to(workdir)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.is_file() or dest.read_bytes() != p.read_bytes():
+                shutil.copyfile(p, dest)
+        return _validate_cached_envs(cache, envs, use_docker)
+
+
+def _validate_cached_envs(workdir: Path, envs: list[str], use_docker: bool) -> CheckResult:
     probe = _exec(REGISTRY_PROBE, workdir, use_docker, timeout=30, tool="tofu_validate", category="registry_probe")
+    if probe.timed_out:
+        return _check("tofu_validate", "timeout", passed=False, skipped=True, summary="registry probe timed out")
     if probe.code != 0:
         return _check("tofu_validate", "skipped", passed=False, skipped=True,
                       summary="module registry unreachable from the sandbox; tofu validate not run")
     fails, network = [], []
+    checked = 0
     for env in envs:
         d = f"envs/{env}/core"
         if not (workdir / d).exists():
             perf.event("check_env", "tofu_validate", env=env, outcome="skipped", reason="no envs/<env>/core folder")
+            network.append(f"{env}: missing environment directory")
             continue
-        # .terraform (downloaded providers/modules) is removed afterwards: never scanned, never committed
+        # Download state stays in this leased cache workspace, outside published files.
         for attempt in (1, 2):     # retry once on transient registry/network errors
-            r = _exec(f"cd {d} && tofu init -backend=false -input=false -no-color >/dev/null && "
-                      "tofu validate -no-color -json; rc=$?; rm -rf .terraform .terraform.lock.hcl; exit $rc",
-                      workdir, use_docker, timeout=300, tool="tofu_validate", category="init_validate", env=env,
+            r = _exec(f"cd {shlex.quote(d)} && tofu init -backend=false -input=false -no-color",
+                      workdir, use_docker, timeout=300, tool="tofu_validate", category="init", env=env,
                       attempt=attempt)
             code, out = (124, f"timeout after 300s") if r.timed_out else (r.code, r.text)
-            # the container removes these itself, except when it is killed on a timeout
-            with perf.span("fs", "sandbox.cleanup", env=env):
-                shutil.rmtree(workdir / d / ".terraform", ignore_errors=True)
-                (workdir / d / ".terraform.lock.hcl").unlink(missing_ok=True)
+            if r.timed_out:
+                return _check("tofu_validate", "timeout", passed=False, skipped=True, summary=f"{env}: init timed out; remaining environments not validated")
             if code == 0 or not _network_failure(out):
                 break
         if code != 0 and _network_failure(out):
             network.append(env)
             perf.event("check_env", "tofu_validate", env=env, outcome="network_error", attempts=attempt)
             continue
+        if code != 0:
+            return _exec_failure("tofu_validate", r)
+        r = _exec(f"cd {shlex.quote(d)} && tofu validate -no-color -json", workdir, use_docker,
+                  timeout=120, tool="tofu_validate", category="validate", env=env)
+        code, out = r.code, r.text
+        if r.timed_out:
+            return _check("tofu_validate", "timeout", passed=False, skipped=True, summary=f"{env}: validate timed out")
+        if any(s in out.lower() for s in ("unrecognized remote plugin", "failed to instantiate provider", "failed to read schema", "failed to load plugin")):
+            return _exec_failure("tofu_validate", r)
         data = parse_json(r.stdout)
+        if not isinstance(data, dict) or not isinstance(data.get("diagnostics"), list) or not isinstance(data.get("valid"), bool):
+            return _parse_failure("tofu_validate", r)
+        checked += 1
         diags = data.get("diagnostics", []) if isinstance(data, dict) else None
         if diags is None:
             diags = [] if code == 0 else [{"severity": "error", "summary": r.display()[-2000:]}]
@@ -285,9 +351,9 @@ def _validate_envs(workdir: Path, envs: list[str], use_docker: bool) -> CheckRes
             fails.append(Finding(rule_id="init", severity="high", file=d, message=out[-1500:]))
         perf.event("check_env", "tofu_validate", env=env, attempts=attempt, exit_code=code, errors=env_errors,
                    outcome="valid" if not env_errors else "errors", parsed=isinstance(data, dict))
-    if network and not fails:
+    if network or not checked:
         return _check("tofu_validate", "skipped", passed=False, skipped=True,
-                      summary=f"registry/network errors during tofu init for {', '.join(network)}; not validated")
+                      findings=fails, summary=f"incomplete environment validation: {', '.join(network) or 'no environments checked'}")
     summary = "valid" if not fails else f"{len(fails)} errors"
     if network:
         summary += f" (not validated, network errors: {', '.join(network)})"
@@ -313,7 +379,7 @@ def _other_checks(workdir: Path, use_docker: bool, want, skipped) -> list[CheckR
             data = parse_json(r.stdout, r.text, openers="{")
             if r.code in EXEC_FAILURE_CODES or (not isinstance(data, dict) and r.code != 0):
                 results.append(_exec_failure("tflint", r))
-            elif not isinstance(data, dict):
+            elif not isinstance(data, dict) or not isinstance(data.get("issues"), list) or not isinstance(data.get("errors"), list):
                 results.append(_parse_failure("tflint", r))
             else:
                 f = []
@@ -324,7 +390,7 @@ def _other_checks(workdir: Path, use_docker: bool, want, skipped) -> list[CheckR
                                          file=i["range"]["filename"], message=i["message"]))
                     except (KeyError, TypeError):
                         continue
-                if r.code != 0 and not f:     # exit != 0 with no issues: tflint's own errors (config, plugins)
+                if data.get("errors") or (r.code != 0 and not f):
                     results.append(_exec_failure("tflint", r))
                 else:
                     results.append(_check("tflint", "findings" if f else "passed", passed=r.code == 0, findings=f,
@@ -335,9 +401,9 @@ def _other_checks(workdir: Path, use_docker: bool, want, skipped) -> list[CheckR
             results.append(skipped("trivy"))
         elif r := run("trivy", "trivy config --quiet --format json --severity HIGH,CRITICAL .", 600):
             data = parse_json(r.stdout, r.text, openers="{")
-            if r.code in EXEC_FAILURE_CODES or (not isinstance(data, dict) and r.code != 0):
+            if r.code != 0:
                 results.append(_exec_failure("trivy", r))
-            elif not isinstance(data, dict):
+            elif not isinstance(data, dict) or not isinstance(data.get("Results"), list):
                 results.append(_parse_failure("trivy", r))
             else:
                 f = []
@@ -352,26 +418,7 @@ def _other_checks(workdir: Path, use_docker: bool, want, skipped) -> list[CheckR
         if not _available("checkov", use_docker):
             results.append(skipped("checkov"))
         elif r := run("checkov", "checkov -d . --framework terraform --compact --quiet -o json --soft-fail", 600):
-            data = parse_json(r.stdout, r.text)
-            if r.code in EXEC_FAILURE_CODES or (not isinstance(data, (dict, list)) and r.code != 0):
-                results.append(_exec_failure("checkov", r))
-            elif not isinstance(data, (dict, list)):
-                results.append(_parse_failure("checkov", r))
-            else:
-                f = []
-                blocks = data if isinstance(data, list) else [data]
-                for b in blocks:
-                    if not isinstance(b, dict):
-                        continue
-                    for fc in (b.get("results") or {}).get("failed_checks", []):
-                        sev = (fc.get("severity") or "MEDIUM").upper()
-                        f.append(Finding(rule_id=fc.get("check_id", "checkov"), severity=SEVERITY.get(sev, "medium"),
-                                         file=fc.get("file_path"), message=fc.get("check_name", "")))
-                high = [x for x in f if x.severity in ("high", "critical")]
-                perf.event("check_detail", "checkov", resource_count=_first_key(blocks, "resource_count"),
-                           parsing_errors=_first_key(blocks, "parsing_errors"))
-                results.append(_check("checkov", "findings" if f else "passed", passed=not high, findings=f[:200],
-                                      summary=f"{len(f)} failed checks ({len(high)} high/critical)"))
+            results.append(_checkov_result(r))
 
     if want("actionlint"):
         if not _available("actionlint", use_docker):
@@ -392,14 +439,20 @@ def _other_checks(workdir: Path, use_docker: bool, want, skipped) -> list[CheckR
         if not _available("helm", use_docker) or not (workdir / "gitops" / "charts" / "app").exists():
             results += [skipped(t) for t in ("helm_lint", "kubeconform") if want(t)]
         else:
-            if want("helm_lint") and (r := run("helm_lint", "helm lint gitops/charts/app && helm template gitops/charts/app | "
-                                               "kubeconform -strict -summary -ignore-missing-schemas")):
-                results.append(_simple("helm_lint", r, "helm"))
-            # Helm values files are not manifests; validate only Kubernetes resources we generate
-            if want("kubeconform") and (r := run("kubeconform", "find gitops -name '*.yaml' -not -path '*/charts/*' "
-                                                 "-not -name 'values.yaml' | xargs -r kubeconform -strict -summary "
-                                                 "-ignore-missing-schemas")):
-                results.append(_simple("kubeconform", r, "kubeconform"))
+            schema = os.environ.get("PHASE4_KUBERNETES_SCHEMA_LOCATION", "")
+            schema_args = " -schema-location default" + (" -schema-location " + shlex.quote(schema) if schema else "")
+            if want("helm_lint"):
+                values = sorted(workdir.glob("gitops/apps/*/*/values.yaml"))
+                commands = ["helm lint gitops/charts/app"]
+                for value in values or [None]:
+                    arg = " -f " + shlex.quote(value.relative_to(workdir).as_posix()) if value else ""
+                    commands.append("helm template gitops/charts/app" + arg + " | kubeconform -strict -summary -ignore-missing-schemas" + schema_args)
+                if r := run("helm_lint", " && ".join(commands)):
+                    results.append(_schema_result("helm_lint", r))
+            if want("kubeconform"):
+                cmd = "find gitops -name '*.yaml' -not -path '*/charts/*' -not -name 'values.yaml' -print0 | xargs -0 -r kubeconform -strict -summary -ignore-missing-schemas" + schema_args
+                if r := run("kubeconform", cmd):
+                    results.append(_schema_result("kubeconform", r))
 
     if want("gitleaks"):
         if not _available("gitleaks", use_docker):
@@ -464,3 +517,41 @@ def incomplete(results: list[CheckResult]) -> list[str]:
 
 def blocking(results: list[CheckResult]) -> list[CheckResult]:
     return [r for r in results if not r.passed and not r.skipped and r.tool not in ("tofu_fmt",)]
+
+
+def _checkov_result(r: CmdResult) -> CheckResult:
+    if r.code != 0:
+        return _exec_failure("checkov", r)
+    data = parse_json(r.stdout, r.text)
+    blocks = data if isinstance(data, list) else [data]
+    if not blocks or any(not isinstance(b, dict) or not isinstance(b.get("results"), dict)
+                         or not isinstance(b["results"].get("failed_checks"), list) for b in blocks):
+        return _parse_failure("checkov", r)
+    findings, unknown = [], 0
+    for b in blocks:
+        for fc in b["results"]["failed_checks"]:
+            if not isinstance(fc, dict):
+                return _parse_failure("checkov", r)
+            unknown += not bool(fc.get("severity"))
+            sev = SEVERITY.get(str(fc.get("severity", "")).upper(), "medium")
+            findings.append(Finding(rule_id=fc.get("check_id", "checkov"), severity=sev, file=fc.get("file_path"),
+                                    message=("[severity unreported; review required] " if not fc.get("severity") else "") + fc.get("check_name", "")))
+    incomplete_scan = any((b.get("summary") or {}).get("parsing_errors") for b in blocks) or "Failed to download module" in r.stderr
+    high = sum(f.severity in ("high", "critical") for f in findings)
+    return _check("checkov", "execution_error" if incomplete_scan else "findings" if findings else "passed",
+                  passed=not high and not unknown and not incomplete_scan, findings=findings[:200],
+                  summary=f"{len(findings)} findings; {unknown} severity unreported; coverage {'incomplete' if incomplete_scan else 'reported'}")
+
+
+def _schema_result(tool: str, r: CmdResult) -> CheckResult:
+    if r.code != 0:
+        return _simple(tool, r, tool)
+    counts = re.findall(r"Valid:\s*(\d+), Invalid:\s*(\d+), Errors:\s*(\d+), Skipped:\s*(\d+)", r.text)
+    if not counts:
+        return _parse_failure(tool, r)
+    valid, invalid, errors, skipped = map(sum, zip(*(tuple(map(int, c)) for c in counts)))
+    if skipped or valid == 0:
+        return _check(tool, "skipped", passed=False, skipped=True,
+                      summary=f"{valid} validated, {skipped} skipped; supply missing CRD schemas using PHASE4_KUBERNETES_SCHEMA_LOCATION")
+    return _check(tool, "findings" if invalid or errors else "passed", passed=not invalid and not errors,
+                  summary=f"{valid} validated, {invalid} invalid, {errors} errors")

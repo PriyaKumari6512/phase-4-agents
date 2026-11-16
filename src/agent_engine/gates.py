@@ -23,6 +23,7 @@ from pathlib import Path
 
 from agent_engine.config import GATES_DIRNAME, GATES_FILE
 from agent_engine.history import file_digest
+from agent_engine.runtime import atomic_json, project_lock
 
 DECISIONS = ("approved", "changes_requested", "rejected")
 HISTORY_FILENAME = "history.jsonl"
@@ -78,6 +79,11 @@ def record_decision(
     submitted_by: dict,
     comment: str = "",
 ) -> dict:
+    with project_lock(project_dir):
+        return _record_decision(project_dir, gate, decision, approver, submitted_by, comment)
+
+
+def _record_decision(project_dir, gate, decision, approver, submitted_by, comment):
     """Appends the decision to gates/history.jsonl and writes (approved) or
     removes (changes requested, rejected) gates/<gate>.approved.json.
     Refuses an approver who also submitted the work (maker-checker).
@@ -108,7 +114,7 @@ def record_decision(
         f.write(json.dumps(record) + "\n")
     approval = project_dir / gate.approval_file
     if decision == "approved":
-        approval.write_text(json.dumps(record, indent=2), encoding="utf-8")
+        atomic_json(approval, record)
     else:
         approval.unlink(missing_ok=True)
     return record
@@ -120,7 +126,7 @@ def _same_person(a: dict, b: dict) -> bool:
     return a["name"].strip().casefold() == b["name"].strip().casefold()
 
 
-def stale_approvals(project_dir: Path, input_files: list[str]) -> list[str]:
+def stale_approvals(project_dir: Path, input_files: list[str], gates: dict[str, Gate] | None = None) -> list[str]:
     """For each gates/<gate>.approved.json among `input_files`: the approved
     files that have changed or gone since the approval. Empty = all hold.
     """
@@ -129,8 +135,19 @@ def stale_approvals(project_dir: Path, input_files: list[str]) -> list[str]:
         if not (f.startswith(f"{GATES_DIRNAME}/") and f.endswith(APPROVED_SUFFIX) and (project_dir / f).is_file()):
             continue
         record = json.loads((project_dir / f).read_text(encoding="utf-8"))
+        name = Path(f).name.removesuffix(APPROVED_SUFFIX)
+        gate = (load_gates() if gates is None else gates).get(name)
+        if record.get("gate") != name or record.get("project") != project_dir.name or record.get("decision") != "approved":
+            problems.append(f"invalid approval record for {name}")
+            continue
+        if gate is None or set(record.get("artifacts", {})) != set(gate.files):
+            problems.append(f"{name} approval does not cover the exact required artifact set")
+            continue
         for artifact, digest in record.get("artifacts", {}).items():
             path = project_dir / artifact
+            if not path.resolve().is_relative_to(project_dir.resolve()):
+                problems.append(f"{name} artifact escapes project")
+                continue
             if not path.is_file():
                 problems.append(f"{record['gate']} approved {artifact}, which no longer exists")
             elif file_digest(path) != digest:

@@ -32,4 +32,4 @@ files = ["allocation/assignments.json"]
 
 [P4-G4]
 description = "Infrastructure, GitOps and CI change set from the Infra & Pipeline agent (platform engineer)"
-files = ["infra/intent.json", "infra/manifest.json"]
+files = ["infra/intent.json", "infra/manifest.json", "infra/checks.json", "infra/PR.md"]

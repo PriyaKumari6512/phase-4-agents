@@ -17,7 +17,7 @@ from pathlib import Path
 from agent_engine import config
 from agent_engine.phase4 import contracts, files
 
-EXAMPLES_DIR = config.ENGINE_ROOT / "examples" / "phase4"
+EXAMPLES_DIR = config.ASSETS_ROOT / "examples" / "phase4"
 SCHEMAS = {
     "project.schema.json": contracts.ProjectSettings, "history.schema.json": contracts.History,
     "features.schema.json": contracts.FeatureList, "backlog.schema.json": contracts.Backlog,
@@ -50,10 +50,20 @@ def add_parser(sub) -> None:
     o.add_argument("--publish", action="store_true", help="When everything is approved, run phase4 publish for all four.")
     sc = s.add_parser("schemas", help="Write JSON Schemas of the Phase 4 files.")
     sc.add_argument("--out", default="schemas")
+    for name in ("check-ci", "reconcile"):
+        command = s.add_parser(name, help="Refresh read-only operational CI / coding-agent outcome evidence.")
+        command.add_argument("--project-name", required=True)
 
 
 def run(args: argparse.Namespace) -> int:
     try:
+        if args.phase4_command in ("check-ci", "reconcile"):
+            from agent_engine.phase4 import readiness
+            from agent_engine.runtime import project_lock
+            with project_lock(files.project_dir(args.project_name)):
+                fn = readiness.check_ci if args.phase4_command == "check-ci" else readiness.reconcile
+                print(json.dumps(fn(args.project_name), indent=2))
+            return 0
         if args.phase4_command == "init":
             return _init(args.project_name, args.example, args.force)
         if args.phase4_command == "publish":

@@ -4,6 +4,7 @@ import ai.timefold.solver.core.api.score.HardMediumSoftScore;
 import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
+import ai.timefold.solver.core.api.score.stream.Joiners;
 import ai.timefold.solver.core.api.score.stream.uni.UniConstraintStream;
 import ai.timefold.solver.service.definition.api.description.ConstraintInfo;
 
@@ -25,6 +26,7 @@ public class TaskAssigningConstraintProvider implements ConstraintProvider {
                 // Hard constraints
                 noMissingSkills(constraintFactory),
                 capacityExceeded(constraintFactory),
+                taskPrecedence(constraintFactory),
 
                 // Medium constraints
                 minimizeUnassignedTasks(constraintFactory),
@@ -35,6 +37,17 @@ public class TaskAssigningConstraintProvider implements ConstraintProvider {
                 majorPriorityTaskEndTime(constraintFactory),
                 minorPriorityTaskEndTime(constraintFactory)
         };
+    }
+
+    protected Constraint taskPrecedence(ConstraintFactory factory) {
+        return factory.forEachIncludingUnassigned(Task.class)
+                .join(factory.forEachIncludingUnassigned(Task.class),
+                        Joiners.filtering((task, predecessor) -> task.getPredecessorIds().contains(predecessor.getId())))
+                .filter((task, predecessor) -> task.getEmployee() != null
+                        && (predecessor.getEmployee() == null || predecessor.getEndTime() == null
+                                || task.getStartTime() == null || predecessor.getEndTime() > task.getStartTime()))
+                .penalize(HardMediumSoftScore.ONE_HARD)
+                .asConstraint("Task precedence");
     }
 
     protected Constraint noMissingSkills(ConstraintFactory constraintFactory) {

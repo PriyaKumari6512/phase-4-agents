@@ -381,7 +381,7 @@ def _stage_row(st: Span, child: Span | None, points: list[dict]) -> dict:
         "model_calls": len(calls), "model_call_errors": sum(c.status != "ok" for c in calls),
         "compaction_calls": sum(bool(c.attrs.get("compaction")) for c in calls),
         "tokens": _tokens(calls), "usage_aggregate": usage, "usage_reconciliation": _reconcile(calls, usage),
-        "tool_calls": len(kinds.get("tool", [])), "tool_domain_errors": sum(t.status == "domain_error" for t in tools),
+        "tool_calls": len(kinds.get("tool", [])), "tool_domain_errors": sum(t.status == "domain_error" for t in kinds.get("tool", [])),
         "deterministic_tool_executions": len(kinds.get("tool_exec", [])),
         "helpers": len(helper_iv), "helper_max_concurrency": max_concurrency(helper_iv),
         "model_http_attempts": len(model_http),

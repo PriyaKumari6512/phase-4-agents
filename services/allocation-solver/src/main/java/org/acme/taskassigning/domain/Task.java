@@ -1,5 +1,6 @@
 package org.acme.taskassigning.domain;
 
+import java.util.List;
 import java.util.Objects;
 
 import ai.timefold.solver.core.api.domain.common.PlanningId;
@@ -19,6 +20,15 @@ public class Task {
     private Customer customer;
     private long minStartTime;
     private Priority priority;
+    private List<String> predecessorIds = List.of();
+
+    public List<String> getPredecessorIds() {
+        return predecessorIds;
+    }
+
+    public void setPredecessorIds(List<String> ids) {
+        predecessorIds = List.copyOf(ids);
+    }
 
     // Shadow variables
     @InverseRelationShadowVariable(sourceVariableName = "tasks")

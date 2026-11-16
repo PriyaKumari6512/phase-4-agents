@@ -22,6 +22,9 @@ read your request history (`requests/task-breakdown.md`) and your previous `back
    complete feature description (quote the relevant prd.md text with its requirement ids, the relevant
    architecture.md components and constraints, and any answers from the request history). The subagent cannot see
    this conversation; give it everything it needs.
+   Before launching helpers, write `backlog/implementation-contract.md` from architecture.md: common repository
+   module roots, API prefix, migration directory, shared feature flags and which feature owns each foundation.
+   Mark unstated choices as assumptions. Give every helper this path and tell it to follow the same contract.
 4. **Build the backlog.** Call `backlog_build`. If it reports a spec-kit format error for a feature, send that
    feature back to `speckit-feature` with the exact error, then build again.
 5. **Enrich, in parallel.** For every epic (E-NNN) call the `task` tool with subagent `backlog-enricher` (all in

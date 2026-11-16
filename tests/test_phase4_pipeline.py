@@ -13,6 +13,7 @@ import pytest
 from agent_engine import config, gates
 from agent_engine.phase4 import allocation, backlog, files, infra, publish, speckit, sprint
 from agent_engine.phase4.contracts import AssignmentPlan, Backlog, SprintPlan
+from agent_engine.phase4.contracts import CheckResult
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "phase4" / "bookmarks"
@@ -21,6 +22,23 @@ AS_OF = "2026-11-05"
 P = "bm"
 PO = {"name": "Priya", "role": "Product Owner"}
 DEV = {"name": "Rahul"}
+
+
+def mock_passed_checks(monkeypatch):
+    """A unit-test fixture, not evidence that real external scanners ran."""
+    from agent_engine.phase4 import sandbox
+    monkeypatch.setattr(sandbox, "run_checks", lambda wd, envs, **kw: [
+        CheckResult(tool=t, passed=True, outcome="passed", summary="mock scanner result")
+        for t in sandbox.ALL_TOOLS if kw.get("only") is None or t in kw["only"]])
+
+
+def seed_ci_evidence(project):
+    from agent_engine.phase4.contracts import InfraManifest
+    m = files.read_json(project, files.INFRA_MANIFEST, InfraManifest)
+    files.write_json(project, "phase4/ci-readiness.json", {repo: {
+        "success": True, "head_sha": "test-head", "workflow_run_ids": [1],
+        "manifest_sha256": files.file_sha(project, files.INFRA_MANIFEST), "observed_at": files.utcnow().isoformat()}
+        for repo in m.ci_repos})
 
 
 @pytest.fixture
@@ -200,7 +218,7 @@ def _intent():
                 {"component_id": "ARCH-006", "name": "jobs", "kind": "queue", "needs": ["queue"]}]}
 
 
-def test_infra_intent_render_validate_publish_and_ci_readiness(proj):
+def test_infra_intent_render_validate_publish_and_ci_readiness(proj, monkeypatch):
     bad = _intent()
     bad["components"][2]["public_endpoint"] = True
     bad["components"][2]["data_classification"] = "restricted"
@@ -229,25 +247,32 @@ def test_infra_intent_render_validate_publish_and_ci_readiness(proj):
     gaps = " ".join(r["gaps"])
     assert "start command" in gaps and "ingress.host" in gaps and "image promotion" in gaps
     v = json.loads(infra.validate(P))
-    assert v["checks_passed"] and len(v["skipped"]) == 10     # sandbox off here: every check reported skipped
+    assert not v["checks_passed"] and len(v["skipped"]) == 10
     assert v["agent_edited"] == []                            # nothing edited yet (and no CRLF hash drift)
     # an agent repair is tracked in the manifest
     tf = proj / "infra/repo/envs/dev/core/main.tf"
     tf.write_text(tf.read_text(encoding="utf-8") + "\n# reviewed\n", encoding="utf-8")
     assert "repo/envs/dev/core/main.tf" in json.loads(infra.validate(P))["agent_edited"]
-    assert json.loads(infra.check(P))["ok"]
+    assert not json.loads(infra.check(P))["ok"]
     assert "Risk score" in (proj / "infra/PR.md").read_text(encoding="utf-8")
+    approve(proj, "P4-G4")
+    with pytest.raises(publish.PublishError, match="not fully validated"):
+        publish.publish_infra(P)
+    mock_passed_checks(monkeypatch)
+    assert json.loads(infra.validate(P))["checks_passed"]
     approve(proj, "P4-G4")
     prs = publish.publish_infra(P)["pull_requests"]
     assert {p["repo"] for p in prs} == {"acme/taskflow-infra", "acme/taskflow-api", "acme/taskflow-web"}
     assert all(Path(p["local_path"], "PR.md").is_file() for p in prs)
+    assert allocation.ci_ready_repos(P) == set()  # generated/approved is not operational CI
+    seed_ci_evidence(P)
     assert allocation.ci_ready_repos(P) == {"acme/taskflow-api", "acme/taskflow-web"}
     # changing an approved file makes the approval stale: CI is no longer considered ready
     (proj / "infra/intent.json").write_text((proj / "infra/intent.json").read_text(encoding="utf-8") + " ", encoding="utf-8")
     assert allocation.ci_ready_repos(P) == set()
 
 
-def test_ai_agents_only_get_eligible_tasks_once_ci_is_approved(proj):
+def test_ai_agents_only_get_eligible_tasks_once_ci_is_operational(proj, monkeypatch):
     backlog.set_features(P, _features())
     backlog.build(P)
     _enrich(P)
@@ -262,8 +287,10 @@ def test_ai_agents_only_get_eligible_tasks_once_ci_is_approved(proj):
     sprint.solve(P, vals, as_of=AS_OF)
     infra.set_intent(P, _intent())
     infra.render(P)
+    mock_passed_checks(monkeypatch)
     infra.validate(P)
     approve(proj, "P4-G4")
+    seed_ci_evidence(P)
     sp = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
     sprint_of = {sid: s.sprint_index for s in sp.sprints for sid in s.story_ids}
     k = sprint_of[small[0].parent_id]

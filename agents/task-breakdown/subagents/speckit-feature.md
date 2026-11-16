@@ -34,6 +34,11 @@ description. Follow spec-kit's own skills; this page only says how to run them h
    label. When a task needs another one that is not directly before it, end it with `(depends on T00X)`.
 4. Read and follow `/skills/speckit-analyze/SKILL.md`. It only reports. Fix every CRITICAL and HIGH finding yourself
    in spec.md, plan.md or tasks.md (one round), keeping the formats above.
+5. Call `speckit_check_feature(project, feature_directory)` before replying. Repair any format error and check
+   again. Explanatory bullets must not start with `[P]`; reserve checklist syntax for real numbered tasks.
+
+Read `/outputs/<project>/backlog/implementation-contract.md` if present and follow its shared module paths,
+API routes, migration directory and feature-flag mechanism. Reuse shared foundations instead of creating duplicates.
 
 If your task description includes a correction (a parser error, a story to split, an answered question), apply it
 to the existing files instead of starting over.

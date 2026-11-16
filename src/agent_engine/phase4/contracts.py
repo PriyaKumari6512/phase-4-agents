@@ -24,7 +24,7 @@ SCHEMA_VERSION = "1.0.0"
 
 
 class Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, validate_assignment=True, allow_inf_nan=False)
 
 
 # ============================================================================ project settings (input)
@@ -43,11 +43,11 @@ class TeamMember(Strict):
     github_login: str | None = None
     role: str
     allocation_pct: int = Field(default=100, ge=0, le=100)
-    hours_per_day: float = 6.0
+    hours_per_day: float = Field(default=6.0, gt=0, le=24)
     declared_skills: list[str] = []
     timezone: str = "UTC"
     calendar_id: str | None = None
-    wip_limit: int = 3
+    wip_limit: int = Field(default=3, ge=1)
     can_review: bool = True
     learning_goals: list[str] = []
     pto_days: list[date] = []
@@ -57,18 +57,26 @@ class AIAgentWorker(Strict):
     agent_id: str
     provider: Literal["copilot_cloud_agent", "claude_code_action"]
     skills: list[str]
-    max_concurrent_tasks: int = 3
-    max_task_hours: float = 4.0
+    max_concurrent_tasks: int = Field(default=3, ge=1)
+    max_task_hours: float = Field(default=4.0, gt=0)
     enabled: bool = True
 
 
 class SprintCalendar(Strict):
-    sprint_length_days: int = 14
+    sprint_length_days: int = Field(default=14, ge=1, le=366)
     first_sprint_start: date
     planning_horizon_sprints: int = Field(default=4, ge=1, le=12)
     working_weekdays: list[int] = [0, 1, 2, 3, 4]
     holidays: list[date] = []
-    ceremony_hours_per_sprint: float = 6.0
+    ceremony_hours_per_sprint: float = Field(default=6.0, ge=0)
+
+    @model_validator(mode="after")
+    def _weekdays(self):
+        if not self.working_weekdays or any(d not in range(7) for d in self.working_weekdays):
+            raise ValueError("working_weekdays must contain days 0..6")
+        if len(set(self.working_weekdays)) != len(self.working_weekdays):
+            raise ValueError("working_weekdays must be unique")
+        return self
 
 
 class TrackerConfig(Strict):
@@ -114,13 +122,28 @@ class ProjectSettings(Strict):
     calendar: SprintCalendar
     definition_of_done: list[str]
     story_point_scale: list[int] = [1, 2, 3, 5, 8, 13]
-    hours_per_story_point: float = 6.0
+    hours_per_story_point: float = Field(default=6.0, gt=0)
     maintenance_capacity_pct: int = Field(default=20, ge=0, le=60)
-    max_story_points_per_story: int = 13
+    max_story_points_per_story: int = Field(default=13, ge=1)
     deadlines: list[Deadline] = []
     # AI agents get work only after this many recorded outcomes (phase4/agent-outcomes.json); before that they
     # run in shadow mode. 0 trusts them from the start.
     ai_min_recorded_outcomes: int = Field(default=20, ge=0)
+
+    @model_validator(mode="after")
+    def _unique_and_positive(self):
+        groups = [[m.member_id for m in self.team] + [a.agent_id for a in self.ai_agents],
+                  [d.ref_id for d in self.deadlines], self.code_repos]
+        for ids in groups:
+            if any(not x for x in ids) or len(ids) != len(set(ids)):
+                raise ValueError("worker, deadline and repository identifiers must be nonempty and unique")
+        if not self.team:
+            raise ValueError("team must not be empty")
+        if not self.story_point_scale or any(x <= 0 for x in self.story_point_scale):
+            raise ValueError("story_point_scale must contain positive integers")
+        if self.story_point_scale != sorted(set(self.story_point_scale)):
+            raise ValueError("story_point_scale must be sorted and unique")
+        return self
 
 
 class HistoryTicket(Strict):
@@ -251,6 +274,13 @@ class Backlog(Strict):
     issues: list[ValidationIssue] = []
     generated_at: datetime
 
+    @model_validator(mode="after")
+    def _unique_items(self):
+        ids = [i.item_id for i in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate backlog item IDs")
+        return self
+
     def by_id(self) -> dict[str, WorkItem]:
         return {i.item_id: i for i in self.items}
 
@@ -313,6 +343,7 @@ class SprintPlan(Strict):
     version: int = 1
     project: str
     backlog_sha256: str
+    settings_sha256: str | None = None
     as_of: date
     sprints: list[SprintSlot]
     deferred: list[Deferral]
@@ -368,6 +399,7 @@ class AssignmentPlan(Strict):
     version: int = 1
     project: str
     sprint_plan_sha256: str
+    settings_sha256: str | None = None
     sprint_index: int
     assignments: list[Assignment]
     unassigned: list[Unassigned]
@@ -435,13 +467,24 @@ class InfraIntentComponent(Strict):
 
 class InfraIntent(Strict):
     cloud: Literal["aws", "azure", "gcp"]
-    regions: list[str]
-    environments: list[Env] = ["dev", "stg", "prod"]
+    regions: list[str] = Field(min_length=1)
+    environments: list[Env] = Field(default=["dev", "stg", "prod"], min_length=1)
     deploy_target: Literal["kubernetes", "serverless", "vm"] = "kubernetes"
     components: list[InfraIntentComponent]
     slos: dict[str, str] = {}
     monthly_budget_usd: float | None = None
     notes: list[str] = []
+
+    @model_validator(mode="after")
+    def _unique_components(self):
+        ids = [c.component_id for c in self.components]
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("components must have unique IDs and must not be empty")
+        if len(set(self.environments)) != len(self.environments) or len(set(self.regions)) != len(self.regions):
+            raise ValueError("environments and regions must be unique")
+        if any(not r or not all(ch.isalnum() or ch == '-' for ch in r) for r in self.regions):
+            raise ValueError("invalid region")
+        return self
 
 
 class ManifestFile(Strict):
@@ -456,6 +499,7 @@ class InfraManifest(Strict):
     schema_version: str = SCHEMA_VERSION
     project: str
     intent_sha256: str
+    source_hashes: dict[str, str] = {}
     infra_repo: str
     environments: list[Env]
     files: list[ManifestFile]

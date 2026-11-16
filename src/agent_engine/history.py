@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 
 from agent_engine import perf
+from agent_engine.runtime import atomic_json
 from agent_engine.config import (
     GATES_DIRNAME,
     INPUTS_DIRNAME,
@@ -43,6 +44,7 @@ def fingerprint(project_dir: Path) -> dict[str, str]:
             p.relative_to(project_dir).as_posix(): file_digest(p)
             for p in sorted(project_dir.rglob("*"))
             if p.is_file() and p.relative_to(project_dir).parts[0] not in _NOT_OUTPUT
+            and not p.name.startswith(".engine-") and not p.name.endswith(".tmp")
         }
         if perf.enabled():
             sp.set(files=len(digests), bytes=sum((project_dir / f).stat().st_size for f in digests))
@@ -69,7 +71,7 @@ def save_run(project_dir: Path, job_id: str, before: dict[str, str], report: dic
             copied_bytes += copy.stat().st_size if perf.enabled() else 0
         report["files"] = changes
         run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / REPORT_FILENAME).write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        atomic_json(run_dir / REPORT_FILENAME, report)
         sp.set(files_copied=len(changes["created"]) + len(changes["changed"]), bytes_copied=copied_bytes,
                deleted=len(changes["deleted"]))
     return changes

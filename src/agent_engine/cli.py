@@ -34,7 +34,7 @@ from pathlib import Path
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 
 from agent_engine import perf
-from agent_engine.agent import AgentPack, Verdict, available_packs, build_agent, load_pack, model_spec
+from agent_engine.agent import AgentPack, Verdict, available_packs, build_agent, close_agent, load_pack, model_spec
 from agent_engine.config import (
     APP_LOG_FILENAME,
     DEEPAGENT_LOG_FILENAME,
@@ -58,6 +58,7 @@ from agent_engine.logging_setup import (
     notify_job_log_path,
 )
 from agent_engine.observability import build_langfuse_handler, flush_langfuse
+from agent_engine.runtime import atomic_json, project_lock, project_scope, active_inputs, managed_outputs
 from agent_engine.phase4 import cli as phase4_cli
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,11 @@ async def _stream(agent, message: str, callbacks: list, run_name: str) -> dict |
         messages = state.get("messages", [])
         for msg in messages[seen:]:
             calls = "; ".join(f"{c['name']}({c['args']})" for c in getattr(msg, "tool_calls", None) or [])
-            transcript_logger.info("[%s] %s%s", getattr(msg, "type", "?"), f"tool_calls=[{calls}] " if calls else "", _text(msg.content))
+            content = perf.redact(_text(msg.content))
+            limit = max(1000, int(os.environ.get("AGENT_ENGINE_TRANSCRIPT_MAX_CHARS", "20000")))
+            if len(content) > limit:
+                content = content[:limit] + f"\n[transcript truncated; {len(content)} characters, full generated artifacts remain on disk]"
+            transcript_logger.info("[%s] %s%s", getattr(msg, "type", "?"), perf.redact(f"tool_calls=[{calls[:limit]}] ") if calls else "", content)
         seen = len(messages)
     return final_state
 
@@ -177,6 +182,13 @@ def verdict_status(verdict: Verdict) -> tuple[str, str | None]:
 
 
 async def _run(request: str, agent_name: str, project_name: str) -> int:
+    if not _PROJECT_NAME_RE.fullmatch(project_name):
+        raise ValueError("invalid project name")
+    with project_scope(project_name), project_lock(OUTPUTS_DIR / project_name):
+        return await _owned_run(request, agent_name, project_name)
+
+
+async def _owned_run(request: str, agent_name: str, project_name: str) -> int:
     with perf.span("stage", agent_name, agent=agent_name, project=project_name,
                    invocation_id=os.environ.get(perf.ENV_INVOCATION)) as stage:
         code = await _run_stage(request, agent_name, project_name, stage)
@@ -223,12 +235,23 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                 print(f"ERROR: {pack.name} needs {OUTPUTS_DIR / project_name / f}, which doesn't exist yet.{hint}")
             return 1
         # A gate approval listed as an input only counts while the files it approved are unchanged.
-        stale = stale_approvals(OUTPUTS_DIR / project_name, pack.input_files)
+        stale = stale_approvals(OUTPUTS_DIR / project_name, pack.input_files, load_gates())
         if stale:
             pre.set_status("blocked", "; ".join(stale), "stale_approval")
             for problem in stale:
                 print(f"ERROR: {pack.name} can't run: {problem}. Get the gate approved again first.")
             return 1
+        if pack.name in ("task-breakdown", "infra-pipeline", "sprint-planning", "work-allocation"):
+            from agent_engine.phase4 import files as project_files
+            from agent_engine.phase4.contracts import ProjectSettings
+            try:
+                project_files.read_json(project_name, project_files.PROJECT_SETTINGS, ProjectSettings)
+                if pack.name == "work-allocation":
+                    from agent_engine.phase4.allocation import _ctx
+                    _ctx(project_name, 1)  # validate upstream feasibility before paying for a writer
+            except ValueError as exc:
+                print(f"ERROR: invalid Phase 4 inputs: {exc}")
+                return 1
 
     job_id = new_job_id()
     stage.set(job_id=job_id)
@@ -271,6 +294,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
         """One pass of pack `p` on its current model; a model error moves it
         one step along its escalation order and retries, until the list runs out.
         """
+        schema_retries = 0
         while True:
             tier = p.models[level[p.name]]
             entry = {"kind": kind, "agent": p.name, "model_tier": tier, "model": model_spec(tier)}
@@ -285,10 +309,18 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
 
                     handler = PerfCallbackHandler(ps.id, tiers)
                     pass_callbacks = [*callbacks, handler]
+                built = None
                 try:
+                    protected = set(pack.input_files)
+                    if pack.name in ("task-breakdown", "sprint-planning", "work-allocation", "infra-pipeline"):
+                        protected.update(("phase4/history.json", "phase4/skill-profiles.json", "phase4/agent-outcomes.json", "phase4/ci-readiness.json", "phase4/committed-work.json"))
+                        managed_outputs.set(frozenset(("backlog/backlog.json", "backlog/features.json", "backlog/enrichments.json",
+                            "sprint/sprint-plan.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json")))
+                    active_inputs.set(frozenset(protected))
                     built = build_agent(p, level[p.name])
                     with perf.span("graph", f"{p.name}-{kind}") as gs:
-                        state = await _stream(built, message, pass_callbacks, f"{p.name}-{kind}")
+                        deadline_s = float(os.environ.get("AGENT_ENGINE_PASS_TIMEOUT_SECONDS", "1800"))
+                        state = await asyncio.wait_for(_stream(built, message, pass_callbacks, f"{p.name}-{kind}"), timeout=deadline_s)
                         gs.set(messages=len(state.get("messages", [])) if isinstance(state, dict) else None)
                     entry["ok"] = True
                     return state
@@ -296,12 +328,21 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                     entry.update(ok=False, error=str(e))
                     if handler is not None:
                         ps.set(open_model_or_tool_runs=handler.open_runs())
+                    if kind == "verify" and type(e).__name__ in ("StructuredOutputValidationError", "MultipleStructuredOutputsError") and schema_retries < 1:
+                        schema_retries += 1
+                        ps.set_status("error", str(e), "structured_output")
+                        message += "\nYour previous verdict was invalid or truncated. Return one concise Verdict; no repeated evidence or file contents. Keep the summary under 1000 characters."
+                        continue
                     if level[p.name] + 1 >= len(p.models):
                         raise
                     ps.set_status("error", str(e), perf.classify_error(e))
                     level[p.name] += 1
                     logger.warning("%s %s pass failed on %s, retrying on %s: %s", p.name, kind, tier, p.models[level[p.name]], e)
                     print(f"\n[{p.name}: {tier} model failed ({e}); retrying on {p.models[level[p.name]]}]")
+
+                finally:
+                    if built is not None:
+                        await close_agent(built)
 
     try:
         state = await run_pass(pack, "write", _agent_message(pack, request, project_name, request_number))
@@ -318,11 +359,17 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
             for attempt in range(1, pack.max_fix_loops + 2):
                 report["loops"] = attempt
                 try:
-                    state = await run_pass(verifier, "verify", _verifier_message(pack, project_name))
-                    verdict = state.get("structured_response") if state else None
+                    deterministic, human_needed = _deterministic_gaps(pack.name, project_name)
+                    if deterministic:
+                        verdict = Verdict(satisfied=False, status_so_far="partial", gaps=deterministic,
+                                          summary="Deterministic checks found blocking issues before semantic review.")
+                    else:
+                        state = await run_pass(verifier, "verify", _verifier_message(pack, project_name))
+                        verdict = state.get("structured_response") if state else None
                     if not isinstance(verdict, Verdict):
                         raise RuntimeError("no structured verdict returned")
-                    passes[-1]["satisfied"] = verdict.satisfied
+                    if not deterministic:
+                        passes[-1]["satisfied"] = verdict.satisfied
                 except Exception as e:
                     logger.exception("verifier %s failed on attempt %d", verifier.name, attempt)
                     verdict = Verdict(
@@ -346,7 +393,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                 print(f"\n=== {verifier.name} verdict (attempt {attempt}): {verdict.status_so_far} ===\n{verdict.summary}")
                 for gap in verdict.gaps:
                     print(f"  - {gap}")
-                if verdict.satisfied or attempt > pack.max_fix_loops:
+                if verdict.satisfied or attempt > pack.max_fix_loops or human_needed:
                     break
                 # A failed verdict moves the fix pass one step up the escalation order.
                 if level[pack.name] + 1 < len(pack.models):
@@ -372,14 +419,18 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                   fixes=pass_counts.get("fix", 0))
         perf.event("usage_aggregate", pack.name, tokens=usage.usage_metadata,
                    note="UsageMetadataCallbackHandler totals for every pass of this stage (report.json 'tokens')")
-        save_run(OUTPUTS_DIR / project_name, job_id, outputs_before, report)
+        trace_host, job_log = None, current_job_log_path()
         report_path = OUTPUTS_DIR / project_name / REPORT_FILENAME
-        with perf.span("fs", "write_report"):
-            report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
-        with perf.span("diagnostics", "langfuse_flush"):
-            trace_host = flush_langfuse(langfuse)
-        job_log = current_job_log_path()
-        detach_job_log_handler()
+        try:
+            save_run(OUTPUTS_DIR / project_name, job_id, outputs_before, report)
+            with perf.span("fs", "write_report"):
+                atomic_json(report_path, report)
+        finally:
+            try:
+                with perf.span("diagnostics", "langfuse_flush"):
+                    trace_host = flush_langfuse(langfuse)
+            finally:
+                detach_job_log_handler()
 
     print(f"\nStatus: {report['status']}  |  time: {report['elapsed_seconds']}s")
     for p in passes:
@@ -392,6 +443,26 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
     if trace_host:
         print(f"Langfuse: {trace_host}")
     return exit_code
+
+
+def _deterministic_gaps(agent: str, project: str) -> tuple[list[str], bool]:
+    """A semantic reviewer is still required when the cheap checks pass."""
+    from agent_engine.phase4 import backlog, sprint, allocation, infra, files
+    checks = {"task-breakdown": lambda: backlog.validate_report(project, write=False),
+              "sprint-planning": lambda: sprint.check(project), "work-allocation": lambda: allocation.check(project),
+              "infra-pipeline": lambda: infra.check(project)}
+    if agent not in checks:
+        return [], False
+    result = json.loads(checks[agent]())
+    gaps = [x["message"] for x in result.get("blocking", [])] + result.get("problems", [])
+    human = False
+    if agent == "sprint-planning" and result.get("solver") == "INFEASIBLE":
+        gaps.append("The sprint plan is infeasible. An approver must choose an option or change the inputs before execution.")
+        human = True
+    if agent == "infra-pipeline":
+        manifest = files.read_json(project, files.INFRA_MANIFEST)
+        human = manifest.get("validation_complete") is False
+    return gaps, human
 
 
 def _add_inputs(files: list[str], project_name: str, round_number: int | None) -> int:
