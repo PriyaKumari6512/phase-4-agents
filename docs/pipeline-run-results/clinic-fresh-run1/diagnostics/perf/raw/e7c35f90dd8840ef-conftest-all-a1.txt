@@ -1,0 +1,8 @@
+$ conftest verify --policy .phase4-policies
+exit=0 timed_out=False
+--- stdout ---
+
+[32m9 tests, 9 passed, 0 warnings, 0 failures, 0 exceptions, 0 skipped[0m
+
+--- stderr ---
+

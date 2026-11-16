@@ -1,0 +1,17 @@
+{
+  "gate": "P4-G2",
+  "project": "clinic-test-2",
+  "decision": "approved",
+  "approver": {
+    "name": "Orchestrator (automated test approval)",
+    "role": "NOT a human sign-off"
+  },
+  "submitted_by": {
+    "name": "sprint-planning agent"
+  },
+  "decided_at": "2026-11-16T09:05:58+00:00",
+  "comment": "Automated test approval by the orchestrator (--test-approve), not a human review. Validator: success.",
+  "artifacts": {
+    "sprint/sprint-plan.json": "sha256:e2992adf58b014a43b0f7c7797f981c35f312396b52199557e801e09198a9d08"
+  }
+}

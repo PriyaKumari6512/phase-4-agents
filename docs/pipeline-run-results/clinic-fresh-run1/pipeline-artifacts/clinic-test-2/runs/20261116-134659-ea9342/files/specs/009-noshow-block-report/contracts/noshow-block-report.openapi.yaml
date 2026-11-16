@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: BrightSmile clinic API v1 - no-show block and report (feature 009 additions)
+  version: 1.0.0
+  description: >
+    Operations added to api-clinic-api-v1 by feature 009. All paths are under /api, use the
+    HttpOnly cookie session and the CSRF header on writes. All answer 404 while the Release 2
+    flag r2_noshow_block_report is off. These operations are merged into
+    contracts/clinic-api-v1.openapi.yaml.
+paths:
+  /api/booking-eligibility:
+    get:
+      summary: Can this person book or reschedule online at this clinic? (patient)
+      description: Used by the slot-picking and reschedule screens to show the block notice early. The server checks again on confirm.
+      parameters:
+        - name: patient_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+          description: A person in the signed-in patient's own account.
+        - name: clinic_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Eligibility
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [blocked]
+                properties:
+                  blocked: { type: boolean }
+                  clinic_phone: { type: string, description: Present when blocked. }
+        '403': { description: The person is not in the signed-in patient's account. }
+        '404': { description: Flag off. }
+  /api/patients/{patient_id}/no-show-block:
+    get:
+      summary: Block state of a patient (receptionist)
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Block state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [blocked]
+                properties:
+                  blocked: { type: boolean }
+                  blocked_at: { type: string, format: date-time, nullable: true }
+        '403': { description: Caller is not a receptionist. }
+        '404': { description: Unknown patient or flag off. }
+  /api/patients/{patient_id}/no-show-block/lift:
+    post:
+      summary: Lift the block (receptionist)
+      description: Starts the person's no-show count again from zero. Records the receptionist and the time.
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Lifted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lifted_at]
+                properties:
+                  lifted_at: { type: string, format: date-time }
+        '403': { description: Caller is not a receptionist. }
+        '404': { description: Unknown patient or flag off. }
+        '409': { description: The patient is not blocked, or the block was already lifted. }
+  /api/reports/no-shows:
+    get:
+      summary: Monthly no-shows per clinic for the last 12 months (practice manager only)
+      description: On screen only; there is no export operation.
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [months]
+                properties:
+                  months:
+                    type: array
+                    items:
+                      type: object
+                      required: [clinic_id, clinic_name, month, no_shows, not_cancelled]
+                      properties:
+                        clinic_id: { type: string, format: uuid }
+                        clinic_name: { type: string }
+                        month: { type: string, example: '2027-03', description: IST calendar month. }
+                        month_in_progress: { type: boolean }
+                        no_shows: { type: integer, minimum: 0 }
+                        not_cancelled: { type: integer, minimum: 0 }
+                        rate: { type: number, nullable: true, description: no_shows / not_cancelled; null when not_cancelled is 0. }
+        '403': { description: Caller is not the practice manager. }
+        '404': { description: Flag off. }
+components:
+  schemas:
+    OnlineBookingBlockedError:
+      type: object
+      description: >
+        Body of the HTTP 403 returned by the existing online booking confirm and online
+        reschedule operations when the person is blocked.
+      required: [code, clinic_phone]
+      properties:
+        code: { type: string, enum: [ONLINE_BOOKING_BLOCKED] }
+        clinic_phone: { type: string }

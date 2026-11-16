@@ -1,0 +1,6 @@
+$ curl -sS -m 15 -o /dev/null https://registry.opentofu.org/.well-known/terraform.json
+exit=0 timed_out=False
+--- stdout ---
+
+--- stderr ---
+

@@ -1,0 +1,243 @@
+openapi: 3.0.3
+info:
+  title: BrightSmile Clinic API - identity operations (excerpt of api-clinic-api-v1)
+  version: 1.0.0
+  description: >
+    Operations of cmp-identity. Merged into contracts/clinic-api-v1.openapi.yaml.
+    Session is a signed JWT in an HttpOnly, Secure, SameSite=Strict cookie. Every write needs the
+    X-CSRF-Token header and a matching Origin. No response carries more personal data than needed.
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: bs_session
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string, description: "e.g. code_wrong, code_expired, locked, throttled, send_failed, invalid_credentials, forbidden, not_found, weak_password, username_taken, last_manager"}
+        message: {type: string}
+        retry_after_seconds: {type: integer}
+    Me:
+      type: object
+      required: [kind, role]
+      properties:
+        kind: {type: string, enum: [patient, staff]}
+        role: {type: string, enum: [patient, receptionist, dentist, manager]}
+        name: {type: string}
+        clinic_id: {type: string, format: uuid, nullable: true}
+    StaffAccount:
+      type: object
+      required: [id, username, name, role, active]
+      properties:
+        id: {type: string, format: uuid}
+        username: {type: string}
+        name: {type: string}
+        role: {type: string, enum: [receptionist, dentist]}
+        clinic_id: {type: string, format: uuid, nullable: true}
+        dentist_id: {type: string, format: uuid, nullable: true}
+        active: {type: boolean}
+    StaffCreate:
+      type: object
+      required: [username, name, role, password]
+      properties:
+        username: {type: string}
+        name: {type: string}
+        role: {type: string, enum: [receptionist, dentist]}
+        clinic_id: {type: string, format: uuid, description: "required for receptionist"}
+        dentist_id: {type: string, format: uuid, description: "required for dentist"}
+        password: {type: string, minLength: 10}
+    PatientAccountSummary:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        phone: {type: string}
+        active: {type: boolean}
+paths:
+  /auth/patient/code:
+    post:
+      summary: Send a sign-in code by SMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [phone], properties: {phone: {type: string}}}
+      responses:
+        "204": {description: Code sent}
+        "429": {description: Locked, per-phone/per-IP throttled or daily cap reached, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "502": {description: Code could not be sent, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+  /auth/patient/verify:
+    post:
+      summary: Verify the code; signs in an existing patient, or asks a new patient for a name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [phone, code], properties: {phone: {type: string}, code: {type: string}}}
+      responses:
+        "200":
+          description: Signed in (needs_name false) or verified new number (needs_name true, registration cookie set)
+          content:
+            application/json:
+              schema: {type: object, required: [needs_name], properties: {needs_name: {type: boolean}}}
+        "400": {description: code_wrong or code_expired, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "429": {description: Locked for 15 minutes, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+  /auth/patient/register:
+    post:
+      summary: Create the account for a verified new number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [name], properties: {name: {type: string, minLength: 1}}}
+      responses:
+        "201": {description: Account created and signed in, content: {application/json: {schema: {$ref: "#/components/schemas/Me"}}}}
+        "400": {description: Empty name or no valid verification, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+  /auth/staff/login:
+    post:
+      summary: Staff sign-in with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [username, password], properties: {username: {type: string}, password: {type: string}}}
+      responses:
+        "200": {description: Signed in, content: {application/json: {schema: {$ref: "#/components/schemas/Me"}}}}
+        "401": {description: invalid_credentials (same answer for unknown user, wrong password, deactivated), content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "429": {description: Locked for 15 minutes, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+  /auth/staff/password:
+    post:
+      summary: Change own password
+      security: [{session: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [current_password, new_password], properties: {current_password: {type: string}, new_password: {type: string, minLength: 10}}}
+      responses:
+        "204": {description: Changed}
+        "400": {description: weak_password or wrong current password, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+  /auth/logout:
+    post:
+      summary: End the session
+      security: [{session: []}]
+      responses:
+        "204": {description: Signed out}
+  /auth/me:
+    get:
+      summary: Who is signed in (current role, clinic and active flag from the database)
+      security: [{session: []}]
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Me"}}}}
+        "401": {description: Not signed in}
+  /staff:
+    get:
+      summary: List staff accounts (manager only)
+      security: [{session: []}]
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/StaffAccount"}}}}}
+        "403": {description: Not the manager}
+    post:
+      summary: Create a receptionist or dentist account (manager only)
+      security: [{session: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/StaffCreate"}
+      responses:
+        "201": {description: Created, content: {application/json: {schema: {$ref: "#/components/schemas/StaffAccount"}}}}
+        "400": {description: weak_password or invalid fields, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "403": {description: Not the manager}
+        "409": {description: username_taken, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+  /staff/{staff_id}:
+    patch:
+      summary: Change name or clinic assignment (manager only)
+      security: [{session: []}]
+      parameters: [{name: staff_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, properties: {name: {type: string}, clinic_id: {type: string, format: uuid}}}
+      responses:
+        "200": {description: Updated, content: {application/json: {schema: {$ref: "#/components/schemas/StaffAccount"}}}}
+        "403": {description: Not the manager}
+        "404": {description: Not found}
+  /staff/{staff_id}/deactivate:
+    post:
+      summary: Deactivate an account (manager only)
+      security: [{session: []}]
+      parameters: [{name: staff_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Deactivated, content: {application/json: {schema: {$ref: "#/components/schemas/StaffAccount"}}}}
+        "403": {description: Not the manager}
+        "409": {description: last_manager}
+  /staff/{staff_id}/activate:
+    post:
+      summary: Reactivate an account (manager only)
+      security: [{session: []}]
+      parameters: [{name: staff_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Activated, content: {application/json: {schema: {$ref: "#/components/schemas/StaffAccount"}}}}
+        "403": {description: Not the manager}
+  /staff/{staff_id}/password:
+    post:
+      summary: Set a new password for a staff account (manager only)
+      security: [{session: []}]
+      parameters: [{name: staff_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [new_password], properties: {new_password: {type: string, minLength: 10}}}
+      responses:
+        "204": {description: Set}
+        "400": {description: weak_password}
+        "403": {description: Not the manager}
+  /patients/search:
+    get:
+      summary: Find patient accounts by phone number or name (receptionist, manager)
+      security: [{session: []}]
+      parameters: [{name: q, in: query, required: true, schema: {type: string, minLength: 3}}]
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/PatientAccountSummary"}}}}}
+        "403": {description: Role not allowed}
+  /patient-accounts/{account_id}/deactivate:
+    post:
+      summary: Deactivate a patient account (receptionist, manager)
+      security: [{session: []}]
+      parameters: [{name: account_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "204": {description: Deactivated}
+        "403": {description: Role not allowed}
+        "404": {description: Not found}
+  /patient-accounts/{account_id}/reactivate:
+    post:
+      summary: Reactivate a patient account (manager only)
+      security: [{session: []}]
+      parameters: [{name: account_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "204": {description: Reactivated}
+        "403": {description: Not the manager}
+  /patient-accounts/{account_id}/erasure:
+    get:
+      summary: Erasure preview, with number of future appointments (manager only)
+      security: [{session: []}]
+      parameters: [{name: account_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {type: object, properties: {future_appointments: {type: integer}, erasure_requested_at: {type: string, format: date-time, nullable: true}, erased_at: {type: string, format: date-time, nullable: true}}}}}}
+        "403": {description: Not the manager}
+    post:
+      summary: Record an erasure request and start erasure (manager only)
+      security: [{session: []}]
+      parameters: [{name: account_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "202": {description: Request recorded; completed within 30 days}
+        "403": {description: Not the manager}
+        "404": {description: Not found}

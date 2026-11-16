@@ -1,0 +1,99 @@
+{
+  "cloud": "aws",
+  "regions": [
+    "ap-south-1"
+  ],
+  "environments": [
+    "dev",
+    "stg",
+    "prod"
+  ],
+  "deploy_target": "kubernetes",
+  "components": [
+    {
+      "component_id": "ctr-clinic-api",
+      "name": "clinic-api",
+      "kind": "service",
+      "needs": [
+        "k8s_workload",
+        "public_endpoint",
+        "container_registry"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": true,
+      "data_classification": "confidential",
+      "runtime": "python3.12",
+      "repo": "brightsmile/clinic-api",
+      "depends_on": [
+        "ctr-db"
+      ],
+      "secrets": [
+        "JWT_SIGNING_KEY",
+        "SMS_PROVIDER_API_KEY",
+        "SMS_WEBHOOK_HMAC_SECRET",
+        "WHATSAPP_PROVIDER_API_KEY",
+        "WHATSAPP_WEBHOOK_HMAC_SECRET"
+      ],
+      "source": "architecture.md sections 4 (containers), 8 (deployment), 9 (data protection and secrets), 10 (capacity)"
+    },
+    {
+      "component_id": "ctr-db",
+      "name": "db",
+      "kind": "database",
+      "needs": [
+        "postgres"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "restricted",
+      "runtime": "postgresql16",
+      "repo": null,
+      "depends_on": [],
+      "secrets": [],
+      "source": "architecture.md sections 4, 5 (backup RPO/RTO), 10 (capacity: small tier)"
+    },
+    {
+      "component_id": "ctr-web",
+      "name": "web",
+      "kind": "frontend",
+      "needs": [
+        "object_storage",
+        "cdn"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": false,
+      "data_classification": "public",
+      "runtime": "node-react-spa",
+      "repo": "brightsmile/clinic-web",
+      "depends_on": [
+        "ctr-clinic-api"
+      ],
+      "secrets": [],
+      "source": "architecture.md sections 4 (ctr-web, static SPA on CDN), 8 (static site bucket and CDN)"
+    }
+  ],
+  "slos": {
+    "slots_latency": "95% of free-slot requests within 2 s (server p95 <= 500 ms), per month",
+    "booking_latency": "95% of booking confirmations within 3 s (server p95 <= 800 ms), per month",
+    "online_availability": "99.5% online booking availability per month (probe every minute: health, slot read)",
+    "reception_availability": "99.5% of 08:00-20:00 Mon-Sat hours per month",
+    "reminder_timeliness": "99% of reminders sent within 15 minutes of scheduled time per month",
+    "reminder_cancelled": "0 reminders sent for cancelled appointments per month"
+  },
+  "monthly_budget_usd": null,
+  "notes": [
+    "Architecture section 8 / ADR-0005 chooses a managed container service (not Kubernetes); the golden-path catalog only renders Kubernetes (EKS) workloads, so deploy_target=kubernetes is the closest catalog option. Platform team must confirm or provide a container-service template.",
+    "Region ap-south-1 (Mumbai) is the allowed India region (CON-004, CON-008).",
+    "Prod: 2 API replicas across two zones, autoscale 2-4 on CPU above 60%; Multi-AZ PostgreSQL with synchronous standby. Dev and stg: single-node database, 1 API replica.",
+    "DB: PostgreSQL 16 with btree_gist extension (created by the API's migrations), backups kept 14 days with point-in-time restore, RPO 15 min, RTO 1 h, encrypted at rest.",
+    "No cache, queue or broker by design (ADR-0002). The reminder dispatcher and scheduled jobs run inside the API process; there is no worker.",
+    "ctr-web is a static SPA built and published separately to a bucket behind a CDN with WAF routing /api to the API; the catalog has no CDN/WAF template.",
+    "DNS name and certificate are provided by the clinic (DEP-004).",
+    "No monthly budget is stated in architecture.md.",
+    "SMS/WhatsApp provider accounts belong to the clinic; staging uses sandbox provider accounts.",
+    "API listens on port 8000 and serves GET /health (architecture section 13)."
+  ]
+}

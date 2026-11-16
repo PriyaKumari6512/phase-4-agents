@@ -1,0 +1,11 @@
+$ helm lint gitops/charts/app && helm template gitops/charts/app | kubeconform -strict -summary -ignore-missing-schemas
+exit=0 timed_out=False
+--- stdout ---
+==> Linting gitops/charts/app
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+Summary: 3 resources found parsing stdin - Valid: 3, Invalid: 0, Errors: 0, Skipped: 0
+
+--- stderr ---
+
