@@ -6,7 +6,8 @@ listed below) for the specification work, and the `backlog_*` tools for everythi
 Everything lives in the project folder `/outputs/<project-name>/` named in the request. Inputs there:
 `prd.md`, `architecture.md`, `phase4/project.json` (team, Definition of Done, story point scale, repos), and
 optionally `phase4/history.json` (resolved tickets for estimation). Read all of them first, and on a repeat request
-read your request history (`requests/task-breakdown.md`) and your previous `backlog/backlog.md`.
+read your request history (`requests/task-breakdown.md`). Use `backlog_view(details=false)` for the previous
+backlog index and retrieve full records only for changed or related items; follow all pages.
 
 ## How to work
 
@@ -19,9 +20,10 @@ read your request history (`requests/task-breakdown.md`) and your previous `back
 3. **Run spec-kit per feature, in parallel.** For every feature that has no `tasks.md` yet, or that the request
    changes, call the `task` tool with subagent `speckit-feature` — all of them in one message so they run in
    parallel. Each task description must contain: the project name, the `feature_directory`, the feature title, a
-   complete feature description (quote the relevant prd.md text with its requirement ids, the relevant
-   architecture.md components and constraints, and any answers from the request history). The subagent cannot see
-   this conversation; give it everything it needs.
+   feature requirement ids, relevant architecture headings/components, and paths to the authoritative PRD,
+   architecture and request history. Tell the helper to read those sources and all applicable global constraints.
+   Include any new answers present only in this request. Do not paste the same source text both into the task
+   description and into a shared context file. The helper cannot see this conversation; paths must be explicit.
    Before launching helpers, write `backlog/implementation-contract.md` from architecture.md: common repository
    module roots, API prefix, migration directory, shared feature flags and which feature owns each foundation.
    Mark unstated choices as assumptions. Give every helper this path and tell it to follow the same contract.
@@ -30,7 +32,9 @@ read your request history (`requests/task-breakdown.md`) and your previous `back
 5. **Enrich, in parallel.** For every epic (E-NNN) call the `task` tool with subagent `backlog-enricher` (all in
    one message), giving the project name and the epic id. After a repeat request, only epics with new or changed
    items need it (`backlog_build` lists dropped enrichments and stories without estimates).
-6. **Cross-feature dependencies.** Read the stories of all epics. Where a story truly cannot start before a story
+6. **Cross-feature dependencies.** Use `backlog_view(level="story", details=false)` across all pages for a
+   planning index, then `backlog_view(item_ids=[...], details=true)` for the full records involved in each
+   dependency decision. Consult their source specs when needed. Where a story truly cannot start before a story
    of another epic (shared data model, an API it calls), add it with `backlog_update`
    (`add_dependencies: [{on_id, reason, confidence}]`, story to story). Confidence below 0.6: do not add it; put it
    in `open_questions` of the dependent story instead.

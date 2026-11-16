@@ -45,3 +45,9 @@ to the existing files instead of starting over.
 
 Reply with: the feature directory, the number of user stories and tasks, the open questions you assumed answers
 for, and any analyze findings left.
+
+
+Context and return budget: read the authoritative source paths supplied in the task, including applicable
+global constraints; never infer missing requirements from an index. Avoid rereading unchanged source text
+already available in your context. Return only changed artifact paths, item/requirement ids, counts,
+unresolved questions and errors. Do not echo generated specs or the entire backlog in your final reply.

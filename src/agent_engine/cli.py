@@ -181,17 +181,19 @@ def verdict_status(verdict: Verdict) -> tuple[str, str | None]:
     return verdict.status_so_far, None
 
 
-async def _run(request: str, agent_name: str, project_name: str) -> int:
+async def _run(request: str, agent_name: str, project_name: str, resume_verification: bool = False) -> int:
     if not _PROJECT_NAME_RE.fullmatch(project_name):
         raise ValueError("invalid project name")
     with project_scope(project_name), project_lock(OUTPUTS_DIR / project_name):
+        if resume_verification:
+            return await _owned_run(request, agent_name, project_name, resume_verification=True)
         return await _owned_run(request, agent_name, project_name)
 
 
-async def _owned_run(request: str, agent_name: str, project_name: str) -> int:
+async def _owned_run(request: str, agent_name: str, project_name: str, resume_verification: bool = False) -> int:
     with perf.span("stage", agent_name, agent=agent_name, project=project_name,
                    invocation_id=os.environ.get(perf.ENV_INVOCATION)) as stage:
-        code = await _run_stage(request, agent_name, project_name, stage)
+        code = await _run_stage(request, agent_name, project_name, stage, resume_verification=resume_verification)
         stage.set(exit_code=code)
         if code:
             stage.set_status("failed", category="exit_code")
@@ -205,7 +207,15 @@ def _model_tiers() -> dict[str, str]:
         return {}
 
 
-async def _run_stage(request: str, agent_name: str, project_name: str, stage) -> int:
+async def _run_stage(request: str, agent_name: str, project_name: str, stage, resume_verification: bool = False) -> int:
+    from agent_engine import verification_resume
+    resumed_from = None
+    if resume_verification:
+        try:
+            resumed_from = verification_resume.validate(OUTPUTS_DIR / project_name, agent_name, request)
+        except (ValueError, OSError) as exc:
+            print(f"ERROR: {exc}")
+            return 1
     with perf.span("phase", "preflight") as pre:
         try:  # fail on a bad pack (or its verifier) before any model call
             pack = load_pack(agent_name)
@@ -279,6 +289,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
     report: dict = {
         "job_id": job_id, "agent": pack.name, "project": project_name, "request": request_number, "request_text": request,
     }
+    if resumed_from:
+        report["verification_resumed_from"] = resumed_from
     # Stamped so the orchestrator can tell this run's report from an older one (orchestrator.run_agent).
     if os.environ.get(perf.ENV_INVOCATION):
         report["invocation_id"] = os.environ[perf.ENV_INVOCATION]
@@ -315,7 +327,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                     if pack.name in ("task-breakdown", "sprint-planning", "work-allocation", "infra-pipeline"):
                         protected.update(("phase4/history.json", "phase4/skill-profiles.json", "phase4/agent-outcomes.json", "phase4/ci-readiness.json", "phase4/committed-work.json"))
                         managed_outputs.set(frozenset(("backlog/backlog.json", "backlog/features.json", "backlog/enrichments.json",
-                            "sprint/sprint-plan.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json")))
+                            "sprint/sprint-plan.json", "sprint/solver-diagnostics.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json")))
                     active_inputs.set(frozenset(protected))
                     built = build_agent(p, level[p.name])
                     with perf.span("graph", f"{p.name}-{kind}") as gs:
@@ -345,7 +357,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                         await close_agent(built)
 
     try:
-        state = await run_pass(pack, "write", _agent_message(pack, request, project_name, request_number))
+        verification_resume.checkpoint_path(OUTPUTS_DIR / project_name, agent_name).unlink(missing_ok=True)
+        state = None if resumed_from else await run_pass(pack, "write", _agent_message(pack, request, project_name, request_number))
         report["agent_reply"] = _text(state["messages"][-1].content) if state and state.get("messages") else None
         print(report["agent_reply"] or "(agent produced no reply)")
         # A declared output that wasn't written is a failed run, not something to pay a verifier for.
@@ -377,6 +390,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage) ->
                         summary="The verifier could not complete this attempt; the output was not judged.",
                     )
                     report.update(status="partial", verified=False, verdict=verdict.model_dump())
+                    if not _missing(project_name, pack.output_files):
+                        verification_resume.save(OUTPUTS_DIR / project_name, agent_name, request, job_id)
                     perf.event("verdict", verifier.name, attempt=attempt, verifier_failed=True,
                                error=perf.error_summary(e))
                     print(f"\n=== {verifier.name} failed (attempt {attempt}): {e} ===")
@@ -514,6 +529,8 @@ def main() -> None:
     run_parser.add_argument("request", help="The request: a requirement, or feedback on an earlier output.")
     run_parser.add_argument("--agent", required=True, help="Agent pack name (see `list`).")
     run_parser.add_argument("--project-name", required=True, help="Output folder under outputs/ (a-z, 0-9, -).")
+    run_parser.add_argument("--resume-verification", action="store_true",
+                            help="Retry a failed verifier without regeneration; requires unchanged checkpoint and request.")
     inputs_parser = sub.add_parser("add-inputs", help="Add client files to a project's inputs/round-N/.")
     inputs_parser.add_argument("files", nargs="+", help="Files to add (PDF, images, Word, Excel, PowerPoint, email, text).")
     inputs_parser.add_argument("--project-name", required=True, help="Output folder under outputs/ (a-z, 0-9, -).")
@@ -579,6 +596,8 @@ def _dispatch(args: argparse.Namespace) -> int | None:
     if args.command == "gate":
         approver = {"name": args.approver, **({"role": args.approver_role} if args.approver_role else {})}
         raise SystemExit(_gate(args.gate, args.project_name, args.decision, approver, {"name": args.submitted_by}, args.comment))
+    if args.resume_verification:
+        raise SystemExit(asyncio.run(_run(args.request, args.agent, args.project_name, resume_verification=True)))
     raise SystemExit(asyncio.run(_run(args.request, args.agent, args.project_name)))
 
 

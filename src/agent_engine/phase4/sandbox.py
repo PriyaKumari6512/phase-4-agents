@@ -30,6 +30,8 @@ import re
 import shlex
 import time
 import sys
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -101,11 +103,14 @@ def _exec(cmd: str, workdir: Path, use_docker: bool, timeout: int = 300, *, tool
         # In Docker the cache is a named volume: provider binaries cannot run from a Windows bind mount.
         if use_docker:
             uid, gid = _sandbox_identity()
-            volume = _cache_volume(workdir)
-            _ensure_cache_volume(volume, uid, gid, get_settings().phase4_iac_sandbox_image)
+            cache_args = []
+            if tool == "tofu_validate":
+                volume = _cache_volume(workdir)
+                _ensure_cache_volume(volume, uid, gid, get_settings().phase4_iac_sandbox_image)
+                cache_args = ["-v", f"{volume}:/tofu-cache", "-e", "TF_PLUGIN_CACHE_DIR=/tofu-cache"]
             full = ["docker", "run", "--rm", "--name", name, "--network", "bridge", "-v", f"{workdir.resolve()}:/work",
                     "--user", f"{uid}:{gid}", "-e", "HOME=/tmp/phase4-home",
-                    "-v", f"{volume}:/tofu-cache", "-e", "TF_PLUGIN_CACHE_DIR=/tofu-cache",
+                    *cache_args,
                     "-e", "TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE=true",
                 "-w", "/work", get_settings().phase4_iac_sandbox_image, "bash", "-o", "pipefail", "-c",
                 "mkdir -p /tmp/phase4-home && " + cmd]
@@ -149,9 +154,9 @@ def _sandbox_identity() -> tuple[int, int]:
 
 
 def _cache_volume(workdir: Path) -> str:
-    # OpenTofu's shared provider cache is not safe for concurrent writers.
-    # Validation holds the source-specific workspace lease across all envs.
-    key = hashlib.sha256(str(workdir.resolve()).encode()).hexdigest()[:20]
+    # One volume per cache root/user, protected by the provider-cache lease.
+    # Scanner snapshots must not create an unbounded number of Docker volumes.
+    key = hashlib.sha256(str(Path(get_settings().phase4_iac_cache_dir).resolve()).encode()).hexdigest()[:20]
     return f"phase4-tofu-{_sandbox_identity()[0]}-{key}"
 
 
@@ -235,7 +240,11 @@ def run_checks(workdir: Path, envs: list[str], *, include_init: bool = True,
             raise ValueError("PHASE4_IAC_TOTAL_BUDGET_SECONDS must be between 1 and 7200")
         token = _budget_deadline.set(time.monotonic() + budget)
         try:
-            results = _run_checks(workdir, envs, tools, include_init, use_docker)
+            workers = int(os.environ.get("PHASE4_IAC_CHECK_CONCURRENCY", "1"))
+            if not 1 <= workers <= 4:
+                raise ValueError("PHASE4_IAC_CHECK_CONCURRENCY must be between 1 and 4")
+            results = (_parallel_checks(workdir, envs, tools, include_init, use_docker, workers)
+                       if workers > 1 else _run_checks(workdir, envs, tools, include_init, use_docker))
         finally:
             _budget_deadline.reset(token)
         sp.set(outcomes={r.tool: r.outcome for r in results})
@@ -268,11 +277,46 @@ def _run_checks(workdir: Path, envs: list[str], tools: list[str], include_init: 
                     results.append(_check("tofu_fmt", "findings", passed=False, summary="fmt diff",
                                           findings=[Finding(rule_id="fmt", severity="low", message=r.display()[-3000:])]))
             if include_init and want("tofu_validate"):
-                results.append(_validate_envs(workdir, envs, use_docker))
+                try:
+                    results.append(_validate_envs(workdir, envs, use_docker))
+                except TimeoutError:
+                    results.append(_check("tofu_validate", "timeout", passed=False, skipped=True,
+                                          summary="validation budget exhausted waiting for provider-cache lease"))
         else:
             results += [skipped(t) for t in ("tofu_fmt", "tofu_validate") if want(t)]
     results += _other_checks(workdir, use_docker, want, skipped)
     return results
+
+
+def _parallel_checks(workdir: Path, envs: list[str], tools: list[str], include_init: bool,
+                     use_docker: bool, workers: int) -> list[CheckResult]:
+    """Each scanner sees the same bytes and owns its temporary files; ordered results."""
+    def digest():
+        return {p.relative_to(workdir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in workdir.rglob("*") if p.is_file() and not p.name.startswith(".engine-")}
+    if any(p.is_symlink() for p in workdir.rglob("*")):
+        raise ValueError("parallel checks require a workdir without symlinks")
+    before = digest()
+    groups = [[t for t in tools if t.startswith("tofu_")]] + [[t] for t in tools if not t.startswith("tofu_")]
+    groups = [g for g in groups if g]
+    with tempfile.TemporaryDirectory(prefix="phase4-scans-") as temp:
+        frozen = Path(temp) / "source"
+        shutil.copytree(workdir, frozen)
+        def check(group):
+            # Only active workers allocate a copy, bounding simultaneous disk use.
+            with tempfile.TemporaryDirectory(dir=temp, prefix="worker-") as worker:
+                target = Path(worker) / "source"
+                shutil.copytree(frozen, target)
+                return _run_checks(target, envs, group, include_init, use_docker)
+        if digest() != before:
+            raise ValueError("infrastructure changed while taking scanner snapshot; retry")
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="iac-check") as pool:
+            futures = [pool.submit(contextvars.copy_context().run, check, group) for group in groups]
+            results = [item for future in futures for item in future.result()]
+    if digest() != before:
+        return [_check(t, "execution_error", passed=False,
+                       summary="source changed during validation; results discarded; retry") for t in tools]
+    return sorted(results, key=lambda r: tools.index(r.tool))
 
 
 def _validate_envs(workdir: Path, envs: list[str], use_docker: bool) -> CheckResult:
@@ -285,14 +329,25 @@ def _validate_envs(workdir: Path, envs: list[str], use_docker: bool) -> CheckRes
                and not any(x in (".terraform", ".git") or x.startswith(".engine-") for x in p.relative_to(workdir).parts)]
     for p in sorted(sources, key=lambda p: p.relative_to(workdir).as_posix()):
         h.update(p.relative_to(workdir).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
-    cache = Path(get_settings().phase4_iac_cache_dir) / "validation" / h.hexdigest()
-    with project_lock(cache, "validation"):
+    cache_root = Path(get_settings().phase4_iac_cache_dir)
+    cache = cache_root / "validation" / h.hexdigest()
+    # All validation initializations share the host plugin cache. Its lease also
+    # serializes retention so no in-use directory or lock inode can be removed.
+    remaining = max(0, (_budget_deadline.get() or time.monotonic() + 900) - time.monotonic())
+    with project_lock(cache_root, "provider-cache", timeout=remaining), project_lock(cache, "validation"):
+        from agent_engine.phase4.cache_retention import prune_validation_cache
+        prune_validation_cache(cache_root, keep=cache)
         for p in sources:
             dest = cache / p.relative_to(workdir)
             dest.parent.mkdir(parents=True, exist_ok=True)
             if not dest.is_file() or dest.read_bytes() != p.read_bytes():
                 shutil.copyfile(p, dest)
-        return _validate_cached_envs(cache, envs, use_docker)
+        marker = cache / ".engine-cache-owned"
+        marker.write_text("phase4-validation-v1\n", encoding="utf-8")
+        try:
+            return _validate_cached_envs(cache, envs, use_docker)
+        finally:
+            marker.touch()
 
 
 def _validate_cached_envs(workdir: Path, envs: list[str], use_docker: bool) -> CheckResult:

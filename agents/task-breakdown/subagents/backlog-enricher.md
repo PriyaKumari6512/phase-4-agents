@@ -32,3 +32,9 @@ For every task of the epic:
 
 Never invent facts. Reply with the number of stories and tasks you updated, total story points, and anything you
 could not decide.
+
+
+Context and return budget: read the authoritative source paths supplied in the task, including applicable
+global constraints; never infer missing requirements from an index. Avoid rereading unchanged source text
+already available in your context. Return only changed artifact paths, item/requirement ids, counts,
+unresolved questions and errors. Do not echo generated specs or the entire backlog in your final reply.

@@ -197,6 +197,12 @@ def solve(project: str, business_values: dict[str, int], pins: dict[str, int] | 
     perf.event("solver_input", "sprint", stories=len(stories), sprints=len(sprints), deadlines=len(deadlines),
                pins=len(pins), relaxations=len(relax), excluded=len(excluded))
     res = cpsat_solve(stories, sprints, deadlines, time_limit_s=time_limit_s)
+    from agent_engine.phase4.sprint_model import diagnostics
+    diagnostic = diagnostics(stories, sprints, deadlines, res)
+    diagnostic.update(backlog_sha256=files.file_sha(project, files.BACKLOG),
+                      settings_sha256=files.file_sha(project, files.PROJECT_SETTINGS),
+                      generated_at=files.utcnow(), as_of=as_of_d.isoformat(), candidates=[])
+    files.write_json(project, "sprint/solver-diagnostics.json", diagnostic)
     if res.status not in ("OPTIMAL", "FEASIBLE", "INFEASIBLE"):
         # UNKNOWN (time limit without a solution) or MODEL_INVALID: neither a plan nor a proof that none exists.
         # Writing it would replace the last valid plan with one that defers every story for no stated reason.
@@ -209,7 +215,9 @@ def solve(project: str, business_values: dict[str, int], pins: dict[str, int] | 
             f"the CP-SAT solver ended {res.status} after {res.wall_time_s}s (time limit {time_limit_s}s) without a plan "
             f"or a proof of infeasibility; sprint/sprint-plan.json was not changed and {kept}. Nothing was relaxed. "
             "Tell the approver; do not present an empty plan.")
-    options = verified_options(stories, sprints, deadlines, res.conflicting) if res.status == "INFEASIBLE" else []
+    options = (verified_options(stories, sprints, deadlines, res.conflicting, audit=diagnostic["candidates"])
+               if res.status == "INFEASIBLE" else [])
+    files.write_json(project, "sprint/solver-diagnostics.json", diagnostic)
     placement = res.placement or {s.story_id: 0 for s in stories}
     deferred = []
     for s in stories:

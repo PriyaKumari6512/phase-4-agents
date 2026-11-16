@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import json
+import hashlib
 from typing import Callable
 
 from langchain_core.tools import tool
@@ -30,7 +31,14 @@ def _run(name: str, fn: Callable[[], str]) -> str:
             logger.exception("phase4 tool failed")
             result = f"ERROR: {type(e).__name__}: {e}"
             sp.set_status("domain_error", result, "tool_exception:" + perf.classify_error(e))
-        sp.set(output_chars=len(result))
+        original_chars = len(result)
+        # Whitespace is not domain data. Keep every field and error, but avoid paying
+        # for pretty-printing these JSON responses on every subsequent model turn.
+        try:
+            result = json.dumps(json.loads(result), ensure_ascii=False, separators=(",", ":"))
+        except (ValueError, TypeError):
+            pass
+        sp.set(output_chars=len(result), original_output_chars=original_chars)
         return result
 
 
@@ -57,13 +65,23 @@ def speckit_script(project: str, script: str, script_args: str = "", feature_dir
 # ============================================================================ backlog (Agent 1)
 @tool
 def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: list[str] | None = None,
-                 offset: int = 0, limit: int = 100, details: bool = True) -> str:
+                 offset: int = 0, limit: int = 100, details: bool = True,
+                 max_chars: int = 24000, expected_sha256: str = "") -> str:
     """Read exact backlog records scoped to one epic, level or item IDs. Paginated; never silently truncates.
     Use details=false for a compact planning index; details=true includes every field of selected items.
+    Follow next_offset until null. max_chars bounds item payload (one oversized item is returned whole).
+    expected_sha256 optionally rejects pages from a changed snapshot; restart pagination if it changes.
     This avoids repeatedly reading the complete backlog JSON for one feature's work."""
     def view():
         from agent_engine.phase4.contracts import Backlog
-        b = files.read_json(project, files.BACKLOG, Backlog)
+        # Hash exactly the bytes parsed, not a second read that may race enrichment.
+        raw = files.path(project, files.BACKLOG).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        b = Backlog.model_validate_json(raw)
+        if expected_sha256 and expected_sha256 != digest:
+            raise files.ProjectError("backlog changed since the previous page; restart pagination")
+        if not 1000 <= max_chars <= 200000:
+            raise files.ProjectError("max_chars must be between 1000 and 200000")
         if offset < 0 or not 1 <= limit <= 200 or level not in ("", "epic", "story", "task"):
             raise files.ProjectError("offset must be >=0, limit 1..200, level epic/story/task or empty")
         children = {i.item_id for i in b.items if i.parent_id == epic_id}
@@ -71,9 +89,18 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
                 and (not level or i.level == level) and (not item_ids or i.item_id in item_ids)]
         page = rows[offset:offset + limit]
         compact = ("item_id", "level", "parent_id", "title", "priority", "moscow", "estimate", "dependencies", "source_refs", "open_questions")
-        return json.dumps({"backlog_sha256": files.file_sha(project, files.BACKLOG), "total": len(rows),
-                           "next_offset": offset + limit if offset + limit < len(rows) else None,
-                           "items": [i.model_dump(mode="json") if details else i.model_dump(mode="json", include=set(compact)) for i in page]})
+        selected, size = [], 2
+        for item in page:
+            value = item.model_dump(mode="json") if details else item.model_dump(mode="json", include=set(compact))
+            length = len(json.dumps(value, ensure_ascii=False, separators=(",", ":"))) + 1
+            if selected and size + length > max_chars:
+                break
+            selected.append(value)
+            size += length
+        end = offset + len(selected)
+        return json.dumps({"backlog_sha256": digest, "total": len(rows),
+                           "next_offset": end if end < len(rows) else None,
+                           "oversized_item": size > max_chars, "items": selected})
     return _run("backlog_view", view)
 
 

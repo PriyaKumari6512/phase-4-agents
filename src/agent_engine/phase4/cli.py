@@ -45,6 +45,8 @@ def add_parser(sub) -> None:
     o.add_argument("--project-name", required=True)
     o.add_argument("--sprint", type=int, default=1, help="Sprint Work Allocation assigns (default 1).")
     o.add_argument("--plan", action="store_true", help="Only show what would run; no model calls.")
+    o.add_argument("--parallel-independent", action="store_true",
+                   help="Overlap Task Breakdown and Infra in isolated workspaces when both need to run.")
     o.add_argument("--test-approve", action="store_true",
                    help="TEST ONLY: approve the gates itself (recorded as an automated test approval, not a human sign-off).")
     o.add_argument("--publish", action="store_true", help="When everything is approved, run phase4 publish for all four.")
@@ -83,7 +85,8 @@ def run(args: argparse.Namespace) -> int:
             return 0
         if args.phase4_command == "orchestrate":
             from agent_engine.phase4.orchestrator import orchestrate
-            return orchestrate(args.project_name, args.sprint, args.test_approve, args.publish, args.plan)
+            return orchestrate(args.project_name, args.sprint, args.test_approve, args.publish, args.plan,
+                               parallel_independent=getattr(args, "parallel_independent", False))
         if args.phase4_command == "schemas":
             out = Path(args.out)
             out.mkdir(parents=True, exist_ok=True)

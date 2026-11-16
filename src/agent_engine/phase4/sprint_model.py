@@ -69,6 +69,49 @@ class SolveResult:
     wall_time_s: float
     conflicting: list[str]
     sprint_load: dict[int, float]
+    proof: str | None = None
+
+
+def required_ids(stories, sprints, deadlines, relax: Relaxation) -> set[str]:
+    """Mandatory placement and dependency closure, matching the model switches."""
+    by = {s.story_id: s for s in stories}
+    K = len(sprints)
+    required = {s.story_id for s in stories
+                if (s.must and not s.wont and f"must:{s.story_id}" not in relax.drop_switches)
+                or (s.frozen_sprint is not None and 1 <= s.frozen_sprint <= K)
+                or (not (s.frozen_sprint is not None and 1 <= s.frozen_sprint <= K)
+                    and s.pinned_sprint is not None and 1 <= s.pinned_sprint <= K
+                    and f"pin:{s.story_id}->{s.pinned_sprint}" not in relax.drop_switches)}
+    for d in deadlines:
+        if d.hard and d.ref_id not in relax.soft_deadlines and f"deadline:{d.ref_id}" not in relax.drop_switches:
+            required.update(s for s in d.story_ids if s in by)
+    todo = list(required)
+    while todo:
+        for dep in by[todo.pop()].depends_on:
+            if dep in by and dep not in required:
+                required.add(dep)
+                todo.append(dep)
+    return required
+
+
+def diagnostics(stories, sprints, deadlines, result: SolveResult) -> dict:
+    required = required_ids(stories, sprints, deadlines, Relaxation())
+    demand = sum(round(s.points * SCALE) for s in stories if s.story_id in required)
+    capacity = sum(int(s.cap_p50 * SCALE) for s in sprints)
+    skills = sorted({k for s in stories for k in s.skill_hours})
+    return {"status": result.status, "wall_time_s": result.wall_time_s,
+            "objective": result.objective, "best_bound": result.best_bound,
+            "required_story_ids": sorted(required), "required_points_scaled": demand,
+            "capacity_points_scaled": capacity, "scale": SCALE,
+            "aggregate_deficit_points": max(0, demand - capacity) / SCALE,
+            "aggregate_bound_proves_infeasible": demand > capacity,
+            "conflicting_assumptions": result.conflicting,
+            "conflict_note": "Solver assumption core is sufficient, not necessarily minimal or the only cause.",
+            "skills": [{"skill": k, "required_hours": sum(s.skill_hours.get(k, 0) for s in stories if s.story_id in required),
+                        "bounded_in_all_sprints": all(k in s.skill_caps for s in sprints),
+                        "explicit_capacity_hours": sum(s.skill_caps.get(k, 0) for s in sprints)} for k in skills],
+            "dependency_edges": [[d, s.story_id] for s in stories for d in s.depends_on],
+            "limitations": "Bounds are necessary, not sufficient. Dependencies allow the same sprint; no task-duration critical path is inferred. UNKNOWN is not infeasibility."}
 
 
 def _status(code: int) -> str:
@@ -89,15 +132,11 @@ def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[Deadl
     ids = [s.story_id for s in stories]
     by_id = {s.story_id: s for s in stories}
     if not want_core:
-        required = {s.story_id for s in stories if (s.must and not s.wont and f"must:{s.story_id}" not in relax.drop_switches)
-                    or s.frozen_sprint is not None or (s.pinned_sprint and f"pin:{s.story_id}->{s.pinned_sprint}" not in relax.drop_switches)}
-        for d in deadlines:
-            if d.hard and d.ref_id not in relax.soft_deadlines and f"deadline:{d.ref_id}" not in relax.drop_switches:
-                required.update(s for s in d.story_ids if s in by_id)
+        required = required_ids(stories, sprints, deadlines, relax)
         # A necessary bound only: it can prove infeasibility, never declare feasibility.
-        if sum(by_id[s].points for s in required) > sum(s.cap_p50 * relax.capacity_factor for s in sprints) + 1e-6:
+        if sum(round(by_id[s].points * SCALE) for s in required) > sum(int(s.cap_p50 * relax.capacity_factor * SCALE) for s in sprints):
             perf.event("solver_pruned", "sprint.candidate", reason="required points exceed total capacity")
-            return SolveResult("INFEASIBLE", {}, None, None, 0.0, [], {})
+            return SolveResult("INFEASIBLE", {}, None, None, 0.0, [], {}, "required points exceed total scaled capacity")
     m = cp_model.CpModel()
     x = {(s.story_id, k): m.new_bool_var(f"x[{s.story_id},{k}]") for s in stories for k in range(K + 1)}
     sp, planned = {}, {}
@@ -219,7 +258,8 @@ def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[Deadl
                        wall_time_s=round(wall, 3), conflicting=conflicting, sprint_load=load)
 
 
-def verified_options(stories, sprints, deadlines, conflicting: list[str], time_limit_s: float = 5.0) -> list[dict]:
+def verified_options(stories, sprints, deadlines, conflicting: list[str], time_limit_s: float = 5.0,
+                     audit: list[dict] | None = None) -> list[dict]:
     """Candidate fixes for each conflicting switch; only those that make the model feasible are returned."""
     candidates: list[tuple[str, Relaxation, list[str], str]] = []
     for name in conflicting:
@@ -249,12 +289,18 @@ def verified_options(stories, sprints, deadlines, conflicting: list[str], time_l
                 res = solve(stories, sprints, deadlines, relax, time_limit_s=time_limit_s, want_core=False,
                             purpose="candidate")
                 sp.set(status=res.status, feasible=res.status in ("OPTIMAL", "FEASIBLE"))
+            if audit is not None:
+                audit.append({"changes": changes, "status": res.status, "wall_time_s": res.wall_time_s,
+                              "proof": res.proof, "time_limit_s": time_limit_s})
             if res.status in ("OPTIMAL", "FEASIBLE") and summary not in seen:
                 seen.add(summary)
                 deferred = [s for s, k in res.placement.items() if k == 0]
                 out.append({"option_id": f"OPT-{len(out) + 1}", "summary": summary, "changes": changes,
                             "impact": f"{impact}; {len(deferred)} stories left unplanned"})
             if len(out) >= 4:
+                if audit is not None:
+                    audit.extend({"changes": c[2], "status": "NOT_TESTED", "reason": "four feasible options found"}
+                                 for c in candidates[n:])
                 break
         group.set(attempts=attempts, verified=len(out))
     return out

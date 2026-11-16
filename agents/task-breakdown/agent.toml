@@ -17,7 +17,7 @@ description = "backlog/backlog.json (epics, stories, tasks with acceptance crite
 files = ["backlog/backlog.json", "backlog/backlog.md"]
 
 [subagents.speckit-feature]
-description = "Runs github spec-kit (specify, plan, tasks, analyze) for ONE feature. Task description must give: the project name, the feature_directory (specs/NNN-name), the feature title and its full description with the prd.md requirement ids it covers and the architecture components involved."
+description = "Runs github spec-kit (specify, plan, tasks, analyze) for ONE feature. Task description must give: project, feature_directory (specs/NNN-name), title, requirement ids, architecture components, authoritative source paths and any new request-only answers. The helper reads the relevant requirements and global constraints from those sources."
 prompt = "subagents/speckit-feature.md"
 
 [subagents.backlog-enricher]

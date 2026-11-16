@@ -31,15 +31,28 @@ class HelperLimitMiddleware(AgentMiddleware):
     """Bound task fan-out without serializing ordinary reads."""
     def __init__(self, limit: int | None = None):
         limit = limit if limit is not None else int(os.environ.get("AGENT_ENGINE_HELPER_CONCURRENCY", "9"))
-        if limit < 1:
-            raise ValueError("AGENT_ENGINE_HELPER_CONCURRENCY must be >= 1")
+        if not 1 <= limit <= 32:
+            raise ValueError("AGENT_ENGINE_HELPER_CONCURRENCY must be between 1 and 32")
+        self.limit = limit
+        self.active = 0
+        self.peak = 0
         self.slots = asyncio.Semaphore(limit)
 
     async def awrap_tool_call(self, request, handler):
         name = request.tool.name if request.tool else request.tool_call["name"]
         if name == "task":
+            started = time.perf_counter()
             async with self.slots:
-                return await handler(request)
+                acquired = time.perf_counter()
+                self.active += 1
+                self.peak = max(self.peak, self.active)
+                try:
+                    return await handler(request)
+                finally:
+                    self.active -= 1
+                    perf.event("concurrency", "helper_slot", limit=self.limit, peak=self.peak,
+                               active=self.active, wait_s=round(acquired - started, 6),
+                               hold_s=round(time.perf_counter() - acquired, 6))
         return await handler(request)
 
 # Module-level, not per-instance, so every subagent's own FileLockMiddleware

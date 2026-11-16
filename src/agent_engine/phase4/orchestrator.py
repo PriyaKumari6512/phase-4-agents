@@ -282,13 +282,18 @@ def read_child_report(report: Path, agent: str, invocation_id: str, exit_code: i
     return status, gaps, None
 
 
-def run_agent(agent: str, request: str, project: str) -> dict:
+def run_agent(agent: str, request: str, project: str, *, outputs_dir: Path | None = None,
+              logs_dir: Path | None = None) -> dict:
     """`agent-engine run` as a child process, output shown live.
     Returns {status, exit_code, rate_limited, gaps, invocation_id, report_problem}."""
     invocation_id = perf.new_id(24)
     cmd = [sys.executable, "-m", "agent_engine.cli", "run", request, "--agent", agent, "--project-name", project]
     with perf.span("child", agent, agent=agent, invocation_id=invocation_id) as sp:
         env = {**os.environ, "PYTHONIOENCODING": "utf-8", perf.ENV_INVOCATION: invocation_id, **perf.child_env(sp.id)}
+        if outputs_dir is not None:
+            env["AGENT_ENGINE_OUTPUTS_DIR"] = str(outputs_dir.resolve())
+        if logs_dir is not None:
+            env["AGENT_ENGINE_LOGS_DIR"] = str(logs_dir.resolve())
         t0 = time.perf_counter()
         proc = subprocess.Popen(
             cmd, cwd=config.ENGINE_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -304,7 +309,8 @@ def run_agent(agent: str, request: str, project: str) -> dict:
             tail = (tail + [line])[-80:]
         code = proc.wait()
         with perf.span("fs", "read_child_report"):
-            status, gaps, problem = read_child_report(_root(project) / "report.json", agent, invocation_id, code)
+            child_root = outputs_dir / project if outputs_dir is not None else _root(project)
+            status, gaps, problem = read_child_report(child_root / "report.json", agent, invocation_id, code)
         text = "".join(tail)
         rate_limited = any(m in text for m in RATE_LIMIT_MARKERS)
         sp.set(exit_code=code, report_status=status, report_problem=problem, first_output_s=first_output,
@@ -353,7 +359,7 @@ def _observe_approvals(root: Path, gates: dict[str, Gate]) -> None:
 
 def orchestrate(
     project: str, sprint: int = 1, test_approve: bool = False, publish: bool = False, plan_only: bool = False,
-    runner: Runner = run_agent, out: Callable[[str], None] = print,
+    runner: Runner = run_agent, out: Callable[[str], None] = print, parallel_independent: bool = False,
 ) -> int:
     pipeline_id = perf.new_id()
     perf.set_pipeline(pipeline_id)
@@ -371,7 +377,7 @@ def orchestrate(
                                 execution_mode="publication_authorized" if publish else "generation_only",
                                 extra={"test_approve": test_approve, "sprint": sprint})
         with project_lock(_root(project), "orchestrator"):
-            code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out)
+            code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out, parallel_independent)
         sp.set(exit_code=code, outcome={DONE: "done", FAILED: "failed", WAITING: "waiting"}.get(code, str(code)))
         if code == FAILED:
             sp.set_status("failed", category="pipeline_outcome")
@@ -379,7 +385,7 @@ def orchestrate(
 
 
 def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, plan_only: bool, runner: Runner,
-                 out: Callable[[str], None]) -> int:
+                 out: Callable[[str], None], parallel_independent: bool = False) -> int:
     with perf.span("orchestrator", "preflight"):
         root, gates = _root(project), load_gates()
         if not (root / PROJECT_FILE).is_file():
@@ -409,6 +415,29 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
                 out(f"\nSTOP {s.stage.agent}: {s.why}")
             return WAITING
         if runnable:
+            pair = [s for s in runnable if s.stage.agent in ("task-breakdown", "infra-pipeline")]
+            # Only these two stages have verified independent inputs. Injected
+            # runners keep the existing sequential contract unless tested directly.
+            if parallel_independent and len(pair) == 2 and runner is run_agent:
+                from agent_engine.phase4.parallel_stages import run_pair
+                out("\n>>> running Task Breakdown and Infrastructure in isolated workspaces")
+                try:
+                    results = run_pair(root, pair, runner)
+                except Exception as exc:
+                    out(f"STOP: parallel stage merge failed: {exc}; isolated evidence retained under logs/parallel")
+                    return FAILED
+                for item in pair:
+                    result = results[item.stage.agent]
+                    state[item.stage.agent] = {"inputs": input_digests(item.stage, root, sprint),
+                                               "status": result["status"],
+                                               "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+                    ran.append(item.stage.agent)
+                save_state(root, state)
+                failed = {name: r for name, r in results.items() if r["status"] not in SUCCESS}
+                if failed:
+                    out("STOP: parallel stages need review: " + json.dumps(failed))
+                    return FAILED
+                continue
             step = runnable[0]
             out(f"\n>>> running {step.stage.agent}: {step.why}\n")
             digests = input_digests(step.stage, root, sprint)
