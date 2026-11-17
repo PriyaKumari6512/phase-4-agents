@@ -413,6 +413,33 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         managed_outputs.set(frozenset(("backlog/backlog.json", "backlog/features.json", "backlog/enrichments.json",
                             "sprint/sprint-plan.json", "sprint/solver-diagnostics.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json")))
                     active_inputs.set(frozenset(protected))
+                    if pack.name == "task-breakdown":
+                        from agent_engine.phase4 import breakdown_workflow as workflow
+                        if kind == "verify":
+                            operation = workflow.review(project_name, pass_callbacks)
+                        elif kind == "fix" and workflow.generation_supported(project_name):
+                            operation = workflow.repair(project_name, report.get("verdict", {}).get("gaps", []), pass_callbacks)
+                        elif kind == "write" and workflow.generation_supported(project_name):
+                            operation = workflow.generate(project_name, request, pass_callbacks)
+                        else:
+                            operation = None  # legacy/custom-template writer retains its tools
+                        state = None
+                        if operation is not None:
+                            budget = active_stage_budget.get()
+                            timeout = float(os.environ.get("AGENT_ENGINE_PASS_TIMEOUT_SECONDS", "1800"))
+                            try:
+                                state = await asyncio.wait_for(operation, timeout=min(timeout, budget.remaining()) if budget else timeout)
+                            except asyncio.TimeoutError as exc:
+                                from agent_engine.stage_controls import StageBudgetExceeded
+                                if budget:
+                                    budget.stop("Task Breakdown pass deadline exhausted")
+                                raise StageBudgetExceeded("Task Breakdown pass deadline exhausted") from exc
+                        if state is not None:
+                            if kind == "verify" and not isinstance(state.get("structured_response"), Verdict):
+                                entry["invalid_verdict"] = {"response_chars": 0, "finish_reason": None}
+                                raise InvalidVerdictError("workflow returned no complete valid Verdict")
+                            entry["ok"] = True
+                            return state
                     built = build_agent(p, level[p.name])
                     with perf.span("graph", f"{p.name}-{kind}") as gs:
                         deadline_s = float(os.environ.get("AGENT_ENGINE_PASS_TIMEOUT_SECONDS", "1800"))
@@ -443,7 +470,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         raise
                     if handler is not None:
                         ps.set(open_model_or_tool_runs=handler.open_runs())
-                    if kind == "verify" and _invalid_verdict_error(e) and schema_retries < 1:
+                    if pack.name != "task-breakdown" and kind == "verify" and _invalid_verdict_error(e) and schema_retries < 1:
                         schema_retries += 1
                         ps.set_status("error", str(e), "structured_output")
                         message += "\nThe previous review response was empty, malformed or schema-invalid. Recheck the retained artifacts; return exactly one valid, concise Verdict. Do not rewrite artifacts or echo file bodies. Report partial if review is incomplete."
@@ -605,7 +632,8 @@ def _deterministic_gaps(agent: str, project: str) -> tuple[list[str], bool]:
     if agent not in checks:
         return [], False
     result = json.loads(checks[agent]())
-    gaps = [x["message"] for x in result.get("blocking", [])] + result.get("problems", [])
+    gaps = [(json.dumps(x, ensure_ascii=False) if agent == "task-breakdown" else x["message"])
+            for x in result.get("blocking", [])] + result.get("problems", [])
     human = False
     if agent == "sprint-planning" and result.get("solver") == "INFEASIBLE":
         gaps.append("The sprint plan is infeasible. An approver must choose an option or change the inputs before execution.")

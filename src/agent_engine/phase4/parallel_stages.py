@@ -129,7 +129,7 @@ def _collect(root: Path, evidence: Path, plan: dict):
             parts = Path(rel).parts
             if plan.get("legacy"):
                 sibling = set().union(*OWNED.values()) - OWNED[agent]
-                if parts[0] in sibling or (agent == "infra-pipeline" and parts[0] == ".engine-feature-jobs"):
+                if parts[0] in sibling or (agent == "infra-pipeline" and parts[0] in {".engine-feature-jobs", ".engine-breakdown"}):
                     continue  # never copy a sibling's artifacts from an older snapshot
                 if parts[0] in {"runs", "logs"} and rel in before:
                     continue  # legacy sessions cannot prove ownership of prior history
@@ -137,6 +137,10 @@ def _collect(root: Path, evidence: Path, plan: dict):
                     continue
             allowed = (parts[0] in OWNED[agent] or rel == f"requests/{agent}.md"
                        or (parts[0] == "runs" and rel not in before) or parts[0] == "logs")
+            if parts[0] == ".engine-breakdown" and agent == "task-breakdown":
+                if len(parts) != 3 or parts[1] not in {"plans", "generation", "reviews", "findings", "repairs"} or not re.fullmatch(r"(?:[0-9a-f]{64}|latest)\.json", parts[2]):
+                    raise ValueError(f"unexpected workflow receipt path: {rel}")
+                allowed = True
             if parts[0] == ".engine-feature-jobs" and agent == "task-breakdown":
                 if len(parts) != 2 or not re.fullmatch(r"[0-9]{3}-[a-z0-9][a-z0-9-]*\.json", parts[1]):
                     raise ValueError(f"unexpected feature checkpoint path: {rel}")
@@ -311,7 +315,7 @@ def recover_session(root: Path, session: Path) -> dict:
                 requests[agent] = report["request_text"]
                 for rel in set(before) | set(after):
                     parts = Path(rel).parts
-                    generated = parts[0] in OWNED[agent] or (agent == "task-breakdown" and parts[0] == ".engine-feature-jobs")
+                    generated = parts[0] in OWNED[agent] or (agent == "task-breakdown" and parts[0] in {".engine-feature-jobs", ".engine-breakdown"})
                     bookkeeping = parts[0] in {"runs", "logs"} or rel == "report.json"
                     if generated:
                         if rel in before and before.get(rel) != after.get(rel):
@@ -321,7 +325,7 @@ def recover_session(root: Path, session: Path) -> dict:
                         new = (source / rel).read_text(encoding="utf-8") if rel in after else ""
                         if not new.startswith(old):
                             raise ValueError("request history changed since the retained run")
-                    elif (parts[0] in set().union(*OWNED.values()) or parts[0] == ".engine-feature-jobs"
+                    elif (parts[0] in set().union(*OWNED.values()) or parts[0] in {".engine-feature-jobs", ".engine-breakdown"}
                           or (parts[0] == "requests" and rel != f"requests/{agent}.md")):
                         continue  # sibling outputs are not inputs to this independent stage
                     elif not bookkeeping and before.get(rel) != after.get(rel):

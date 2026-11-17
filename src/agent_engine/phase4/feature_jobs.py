@@ -66,19 +66,23 @@ def inputs(project: str, directory: str) -> dict[str, str]:
     for rel in (files.PRD, files.ARCHITECTURE, ".specify/memory/constitution.md", ".specify/engine-policy.json",
                 "backlog/implementation-contract.md"):
         p = files.path(project, rel)
-        result[rel] = file_digest(p) if p.is_file() else "missing"
+        if rel == files.PRD:
+            from agent_engine.phase4.evidence import packet
+            result[rel] = _digest(packet(project, selected.requirement_ids).get(rel, []))
+        else:
+            result[rel] = file_digest(p) if p.is_file() else "missing"
     for p in sorted((root / ".specify/templates").rglob("*")):
         if p.is_file():
             rel = p.relative_to(root).as_posix()
             result[rel] = file_digest(files.path(project, rel))
-    # Full PRD/architecture hashing is deliberately conservative until source-span
-    # dependencies are explicit. Never reuse solely because requirement IDs match.
+    # Exact PRD sections and all unclassified/global constraints participate in identity.
+    # Architecture remains global until applicability is explicit.
     paths = [Path(config.AGENTS_DIR) / "task-breakdown"]
     for base in paths:
         for p in sorted(base.rglob("*")):
             if p.is_file() and "validator" not in p.relative_to(base).parts:
                 result["pack:" + p.relative_to(base).as_posix()] = file_digest(p)
-    for name in ("feature_jobs.py", "feature_documents.py", "speckit.py", "speckit_parse.py", "contracts.py"):
+    for name in ("feature_jobs.py", "feature_documents.py", "speckit.py", "speckit_parse.py", "contracts.py", "breakdown_workflow.py", "evidence.py", "planning_records.py"):
         p = Path(__file__).parent / name
         result["implementation:" + name] = file_digest(p) if p.is_file() else "missing"
     for p in sorted((Path(__file__).parent / "speckit_assets").rglob("*")):

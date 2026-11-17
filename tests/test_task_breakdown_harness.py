@@ -276,6 +276,11 @@ def test_cli_budget_exhaustion_is_partial_and_keeps_artifacts(proj, monkeypatch,
         (proj / "retained-partial.md").write_text("completed work")
         callback.on_chat_model_start({}, [])
     monkeypatch.setattr(cli, "_stream", stream)
+    from agent_engine.phase4 import breakdown_workflow as workflow
+    async def generate(project, request, callbacks):
+        return await stream(None, request, callbacks, "task-breakdown-write")
+    monkeypatch.setattr(workflow, "generate", generate)
+    monkeypatch.setattr(workflow, "generation_supported", lambda project: True)
     assert asyncio.run(cli._run("Build backlog", "task-breakdown", proj.name)) == 1
     report = json.loads((proj / "report.json").read_text())
     assert report["status"] == "partial"

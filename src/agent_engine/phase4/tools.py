@@ -137,9 +137,16 @@ def source_context(project: str, feature_directory: str = "", epic_id: str = "",
         rel = paths[source]
         raw = files.path(project, rel).read_bytes() if files.exists(project, rel) else b""
         sha = hashlib.sha256(raw).hexdigest()
+        text = raw.decode("utf-8")
+        if selected and source == "prd":
+            from agent_engine.phase4.evidence import packet
+            sections = packet(project, selected.requirement_ids).get(rel, [])
+            text = "".join(section["text"] for section in sections)
+            sha = hashlib.sha256(text.encode()).hexdigest()
+            if expected_sha256 and expected_sha256 != sha:
+                raise files.ProjectError("scoped source changed since previous page; restart")
         if expected_sha256 and expected_sha256 != sha:
             raise files.ProjectError("source changed since previous page; restart")
-        text = raw.decode("utf-8")
         end = min(len(text), offset + limit)
         return json.dumps({"source": source, "path": files.virtual(project, rel), "sha256": sha,
                            "total_chars": len(text), "offset": offset, "text": text[offset:end],
@@ -215,10 +222,7 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
             raise files.ProjectError("backlog_view epic differs from assigned epic")
         # Hash exactly the bytes parsed, not a second read that may race enrichment.
         raw = files.path(project, files.BACKLOG).read_bytes()
-        digest = hashlib.sha256(raw).hexdigest()
         b = Backlog.model_validate_json(raw)
-        if expected_sha256 and expected_sha256 != digest:
-            raise files.ProjectError("backlog changed since the previous page; restart pagination")
         if not 1000 <= max_chars <= 200000:
             raise files.ProjectError("max_chars must be between 1000 and 200000")
         if offset < 0 or not 1 <= limit <= 200 or level not in ("", "epic", "story", "task"):
@@ -226,6 +230,11 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
         children = {i.item_id for i in b.items if i.parent_id == selected_epic}
         rows = [i for i in b.items if (not selected_epic or i.item_id == selected_epic or i.parent_id == selected_epic or i.parent_id in children)
                 and (not level or i.level == level) and (not item_ids or i.item_id in item_ids)]
+        digest = (hashlib.sha256(raw).hexdigest() if not (selected_epic or level or item_ids) else
+                  hashlib.sha256(json.dumps([i.model_dump(mode="json") for i in rows],
+                                             sort_keys=True).encode()).hexdigest())
+        if expected_sha256 and expected_sha256 != digest:
+            raise files.ProjectError("selected backlog records changed since the previous page; restart pagination")
         page = rows[offset:offset + limit]
         compact = ("item_id", "level", "parent_id", "title", "priority", "moscow", "estimate", "dependencies", "source_refs", "open_questions")
         selected, size = [], 2

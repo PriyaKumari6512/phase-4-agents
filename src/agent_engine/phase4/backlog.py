@@ -107,8 +107,13 @@ def _user_story(body: str, title: str) -> UserStory:
 def _feature_items(project: str, f: Feature, settings: ProjectSettings) -> list[WorkItem]:
     root = files.path(project, f.feature_dir)
     try:
-        spec = parse_spec_md((root / "spec.md").read_text(encoding="utf-8"))
-        tasks = parse_tasks_md((root / "tasks.md").read_text(encoding="utf-8"))
+        from agent_engine.phase4.planning_records import read_feature
+        structured = read_feature(project, f.feature_dir)
+        if structured is not None:
+            spec, tasks = structured
+        else:
+            spec = parse_spec_md((root / "spec.md").read_text(encoding="utf-8"))
+            tasks = parse_tasks_md((root / "tasks.md").read_text(encoding="utf-8"))
     except FileNotFoundError as e:
         raise files.ProjectError(f"{f.feature_dir}: {Path(e.filename).name} is missing; finish spec-kit for this feature") from e
     except SpeckitFormatError as e:
@@ -322,6 +327,9 @@ def _item_source(project: str, item: WorkItem, cache: dict[str, str] | None = No
             from agent_engine.phase4.feature_jobs import _requests
             cache[request_key] = _requests(files.project_dir(project))
         sources["requests/task-breakdown.md"] = cache[request_key]
+        from agent_engine.phase4.evidence import packet, digest
+        selected_ids = [rid for f in features if f.feature_dir == feature_dir for rid in f.requirement_ids]
+        sources[files.PRD] = digest(packet(project, selected_ids).get(files.PRD, []))
         sources["feature-definition"] = json.dumps([f.model_dump(mode="json") for f in features
                                                    if f.feature_dir == feature_dir], sort_keys=True)
         cache[key] = files.sha256_text(json.dumps(sources, sort_keys=True))
@@ -748,7 +756,7 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
     no_ac_t = [i.item_id for i in items.values() if i.level == "task" and not i.acceptance_criteria]
     if no_ac_t:
         issue("acceptance_criteria", f"{len(no_ac_t)} tasks without acceptance criteria (they cannot go to an AI "
-              "agent and are harder to review)", no_ac_t, "warning")
+              "agent and are harder to review)", no_ac_t)
     for t in items.values():
         if t.level == "task":
             missing = [d for d in settings.definition_of_done if d not in t.definition_of_done]
@@ -793,7 +801,12 @@ def _validate(backlog: Backlog, settings: ProjectSettings, prd_ids: list[str]) -
             t.skills_required = list(dict.fromkeys(fixed))
     no_skill = [t.item_id for t in items.values() if t.level == "task" and not t.skills_required]
     if no_skill:
-        issue("skills", f"{len(no_skill)} tasks without a skill tag", no_skill, "warning")
+        issue("skills", f"{len(no_skill)} tasks without a skill tag", no_skill)
+    for t in items.values():
+        if t.level == "task" and t.ai_eligible and (
+            not t.estimate or not t.estimate.hours or t.estimate.hours > 4 or
+            len(t.file_paths) > 4 or not t.acceptance_criteria or t.type == "infra"):
+            issue("ai_eligibility", f"{t.item_id}: AI proposal violates objective eligibility limits", [t.item_id])
     sec.end()
     tasks = [t for t in items.values() if t.level == "task"]
     sec = perf.start_span("compute", "backlog.validate.duplicates",

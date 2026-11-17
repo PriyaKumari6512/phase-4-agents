@@ -33,6 +33,19 @@ def stage(proj, tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "model_spec", lambda tier: "test:" + tier)
     monkeypatch.setattr(cli, "build_agent", lambda pack, level=0: (pack.name, pack.models[level]))
     monkeypatch.setattr(cli, "_deterministic_gaps", lambda *args: ([], False))
+    # Mock the operation boundary; these tests exercise recovery with deliberately
+    # synthetic artifacts, not planning or semantic review implementations.
+    from agent_engine.phase4 import breakdown_workflow as workflow
+    async def generate(project, request, callbacks):
+        return await cli._stream(None, request, callbacks, "task-breakdown-write")
+    async def review(project, callbacks):
+        return await cli._stream(None, "review", callbacks, "task-breakdown/validator-verify")
+    async def repair(project, gaps, callbacks):
+        return await cli._stream(None, str(gaps), callbacks, "task-breakdown-fix")
+    monkeypatch.setattr(workflow, "generate", generate)
+    monkeypatch.setattr(workflow, "review", review)
+    monkeypatch.setattr(workflow, "repair", repair)
+    monkeypatch.setattr(workflow, "generation_supported", lambda project: True)
     return proj
 
 
@@ -61,7 +74,7 @@ def test_malformed_review_retries_only_review_then_resumes_after_model_change(st
         raise json.JSONDecodeError("empty", "", 0)
     monkeypatch.setattr(cli, "_stream", stream)
     assert asyncio.run(cli._run("request", "task-breakdown", P)) == 1
-    assert calls == ["task-breakdown-write", "task-breakdown/validator-verify", "task-breakdown/validator-verify"]
+    assert calls == ["task-breakdown-write", "task-breakdown/validator-verify"]
     history = (stage / "requests/task-breakdown.md").read_bytes()
     before = (stage / "backlog/backlog.json").read_bytes()
     monkeypatch.setenv("SDLC_AGENT_STRONG_MODEL", "different:reviewer")
@@ -85,7 +98,7 @@ def test_empty_state_is_bounded_format_failure(stage, monkeypatch):
         return {"messages": []}
     monkeypatch.setattr(cli, "_stream", stream)
     assert asyncio.run(cli._run("request", "task-breakdown", P)) == 1
-    assert len(calls) == 3
+    assert len(calls) == 2
     assert report(stage)["passes"][-1]["invalid_verdict"]["response_chars"] == 0
     assert recovery.next_action(stage, agent.load_pack("task-breakdown"), "request")[0] == "verify"
 
