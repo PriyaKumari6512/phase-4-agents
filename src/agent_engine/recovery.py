@@ -85,7 +85,7 @@ def evaluation(pack) -> dict[str, str]:
     common = ("agent.py", "cli.py", "config.py", "runtime.py", "backends.py", "guardrails.py", "locking.py",
               "stage_controls.py", "model_setup.py", "subscription_models.py", "recovery.py")
     domains = {
-        "task-breakdown": ("backlog", "contracts", "files", "speckit_parse", "textsim", "skills_taxonomy", "tools", "breakdown_workflow", "evidence", "planning_records", "feature_documents"),
+        "task-breakdown": ("backlog", "contracts", "files", "speckit_parse", "textsim", "skills_taxonomy", "tools", "breakdown_workflow", "evidence", "planning_records", "paged_operation", "breakdown_state", "review_batches", "feature_documents"),
         "infra-pipeline": ("infra", "sandbox", "settings", "contracts", "files", "tools"),
         "sprint-planning": ("sprint", "sprint_model", "capacity", "calendars", "settings", "contracts", "files", "tools"),
         "work-allocation": ("allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),

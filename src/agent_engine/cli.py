@@ -428,7 +428,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                             budget = active_stage_budget.get()
                             timeout = float(os.environ.get("AGENT_ENGINE_PASS_TIMEOUT_SECONDS", "1800"))
                             try:
-                                state = await asyncio.wait_for(operation, timeout=min(timeout, budget.remaining()) if budget else timeout)
+                                with workflow.operation_model(p, level[p.name], request):
+                                    state = await asyncio.wait_for(operation, timeout=min(timeout, budget.remaining()) if budget else timeout)
                             except asyncio.TimeoutError as exc:
                                 from agent_engine.stage_controls import StageBudgetExceeded
                                 if budget:

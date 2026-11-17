@@ -82,7 +82,7 @@ def inputs(project: str, directory: str) -> dict[str, str]:
         for p in sorted(base.rglob("*")):
             if p.is_file() and "validator" not in p.relative_to(base).parts:
                 result["pack:" + p.relative_to(base).as_posix()] = file_digest(p)
-    for name in ("feature_jobs.py", "feature_documents.py", "speckit.py", "speckit_parse.py", "contracts.py", "breakdown_workflow.py", "evidence.py", "planning_records.py"):
+    for name in ("feature_jobs.py", "feature_documents.py", "speckit.py", "speckit_parse.py", "contracts.py", "breakdown_workflow.py", "evidence.py", "planning_records.py", "paged_operation.py", "breakdown_state.py", "review_batches.py"):
         p = Path(__file__).parent / name
         result["implementation:" + name] = file_digest(p) if p.is_file() else "missing"
     for p in sorted((Path(__file__).parent / "speckit_assets").rglob("*")):

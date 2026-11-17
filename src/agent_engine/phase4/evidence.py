@@ -1,6 +1,16 @@
 """Exact source sections with conservative inclusion of unclassified constraints."""
 import hashlib
 import re
+from contextvars import ContextVar
+
+frozen_text = ContextVar("breakdown_frozen_sources", default=None)
+
+
+def source_text(project, source):
+    frozen = frozen_text.get()
+    if frozen is not None and frozen[0] == project and source in frozen[1]:
+        return frozen[1][source]
+    return files.read_text(project, source) if files.exists(project, source) else None
 from agent_engine.phase4 import files
 from agent_engine.phase4.speckit_parse import REQ_ID_RE
 
@@ -17,9 +27,9 @@ def packet(project, requirement_ids=()):
     selected = set(requirement_ids)
     output = {}
     for source in SOURCES:
-        if not files.exists(project, source):
+        text = source_text(project, source)
+        if text is None:
             continue
-        text = files.read_text(project, source)
         # Architecture and requests can encode implicit/global dependencies: retain
         # them in full until explicit applicability is available. PRD headings with
         # unrelated numbered functional requirements can be excluded conservatively.

@@ -7,6 +7,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import contextvars
+from contextlib import contextmanager
 from typing import Literal
 from pathlib import Path
 
@@ -20,7 +22,8 @@ from agent_engine.stage_controls import active_stage_budget, StageBudgetExceeded
 from agent_engine.phase4 import files, backlog, speckit, feature_jobs
 from agent_engine.phase4.contracts import FeatureList, Backlog, ProjectSettings, Estimate, UserStory
 from agent_engine.phase4.feature_documents import FeatureDocument, write as write_feature
-from agent_engine.phase4.evidence import packet, digest
+from agent_engine.phase4.evidence import packet, digest, source_text
+from agent_engine.phase4.breakdown_state import frozen_operation, artifact_transaction, freeze_contract
 
 
 class Record(BaseModel):
@@ -142,13 +145,29 @@ def _save(project, kind, key, value):
     atomic_json(_path(project, kind, key), value)
 
 
-async def _call(schema, purpose, payload, callbacks):
-    text = json.dumps(payload, ensure_ascii=False, default=str)
-    if len(text) > _positive('AGENT_ENGINE_BREAKDOWN_JOB_MAX_CHARS', 160000):
-        raise StageBudgetExceeded(f'{purpose}: evidence exceeds bounded job size; retained partial work requires smaller partitions')
-    model = resolve_model_with_retries(model_spec('strong'))
-    if hasattr(model, 'max_tokens'):
-        model.max_tokens = min(getattr(model, 'max_tokens', None) or 16000, 16000)
+_active_model = contextvars.ContextVar('breakdown_operation_model', default=None)
+_active_request = contextvars.ContextVar('breakdown_original_request', default='')
+
+
+@contextmanager
+def operation_model(pack, level, request=""):
+    request_token = _active_request.set(request)
+    token = _active_model.set((pack.name, pack.models[level]))
+    try:
+        yield
+    finally:
+        _active_model.reset(token)
+        _active_request.reset(request_token)
+
+
+def operation_identity(review=False):
+    from agent_engine.agent import load_pack
+    name, tier = _active_model.get() or ('task-breakdown/validator' if review else 'task-breakdown', 'strong')
+    pack = load_pack(name)
+    return {'model': model_spec(tier), 'prompt': pack.system_prompt}
+
+
+def check_allocation(purpose):
     budget = active_stage_budget.get()
     if budget:
         budget.check()
@@ -160,14 +179,39 @@ async def _call(schema, purpose, payload, callbacks):
             budget.output_tokens >= budget.max_output_tokens * (1-reserve) or
             budget.input_tokens >= budget.max_input_tokens * (1-reserve)):
             raise StageBudgetExceeded('generation/repair allocation exhausted; review reserve retained')
+
+
+async def _call(schema, purpose, payload, callbacks):
+    text = json.dumps(payload, ensure_ascii=False, separators=(',', ':'), default=str)
+    identity = operation_identity(purpose.startswith('Independently review'))
+    spec = identity['model']
+    check_allocation(purpose)
+    budget = active_stage_budget.get()
+    model = resolve_model_with_retries(spec)
+    if hasattr(model, 'max_tokens'):
+        model.max_tokens = min(getattr(model, 'max_tokens', None) or 16000, 16000)
     try:
+        rules = RULES + '\nRole instructions (file/tool orchestration is supplied by the application):\n' + identity['prompt']
+        if len(text) > _positive('AGENT_ENGINE_BREAKDOWN_JOB_MAX_CHARS', 160000):
+            from agent_engine.phase4.paged_operation import run
+            return await run(schema, purpose, payload, callbacks, model, spec, rules)
         # The provider receives the complete schema. No tool discovery or file
         # navigation loop is used. Callbacks include shared token/call accounting.
-        operation = model.with_structured_output(schema, **({'method': 'json_schema'} if model_spec('strong').startswith('anthropic:') else {}))
-        result = await asyncio.wait_for(operation.ainvoke([
-            ('system', RULES + '\nOperation: ' + purpose), ('human', text)],
-            config={'callbacks': callbacks}), timeout=min(budget.remaining() if budget else 1800, 1800))
-        return schema.model_validate(result)
+        operation = model.with_structured_output(schema, **({'method': 'json_schema'} if spec.startswith('anthropic:') else {}))
+        try:
+            result = await asyncio.wait_for(operation.ainvoke([
+                ('system', rules + '\nOperation: ' + purpose), ('human', text)],
+                config={'callbacks': callbacks}), timeout=min(budget.remaining() if budget else 1800, 1800))
+            return schema.model_validate(result)
+        except Exception as exc:
+            # A response/schema limit must split output as well as large inputs.
+            # Provider/network errors retain normal escalation/retry semantics.
+            from langchain_core.exceptions import OutputParserException
+            from pydantic import ValidationError
+            if not isinstance(exc, (OutputParserException, ValidationError)) and 'length' not in type(exc).__name__.lower():
+                raise
+            from agent_engine.phase4.paged_operation import run
+            return await run(schema, purpose, payload, callbacks, model, spec, rules)
     finally:
         from agent_engine.agent import close_agent
         from types import SimpleNamespace
@@ -175,7 +219,7 @@ async def _call(schema, purpose, payload, callbacks):
 
 
 def settings(project):
-    return backlog.source_settings(files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings))
+    return backlog.source_settings(ProjectSettings.model_validate_json(source_text(project, files.PROJECT_SETTINGS)))
 
 
 def generation_supported(project):
@@ -194,8 +238,8 @@ def generation_supported(project):
     return True
 
 
+@frozen_operation
 async def generate(project, request, callbacks):
-    speckit.init(project)
     sources = packet(project)
     existing = files.read_json(project, files.FEATURES) if files.exists(project, files.FEATURES) else None
     plan_sources = {k: v for k, v in sources.items() if k != 'backlog/implementation-contract.md'}
@@ -203,7 +247,7 @@ async def generate(project, request, callbacks):
         plan_sources['requests/task-breakdown.md'] = feature_jobs._requests(files.project_dir(project))
     contract_identity = files.file_sha(project, 'backlog/implementation-contract.md') if files.exists(project, 'backlog/implementation-contract.md') else None
     planner_identity = {'schema': Plan.model_json_schema(), 'implementation': Path(__file__).read_text(),
-                        'model': model_spec('strong')}
+                        'model': operation_identity()}
     def plan_identity(features):
         return digest({'sources': plan_sources, 'settings': settings(project), 'request': request,
                        'existing': features, 'planner': planner_identity, 'contract': contract_identity})
@@ -230,6 +274,7 @@ async def generate(project, request, callbacks):
     # Store the post-registration identity too: registering features and writing
     # the derived contract must not invalidate an otherwise unchanged plan.
     contract_identity = files.file_sha(project, contract)
+    freeze_contract(project)
     _save(project, 'plans', plan_identity(plan.features.model_dump(mode='json')), plan.model_dump(mode='json'))
     concurrency = _positive('AGENT_ENGINE_HELPER_CONCURRENCY', 9)
     if concurrency > 32:
@@ -240,10 +285,10 @@ async def generate(project, request, callbacks):
             status = feature_jobs.status(project, f.feature_dir)
             evidence = packet(project, f.requirement_ids)
             identity = digest({'feature': f.model_dump(), 'inputs': status['input_sha256'], 'settings': settings(project),
-                               'schema': Generated.model_json_schema(), 'model': model_spec('strong'),
+                               'schema': Generated.model_json_schema(), 'model': operation_identity(),
                                'history': history_evidence(project, f)})
             saved = _load(project, 'generation', identity)
-            if status['reusable'] and saved:
+            if status['reusable'] and saved and saved.get('outputs') == feature_jobs.outputs(project, f.feature_dir):
                 return saved['patches']
             from agent_engine.stage_controls import helper_scope, HelperScope
             budget = active_stage_budget.get()
@@ -266,7 +311,8 @@ async def generate(project, request, callbacks):
                      'skill_taxonomy': _taxonomy()}, callbacks)
                 write_feature(project, f.feature_dir, generated.document.model_dump(mode='json'))
                 feature_jobs.checkpoint(project, f.feature_dir, status['input_sha256'])
-                value = {'patches': [p.model_dump(mode='json', exclude_none=True) for p in generated.patches]}
+                value = {'patches': [p.model_dump(mode='json', exclude_none=True) for p in generated.patches],
+                         'outputs': feature_jobs.outputs(project, f.feature_dir)}
                 _save(project, 'generation', identity, value)
                 return value['patches']
             finally:
@@ -282,7 +328,7 @@ async def generate(project, request, callbacks):
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
     backlog.build(project)
-    retained = set(backlog._load_enrichments(project))
+    retained = backlog._load_enrichments(project)
     for f, updates in zip(plan.features.features, patches):
         n = f.feature_dir.split('/')[1][:3]
         b = files.read_json(project, files.BACKLOG, Backlog)
@@ -290,18 +336,29 @@ async def generate(project, request, callbacks):
         allowed = children | {i.item_id for i in b.items if i.parent_id in children}
         if any(p['item_id'] not in allowed for p in updates):
             raise files.ProjectError('generation patch outside assigned feature')
-        _apply(project, [p for p in updates if p["item_id"] not in retained])
+        _apply(project, missing_fields(project, updates, retained))
     b = files.read_json(project, files.BACKLOG, Backlog)
     index = [i.model_dump(mode='json') for i in b.stories()]
-    edges = await _call(Dependencies, 'Identify only real cross-feature story prerequisites. '
+    dependency_payload = {'stories': index, 'sources': packet(project)}
+    dependency_key = digest({'payload': dependency_payload, 'model': operation_identity(),
+                             'schema': Dependencies.model_json_schema(), 'version': 1})
+    cached_edges = _load(project, 'dependencies', dependency_key)
+    if cached_edges is not None:
+        edges = Dependencies.model_validate(cached_edges)
+    else:
+        edges = await _call(Dependencies, 'Identify only real cross-feature story prerequisites. '
                         'Uncertain edges below 0.6 are not added.',
-                        {'stories': index, 'sources': sources}, callbacks)
+                        dependency_payload, callbacks)
+        _save(project, 'dependencies', dependency_key, edges.model_dump(mode='json'))
     story_ids = {s.item_id for s in b.stories()}
     if any(e.item_id not in story_ids or e.on_id not in story_ids or e.item_id == e.on_id for e in edges.edges):
         raise files.ProjectError('dependency operation returned invalid story IDs')
     _apply(project, [{'item_id': e.item_id, 'add_dependencies': [{'on_id': e.on_id, 'reason': e.reason, 'confidence': e.confidence}]}
                      for e in edges.edges if e.confidence >= .6])
     check = json.loads(backlog.validate_report(project))
+    dependency_payload['stories'] = [i.model_dump(mode='json') for i in files.read_json(project, files.BACKLOG, Backlog).stories()]
+    _save(project, 'dependencies', digest({'payload': dependency_payload, 'model': operation_identity(),
+          'schema': Dependencies.model_json_schema(), 'version': 1}), edges.model_dump(mode='json'))
     b = files.read_json(project, files.BACKLOG, Backlog)
     summary = (f'Backlog: /outputs/{project}/backlog/backlog.json and backlog/backlog.md. '
                f'{len(b.features)} epics, {check["stories"]} stories, {check["tasks"]} tasks, '
@@ -316,7 +373,8 @@ def history_evidence(project, feature):
     """Retrieve exact candidate tickets; feature similarity is not a story estimate."""
     from agent_engine.phase4.contracts import History
     from agent_engine.phase4.textsim import similarities
-    history = files.read_json(project, files.HISTORY, History) if files.exists(project, files.HISTORY) else History()
+    raw_history = source_text(project, files.HISTORY)
+    history = History.model_validate_json(raw_history) if raw_history is not None else History()
     tickets = [t for t in history.tickets if t.story_points]
     if not tickets:
         return {'analogy_valid': False, 'references': []}
@@ -338,6 +396,35 @@ def _taxonomy():
     return skills_taxonomy.tags()
 
 
+def missing_fields(project, patches, retained):
+    """Preserve valid retained fields while filling missing/invalid required ones."""
+    b = files.read_json(project, files.BACKLOG, Backlog)
+    by = b.by_id()
+    scale = settings(project)['story_point_scale']
+    from agent_engine.phase4.skills_taxonomy import tags
+    output = []
+    for patch in patches:
+        iid = patch['item_id']
+        item = by[iid]
+        old = retained.get(iid, {})
+        value = {'item_id': iid}
+        for key, supplied in patch.items():
+            if key == 'item_id':
+                continue
+            invalid = (key == 'acceptance_criteria' and not item.acceptance_criteria or
+                       key == 'skills_required' and not any(t in tags() for t in item.skills_required) or
+                       key == 'estimate' and (not item.estimate or
+                           (item.level == 'story' and item.estimate.story_points not in scale) or
+                           (item.level == 'task' and not (item.estimate.hours or 0) > 0)))
+            if key == 'task_shares' and 'estimate' in old and item.estimate and item.estimate.story_points in scale:
+                continue  # preserve established allocations alongside a valid retained estimate
+            if key not in old or invalid:
+                value[key] = supplied
+        if len(value) > 1:
+            output.append(value)
+    return output
+
+
 def _apply(project, patches):
     # Stories before tasks: explicit task decisions survive deterministic rollups.
     b = files.read_json(project, files.BACKLOG, Backlog)
@@ -349,10 +436,11 @@ def _apply(project, patches):
             raise files.ProjectError(json.dumps(result['errors']))
 
 
+@frozen_operation
 async def review(project, callbacks):
     from agent_engine.recovery import evaluation
     from agent_engine.agent import load_pack
-    evaluator = evaluation(load_pack('task-breakdown'))
+    evaluator = {**evaluation(load_pack('task-breakdown')), 'resolved_model': operation_identity(True)}
     b = files.read_json(project, files.BACKLOG, Backlog)
     before = digest(b.model_dump(mode='json'))
     jobs = []
@@ -396,16 +484,21 @@ async def review(project, callbacks):
                 jobs.append(('artifact', [name], {'artifact': name, 'text': text[offset:offset+24000],
                     'sources': packet(project, feature.requirement_ids)}))
     jobs.append(('global', ['cross-feature'], {'sources': sources, 'contracts': contracts,
+                 'tasks': [{k: t.model_dump(mode='json')[k] for k in ('item_id','parent_id','title','description_md','file_paths','dependencies','source_refs','acceptance_criteria')} for t in b.items if t.level == 'task'],
                  'stories': [{k: s.model_dump(mode='json')[k] for k in ('item_id','title','source_refs','dependencies','file_paths','open_questions')}
                              for s in b.stories()]}))
+    from agent_engine.phase4.review_batches import batches
+    jobs = list(batches(jobs, min(_positive('AGENT_ENGINE_BREAKDOWN_JOB_MAX_CHARS', 160000),
+                                 _positive('AGENT_ENGINE_BREAKDOWN_REVIEW_BATCH_CHARS', 64000))))
     semaphore = asyncio.Semaphore(_positive('AGENT_ENGINE_BREAKDOWN_REVIEW_CONCURRENCY', 4))
     async def job(kind, ids, payload):
         async with semaphore:
-            payload = {**payload, 'settings': settings(project), 'required_review_ids': ids}
+            payload = {**payload, 'settings': settings(project), 'required_review_ids': ids, 'original_request': _active_request.get()}
             key = digest({'payload': payload, 'evaluator': evaluator, 'schema': Review.model_json_schema(), 'kind': kind})
             cached = _load(project, 'reviews', key)
             result = Review.model_validate(cached) if cached else await _call(Review,
                 'Independently review ' + kind + '. Return every required_review_id in reviewed_ids only after reviewing it. '
+                'For a partition, independently complete EVERY part using its source_refs into the shared exact sources. '
                 'Return complete=false if evidence is insufficient. Report actionable findings naming exact affected IDs/fields.', payload, callbacks)
             if not result.complete or set(result.reviewed_ids) != set(ids):
                 raise files.ProjectError('semantic review incomplete: ' + ', '.join(ids))
@@ -429,6 +522,56 @@ async def review(project, callbacks):
     return {'structured_response': verdict, 'messages': [AIMessage(content=verdict.summary)]}
 
 
+def protect_unaffected(feature, current, generated, affected, findings=()):
+    """Restore unrelated canonical stories/tasks before publishing a structural fix."""
+    value = generated.document.model_dump(mode='json')
+    prefix = feature.feature_dir.split('/')[1][:3]
+    old_stories = {s['number']: s for s in current['stories']}
+    changed = {n for n, story in old_stories.items() if 'S-' + prefix + '-US' + str(n) in affected
+               or set(story['source_ids']) & affected}
+    for phase in current['phases']:
+        if any(prefix + '-' + task['task_id'] in affected for task in phase['tasks']):
+            changed.add(phase.get('story_number'))
+    by_number = {s['number']: s for s in value['stories']}
+    for n, story in old_stories.items():
+        if n not in changed:
+            by_number[n] = story
+        elif n not in by_number:
+            raise files.ProjectError(f'structural repair removed existing story identity US{n}')
+    value['stories'] = sorted(by_number.values(), key=lambda s: s['number'])
+    old_phases = {(p['kind'], p.get('story_number')): p for p in current['phases']}
+    phases = {(p['kind'], p.get('story_number')): p for p in value['phases']}
+    for key, phase in old_phases.items():
+        sid = ('S-' + prefix + '-US' + str(key[1])) if key[0] == 'user_story' else 'S-' + {'setup':'SETUP', 'foundational':'FOUND', 'polish':'POLISH'}[key[0]] + '-' + prefix
+        if key[1] not in changed and sid not in affected:
+            phases[key] = phase
+    value['phases'] = list(phases.values())
+    # Requirements and decisions outside the identified fix are never removed.
+    targeted_fields = {f.get('field', '').split('.')[0].split('/')[0] for f in findings}
+    for field in ('requirements', 'decisions', 'entities', 'interfaces', 'edge_cases',
+                  'open_questions', 'shared_prerequisites', 'validation_steps', 'success_criteria'):
+        if field in targeted_fields:
+            continue
+        for old in current.get(field, []):
+            if old not in value[field]:
+                if isinstance(old, dict) and field == 'requirements' and set(old.get('source_ids', [])) & affected:
+                    continue
+                if isinstance(old, dict):
+                    identity = 'number' if field == 'requirements' else 'topic' if field == 'decisions' else 'name'
+                    value[field] = [entry for entry in value[field] if entry.get(identity) != old.get(identity)]
+                value[field].append(old)
+    generated.document = FeatureDocument.model_validate(value)
+    allowed = {'S-' + prefix + '-US' + str(n) for n in changed if n is not None} | affected
+    allowed |= {prefix + '-' + t['task_id'] for p in value['phases'] if p.get('story_number') in changed for t in p['tasks']}
+    # Ignore attempts to alter valid unrelated enrichment; missing fields can be
+    # filled later through deterministic findings without changing valid records.
+    generated.patches = [p for p in generated.patches if p.item_id in allowed or p.item_id not in {
+        'S-' + prefix + '-US' + str(n) for n in old_stories} | {
+        prefix + '-' + t['task_id'] for phase in current['phases'] for t in phase['tasks']}]
+    return generated
+
+
+@frozen_operation
 async def repair(project, gaps, callbacks):
     b = files.read_json(project, files.BACKLOG, Backlog)
     normalized = sorted(gaps)
@@ -456,31 +599,48 @@ async def repair(project, gaps, callbacks):
         if not features:
             raise files.ProjectError('cannot safely identify structural repair owner; partial artifacts retained: ' + json.dumps(findings))
         from agent_engine.phase4.planning_records import read_feature
-        generated_patches = []
-        for feature in features:
-            if read_feature(project, feature.feature_dir) is None:
-                raise files.ProjectError('legacy/custom feature needs its original writer for structural repair')
-            status = feature_jobs.status(project, feature.feature_dir)
-            current = files.read_json(project, feature.feature_dir + '/feature.json')
-            n = feature.feature_dir.split('/')[1][:3]
-            generated = await _call(Generated, 'Repair the named feature structural findings. '
-                'Preserve all unaffected stories, requirements, task IDs, contracts and unresolved decisions. '
-                'Story IDs use S-' + n + '-US<number> and task IDs ' + n + '-Tnnn. '
-                'Supply complete enrichment patches for changed records.',
-                {'feature': feature.model_dump(), 'existing_document': current, 'findings': findings,
-                 'sources': packet(project, feature.requirement_ids), 'settings': settings(project)}, callbacks)
-            write_feature(project, feature.feature_dir, generated.document.model_dump(mode='json'))
-            feature_jobs.checkpoint(project, feature.feature_dir, status['input_sha256'])
-            allowed_prefixes = ('S-' + n + '-US', n + '-T')
-            allowed_special = {'S-' + phase + '-' + n for phase in ('SETUP', 'FOUND', 'POLISH')}
-            if any(not p.item_id.startswith(allowed_prefixes) and p.item_id not in allowed_special for p in generated.patches):
-                raise files.ProjectError('structural repair patch outside assigned feature')
-            generated_patches.extend(p.model_dump(mode='json', exclude_none=True) for p in generated.patches)
-        backlog.build(project)
-        _apply(project, generated_patches)
-        backlog.validate_report(project)
-        _save(project, 'repairs', identity, {'attempted': True})
-        return {'messages': [AIMessage(content='Affected feature structure repaired; independent review follows.')]}
+        with artifact_transaction(project, ['backlog', *[f.feature_dir for f in features]]):
+            generated_patches = []
+            previous_enrichment = backlog._load_enrichments(project)
+            project_settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+            old_base = {i.item_id: i.model_dump(mode='json') for f in features
+                        for i in backlog._feature_items(project, f, project_settings)}
+            for feature in features:
+                if read_feature(project, feature.feature_dir) is None:
+                    raise files.ProjectError('legacy/custom feature needs its original writer for structural repair')
+                status = feature_jobs.status(project, feature.feature_dir)
+                current = files.read_json(project, feature.feature_dir + '/feature.json')
+                n = feature.feature_dir.split('/')[1][:3]
+                generated = await _call(Generated, 'Repair the named feature structural findings. '
+                    'Preserve all unaffected stories, requirements, task IDs, contracts and unresolved decisions. '
+                    'Story IDs use S-' + n + '-US<number> and task IDs ' + n + '-Tnnn. '
+                    'Supply complete enrichment patches for changed records.',
+                    {'feature': feature.model_dump(), 'existing_document': current, 'findings': findings,
+                     'sources': packet(project, feature.requirement_ids), 'settings': settings(project)}, callbacks)
+                generated = protect_unaffected(feature, current, generated, ids, findings)
+                write_feature(project, feature.feature_dir, generated.document.model_dump(mode='json'))
+                feature_jobs.checkpoint(project, feature.feature_dir, status['input_sha256'])
+                allowed_prefixes = ('S-' + n + '-US', n + '-T')
+                allowed_special = {'S-' + phase + '-' + n for phase in ('SETUP', 'FOUND', 'POLISH')}
+                if any(not p.item_id.startswith(allowed_prefixes) and p.item_id not in allowed_special for p in generated.patches):
+                    raise files.ProjectError('structural repair patch outside assigned feature')
+                generated_patches.extend(p.model_dump(mode='json', exclude_none=True) for p in generated.patches)
+            new_base = {i.item_id: i.model_dump(mode='json') for f in features
+                        for i in backlog._feature_items(project, f, project_settings)}
+            preserved = {}
+            for iid, entry in previous_enrichment.items():
+                if iid not in old_base or old_base[iid] != new_base.get(iid):
+                    continue
+                parent = old_base[iid].get('parent_id')
+                if parent in old_base and old_base[parent] != new_base.get(parent):
+                    continue
+                preserved[iid] = {k: v for k, v in entry.items() if not k.startswith('_')}
+            backlog.build(project)
+            _apply(project, [{'item_id': iid, **entry} for iid, entry in preserved.items()])
+            _apply(project, missing_fields(project, generated_patches, preserved))
+            backlog.validate_report(project)
+            _save(project, 'repairs', identity, {'attempted': True})
+            return {'messages': [AIMessage(content='Affected feature structure repaired; independent review follows.')]}
 
     result = await _call(Repairs, 'Repair only the structured findings, preserving unaffected values and IDs. '
                          'Return patches only for affected items. Never resolve unanswered product decisions by inventing facts.',
@@ -490,8 +650,9 @@ async def repair(project, gaps, callbacks):
     allowed = {i.item_id for i in rows}
     if any(p.item_id not in allowed for p in result.patches):
         raise files.ProjectError('repair patch outside affected partition')
-    _apply(project, [p.model_dump(mode='json', exclude_none=True) for p in result.patches])
-    backlog.validate_report(project)
+    with artifact_transaction(project, ['backlog']):
+        _apply(project, [p.model_dump(mode='json', exclude_none=True) for p in result.patches])
+        backlog.validate_report(project)
     _save(project, 'repairs', identity, {'attempted': True})
     after = files.read_json(project, files.BACKLOG, Backlog)
     if digest([i.model_dump(mode='json') for i in b.items]) == digest([i.model_dump(mode='json') for i in after.items]):

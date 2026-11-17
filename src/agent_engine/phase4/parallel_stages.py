@@ -138,7 +138,7 @@ def _collect(root: Path, evidence: Path, plan: dict):
             allowed = (parts[0] in OWNED[agent] or rel == f"requests/{agent}.md"
                        or (parts[0] == "runs" and rel not in before) or parts[0] == "logs")
             if parts[0] == ".engine-breakdown" and agent == "task-breakdown":
-                if len(parts) != 3 or parts[1] not in {"plans", "generation", "reviews", "findings", "repairs"} or not re.fullmatch(r"(?:[0-9a-f]{64}|latest)\.json", parts[2]):
+                if len(parts) != 3 or parts[1] not in {"plans", "generation", "reviews", "findings", "repairs", "operations", "dependencies"} or not re.fullmatch(r"(?:[0-9a-f]{64}|latest)\.json", parts[2]):
                     raise ValueError(f"unexpected workflow receipt path: {rel}")
                 allowed = True
             if parts[0] == ".engine-feature-jobs" and agent == "task-breakdown":

@@ -71,7 +71,10 @@ def test_review_is_complete_cached_and_internal(proj, monkeypatch):
     before = files.path(P, files.BACKLOG).read_bytes()
     result = asyncio.run(workflow.review(P, []))
     assert result['structured_response'].satisfied
-    assert len(calls) > len(files.read_json(P, files.BACKLOG, Backlog).stories())
+    reviewed = {iid for ids in calls for iid in ids}
+    b = files.read_json(P, files.BACKLOG, Backlog)
+    assert {i.item_id for i in b.items if i.level in ('story', 'task')} <= reviewed
+    assert 'cross-feature' in reviewed
     count = len(calls)
     assert asyncio.run(workflow.review(P, []))['structured_response'].satisfied
     assert len(calls) == count
@@ -81,6 +84,7 @@ def test_review_is_complete_cached_and_internal(proj, monkeypatch):
 
 
 def test_incomplete_partition_cannot_approve(proj, monkeypatch):
+    monkeypatch.setattr(workflow, 'model_spec', lambda tier: 'test:model')
     backlog.set_features(P, _features()); backlog.build(P)
     async def fake(schema, purpose, payload, callbacks):
         return workflow.Review(reviewed_ids=[], complete=True, findings=[])
@@ -114,8 +118,10 @@ def test_generation_and_enrichment_without_agent_tools(proj, monkeypatch):
     assert all(t.acceptance_criteria for t in b.tasks_of('S-001-US1'))
     assert files.exists(P, files.BACKLOG_MD)
     count = calls.count(workflow.Generated)
+    dependency_calls = calls.count(workflow.Dependencies)
     asyncio.run(workflow.generate(P, 'Build backlog', []))
     assert calls.count(workflow.Generated) == count
+    assert calls.count(workflow.Dependencies) == dependency_calls
     plans_before = calls.count(workflow.Plan)
     files.write_text(P, 'backlog/implementation-contract.md', 'Reviewed source-backed contract amendment')
     asyncio.run(workflow.generate(P, 'Build backlog', []))

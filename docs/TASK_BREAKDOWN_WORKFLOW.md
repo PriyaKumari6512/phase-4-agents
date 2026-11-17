@@ -48,12 +48,14 @@ without asserting successful completion. Normal recovery commands remain availab
 
 Existing stage call/token/deadline limits and callback usage accounting apply.
 `AGENT_ENGINE_BREAKDOWN_JOB_MAX_CHARS` defaults to 160000 characters per operation;
-this is an admission ceiling, not a token estimate. Oversized evidence returns
-partial status rather than silently truncating requirements. Task reviews batch
-12 task records; artifact reviews page 24000 characters with full source evidence.
+this is a routing threshold, not a token estimate. Oversized evidence is routed to
+lossless paged execution rather than truncated. Task obligations are formed in
+groups of 12 records and then batched with related
+review obligations; artifact pages retain exact source evidence.
 `AGENT_ENGINE_BREAKDOWN_REVIEW_CONCURRENCY` defaults to 4. Feature concurrency uses
 the existing helper setting (bounded at 32). Individual responses are capped at
-16000 tokens or the lower provider limit. `AGENT_ENGINE_BREAKDOWN_REVIEW_RESERVE`
+16000 tokens or the lower provider limit; larger outputs are assembled incrementally.
+`AGENT_ENGINE_BREAKDOWN_REVIEW_RESERVE`
 defaults to 0.2 of stage admission budgets. Concurrent in-flight calls can overshoot
 reported-token limits; missing provider usage cannot be charged. All remaining
 work is cancelled and awaited if a sibling job fails.
@@ -71,3 +73,61 @@ rejection, internal-state exclusion, scoped pagination and failure recovery with
 paid model calls. Fresh provider evaluations are still needed for semantic quality,
 provider-specific response limits, latency and billed cost. Compare identical input
 bytes across fresh generation, unchanged resume and a local requirement edit.
+
+## Completion and preservation update
+
+Oversized operations now enter `paged_operation.py` automatically instead of
+raising a size-exhaustion error. Inputs are serialized losslessly into exact pages;
+output is assembled incrementally by JSON path and validated against the original
+schema. Source-page coverage is checked in code. Both input access and partial
+output survive transcript compaction. Resume receipts bind the complete payload,
+schema, instructions and selected model. Response parsing/length failures also
+enter this path, so large outputs do not require fitting one response. Transport
+errors retain the existing model escalation behavior. Ordinary calls still use
+the direct structured-response fast path.
+
+The paged worker has only five local operations: read input, read schema, read
+output, edit retained output, and complete. It cannot run shell commands, write
+public artifacts or approve gates. Only the caller publishes a fully validated
+result. Paged execution continues under normal pass/stage deadlines and accounting;
+size is no longer a termination condition. A provider outage, exhausted execution
+budget, invalid result or incomplete semantic review still cannot be reported as
+successful completion. Retained receipts allow work to resume.
+
+Evidence is frozen per generation/review/repair operation, and source changes
+before completion invalidate the result. Project settings and estimation history
+are read from that same frozen view. The parent publishes the shared contract
+before feature jobs start. Existing public source and artifact formats are unchanged.
+
+Generation now fills missing/invalid fields on partially enriched items without
+overwriting retained valid fields or story effort allocations. Structural repairs
+restore unaffected canonical stories, phases, requirements and decisions before
+publication; unchanged records recover their valid enrichment after rebuild.
+Multi-feature structural repairs and field-patch batches roll back public files
+on ordinary failure or cancellation. Source/output hash checks prevent acceptance
+of a checkpoint whose files were rolled back. Existing byte-level writer
+transactions still protect each published feature. A machine crash can leave
+partial artifacts, which must pass the existing recovery/integrity checks.
+
+Semantic review obligations are packed into evidence-sized batches. Exact source
+sections are shared once within each batch and each obligation retains explicit
+source references and required IDs. The aggregate verdict still requires every
+obligation; it does not approve a sample. Cross-feature review includes task scope,
+criteria, paths and dependencies in addition to stories and contracts. Dependency
+analysis is cached against its complete input and selected model/instructions,
+including the post-application identity for unchanged reruns.
+
+The configured pack's current model tier and escalation level now apply to each
+operation. Review receives the configured validator prompt and original request,
+including imports without a request-history file. No model downgrade is introduced.
+`AGENT_ENGINE_BREAKDOWN_REVIEW_BATCH_CHARS` defaults to 64000; the existing job
+ceiling remains the direct-call/paged-call routing threshold. Paged input reads are
+12000 characters, with schema pages and output continuation available as needed.
+
+New tests cover lossless multi-page input/output and resume, mandatory read/schema
+completion, tool-driven paged execution, reduced duplicate serialized evidence,
+field-level enrichment retention, structural repair rollback, unaffected-story
+preservation, model selection, frozen-input invalidation, and dependency reuse.
+The evidence-batching test measures serialized input reduction on a controlled
+fixture, not billed tokens. Live-provider quality and cost comparisons remain
+necessary before claiming a measured performance gain.
