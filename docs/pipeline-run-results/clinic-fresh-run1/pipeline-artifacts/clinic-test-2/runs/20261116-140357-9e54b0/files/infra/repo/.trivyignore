@@ -1,0 +1,5 @@
+# Accepted risks for golden-path modules. Owned by the platform team; every entry needs a justification and review.
+
+# AWS-0104 (unrestricted egress) in terraform-aws-modules/eks node groups: worker nodes need outbound access through
+# the NAT gateway to pull container images and reach AWS APIs. Ingress stays private. Reviewed: platform team.
+AWS-0104

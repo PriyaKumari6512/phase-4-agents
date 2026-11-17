@@ -1,0 +1,7 @@
+$ find gitops -name '*.yaml' -not -path '*/charts/*' -not -name 'values.yaml' | xargs -r kubeconform -strict -summary -ignore-missing-schemas
+exit=0 timed_out=False
+--- stdout ---
+Summary: 10 resources found in 10 files - Valid: 0, Invalid: 0, Errors: 0, Skipped: 10
+
+--- stderr ---
+

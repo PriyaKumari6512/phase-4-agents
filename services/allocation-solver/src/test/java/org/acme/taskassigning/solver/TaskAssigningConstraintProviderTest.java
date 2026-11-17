@@ -34,6 +34,27 @@ class TaskAssigningConstraintProviderTest {
     }
 
     @Test
+    void dependentCannotStartBeforeAnotherEmployeesTaskFinishes() {
+        var before = aTask("before").employee(anEmployee("E1")).startTime(0).build();
+        var after = aTask("after").employee(anEmployee("E2")).startTime(10).build();
+        after.setPredecessorIds(List.of("before"));
+        constraintVerifier.verifyThat(TaskAssigningConstraintProvider::taskPrecedence)
+                .given(before, after).penalizesBy(1);
+        after.setStartTime(before.getEndTime());
+        constraintVerifier.verifyThat(TaskAssigningConstraintProvider::taskPrecedence)
+                .given(before, after).penalizesBy(0);
+    }
+
+    @Test
+    void dependentCannotBeAssignedWhenItsPredecessorIsUnassigned() {
+        var before = aTask("before").build();
+        var after = aTask("after").employee(anEmployee("E2")).startTime(0).build();
+        after.setPredecessorIds(List.of("before"));
+        constraintVerifier.verifyThat(TaskAssigningConstraintProvider::taskPrecedence)
+                .given(before, after).penalizesBy(1);
+    }
+
+    @Test
     void noMissingSkillsPenalized() {
         var employee = anEmployee("E1").skills(List.of("Skill A"));
         var task = aTask("1").taskType(aTaskType("T1").requiredSkills(List.of("Skill A", "Skill B")))

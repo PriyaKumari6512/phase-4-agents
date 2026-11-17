@@ -1,0 +1,58 @@
+# Operations added by feature 001 to contracts/clinic-api-v1.openapi.yaml (copied in task T012).
+openapi: 3.0.3
+info:
+  title: BrightSmile clinic API - platform operations
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      summary: Health check used by the load balancer, the smoke test, probes and rollback
+      operationId: getHealth
+      responses:
+        "200":
+          description: API and database are working
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: API is running but the database is not reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/v1/feature-flags:
+    get:
+      summary: Current feature switches for the web app (Release 2 screens)
+      operationId: listFeatureFlags
+      responses:
+        "200":
+          description: All switches
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [flags]
+                properties:
+                  flags:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                    example:
+                      r2.family-members: false
+                      r2.noshow-block: false
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        database:
+          type: string
+          enum: [ok, unreachable]
+        version:
+          type: string
+          description: Release version, no personal data

@@ -56,6 +56,15 @@ jobs:
           aws ecr get-login-password | docker login --username AWS --password-stdin "${{ "{{" }} vars.ECR_REGISTRY {{ "}}" }}"
           docker build -t "${{ "{{" }} vars.ECR_REGISTRY {{ "}}" }}/{{ project }}/{{ component }}:${{ "{{" }} github.sha {{ "}}" }}" .
           docker push "${{ "{{" }} vars.ECR_REGISTRY {{ "}}" }}/{{ project }}/{{ component }}:${{ "{{" }} github.sha {{ "}}" }}"
-      # Promotion is not generated: a new tag reaches gitops/apps/{{ component }}/<env>/values.yaml through a PR to the
-      # infra repo (or Argo CD Image Updater); Argo CD then syncs. Never kubectl apply from CI.
+      - name: Record immutable build metadata
+        env:
+          IMAGE_REPO: ${{ "{{" }} vars.ECR_REGISTRY {{ "}}" }}/{{ project }}/{{ component }}
+          BUILD_SHA: ${{ "{{" }} github.sha {{ "}}" }}
+        run: |
+          digest=$(aws ecr describe-images --repository-name "{{ project }}/{{ component }}" --image-ids imageTag="$BUILD_SHA" --query 'imageDetails[0].imageDigest' --output text)
+          python -c 'import json,os,sys; json.dump({"component":"{{ component }}","digest":sys.argv[1],"sha":os.environ["BUILD_SHA"]},open("image.json","w"))' "$digest"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-{{ component }}
+          path: image.json
 {%- endif %}

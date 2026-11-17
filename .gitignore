@@ -6,3 +6,5 @@ __pycache__/
 outputs/
 logs/
 .cache/
+# Local Java build/test products
+services/allocation-solver/target/

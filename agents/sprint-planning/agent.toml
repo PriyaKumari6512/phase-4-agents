@@ -1,16 +1,18 @@
-# Sprint Planning (PDLC Phase 4, agent 2): approved backlog -> capacity -> CP-SAT sprint plan with goals.
-description = "Sprint Planning: packs the approved backlog into sprints by value, capacity, dependencies and deadlines."
-model = "strong"
-filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
-tools = ["phase4-sprint"]
+# Sprint Planning (PDLC Phase 4, step 4.2): approved backlog -> sprints, goals and a release plan.
+# The engine plans in code (src/agent_engine/phase4/sprint.py, sprint_planning.py); the model writes the goals,
+# deferral explanations and summary in one structured call. system_prompt.md is that call's instruction.
+description = "Sprint Planning: places the approved stories into sprints by priority, dependencies, capacity and release deadlines, with goals and a release plan."
+# Small model by default (PDLC tier S); a failed check escalates the fix pass to the mid-tier model.
+model = ["fast", "strong"]
+filesystem = ["ls", "read_file"]
 verifier = "sprint-planning/validator"
 max_fix_loops = 2
 request_history = "agent"
 
 [input]
-description = "backlog/backlog.json approved at gate P4-G1, and phase4/project.json (team, calendar, holidays, PTO, deadlines, maintenance share). Optional: phase4/history.json (closed sprints for velocity), a previous sprint/sprint-plan.json (kept stable), and approver pins or a chosen option in the request."
+description = "backlog/backlog.json approved at gate P4-G1 (stories with release, rank, estimates and dependencies; the roadmap) and phase4/project.json (team, calendar, holidays, PTO, deadlines, release_deadlines, maintenance share). Optional: phase4/history.json (closed sprints for velocity) and a previous sprint/sprint-plan.json (kept stable). Pins or a chosen option come from a reviewer's request."
 files = ["backlog/backlog.json", "gates/P4-G1.approved.json", "phase4/project.json"]
 
 [output]
-description = "sprint/sprint-plan.json (sprints with stories, goals, P50/P85 capacity, deferrals with reasons, forecast, solver report, options when infeasible) and sprint/sprint-plan.md for the P4-G2 review."
+description = "sprint/sprint-plan.json (sprints with stories and goals, P50/P85 capacity, deferrals with reasons, release plan, forecast, solver report, options when infeasible) and sprint/sprint-plan.md for the Scrum Master / Engineering Manager at P4-G2."
 files = ["sprint/sprint-plan.json", "sprint/sprint-plan.md"]

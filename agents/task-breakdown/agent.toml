@@ -1,25 +1,18 @@
-# Task Breakdown (PDLC Phase 4, agent 1): prd.md + architecture.md -> spec-kit specs -> estimated backlog.
-description = "Task Breakdown: turns prd.md and architecture.md into spec-kit specs and an estimated, dependency-checked backlog."
-model = "strong"
-filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
-tools = ["phase4-speckit", "phase4-backlog"]
-skills = "skills"
+# Task Breakdown (PDLC Phase 4, step 4.1): approved stories -> FE / BE / DB / DevOps / QA tasks with estimates and
+# dependencies. The engine runs it as structured calls (src/agent_engine/phase4/task_breakdown.py): one per story,
+# one cross-story pass; system_prompt.md is the shared, cached instruction for both.
+description = "Task Breakdown: splits the approved stories into FE/BE/DB/DevOps/QA tasks with estimates, acceptance criteria and dependencies."
+# Mid-tier by default (PDLC tier M); a failed check escalates the fix pass to the frontier model.
+model = ["strong", "frontier"]
+filesystem = ["ls", "read_file"]
 verifier = "task-breakdown/validator"
 max_fix_loops = 2
 request_history = "agent"
 
 [input]
-description = "prd.md (from the prd agent), architecture.md, and phase4/project.json (team, Definition of Done, story point scale, repos, deadlines). Optional: phase4/history.json (resolved tickets, for estimation by analogy)."
-files = ["prd.md", "architecture.md", "phase4/project.json"]
+description = "phase4/stories.json (the approved stories, imported from Jira), prd.md, architecture.md, phase4/project.json (team, Definition of Done, story point scale, repos, deadlines), and the approvals of the design (G3A) and architecture (G3B) gates. Optional: phase4/history.json (resolved tickets, for estimation by analogy)."
+files = ["phase4/stories.json", "prd.md", "architecture.md", "phase4/project.json", "gates/G3A.approved.json", "gates/G3B.approved.json"]
 
 [output]
-description = "backlog/backlog.json (epics, stories, tasks with acceptance criteria, estimates, skills, dependencies, PRD coverage) and backlog/backlog.md for the P4-G1 review; spec-kit specs under specs/."
+description = "backlog/backlog.json (the approved stories with their tasks: discipline, acceptance criteria, hours, skills, dependencies) and backlog/backlog.md for the Tech Lead's review at P4-G1."
 files = ["backlog/backlog.json", "backlog/backlog.md"]
-
-[subagents.speckit-feature]
-description = "Runs github spec-kit (specify, plan, tasks, analyze) for ONE feature. Task description must give: the project name, the feature_directory (specs/NNN-name), the feature title and its full description with the prd.md requirement ids it covers and the architecture components involved."
-prompt = "subagents/speckit-feature.md"
-
-[subagents.backlog-enricher]
-description = "Enriches ONE epic in backlog/backlog.json: story estimates by analogy, task acceptance criteria, skills, AI-eligibility proposals. Task description must give: the project name and the epic id (E-NNN)."
-prompt = "subagents/backlog-enricher.md"

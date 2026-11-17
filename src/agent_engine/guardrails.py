@@ -10,6 +10,7 @@ the gap.
 from __future__ import annotations
 
 import logging
+import posixpath
 from typing import Any, Awaitable, Callable
 
 from langchain.agents.middleware import AgentMiddleware, ToolCallRequest
@@ -18,13 +19,14 @@ from langgraph.types import Command
 
 from agent_engine.config import MUTATING_FILESYSTEM_TOOLS, OUTPUTS_VIRTUAL_PREFIX, READ_ONLY_PROJECT_DIRS
 from agent_engine.logging_setup import notify_job_log_path
+from agent_engine.runtime import active_project, active_inputs, managed_outputs
 
 logger = logging.getLogger(__name__)
 
 
 def _normalize(file_path: str) -> str:
     normalized = file_path.strip().replace("\\", "/")
-    return normalized if normalized.startswith("/") else "/" + normalized
+    return posixpath.normpath("/" + normalized.lstrip("/"))
 
 
 def _is_under_outputs(file_path: str) -> bool:
@@ -37,7 +39,8 @@ def _is_read_only(file_path: str) -> bool:
     (inputs/, gates/, ...), including the folders themselves.
     """
     parts = [p for p in _normalize(file_path).removeprefix(OUTPUTS_VIRTUAL_PREFIX).split("/") if p]
-    return len(parts) >= 2 and parts[1] in READ_ONLY_PROJECT_DIRS
+    return len(parts) >= 2 and (parts[1] in READ_ONLY_PROJECT_DIRS or parts[1] == "report.json"
+                               or parts[1].startswith(".engine-") or "/".join(parts[1:]) in active_inputs.get() | managed_outputs.get())
 
 
 def _has_traversal(file_path: str) -> bool:
@@ -71,7 +74,6 @@ class OutputsOnlyGuardMiddleware(AgentMiddleware):
         file_path = request.tool_call["args"].get("file_path")
         if not file_path:
             return await handler(request)
-
         if _has_traversal(file_path):
             logger.warning("%s rejected: %r contains '..' or a leading '~'", tool_name, file_path)
             return ToolMessage(
@@ -85,6 +87,9 @@ class OutputsOnlyGuardMiddleware(AgentMiddleware):
                 tool_call_id=request.tool_call["id"],
             )
 
+        project = active_project.get()
+        if project and _is_under_outputs(file_path) and not _normalize(file_path).startswith(f"/outputs/{project}/"):
+            return ToolMessage(content=f"ERROR: this run may write only /outputs/{project}/", tool_call_id=request.tool_call["id"])
         if _is_under_outputs(file_path) and _is_read_only(file_path):
             logger.warning("%s rejected: %r is in a read-only project folder", tool_name, file_path)
             return ToolMessage(

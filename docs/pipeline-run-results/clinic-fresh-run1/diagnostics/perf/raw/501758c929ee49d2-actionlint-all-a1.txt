@@ -1,0 +1,6 @@
+$ actionlint -no-color .github/workflows/*.yml
+exit=0 timed_out=False
+--- stdout ---
+
+--- stderr ---
+

@@ -1,0 +1,88 @@
+# Additions to api-clinic-api-v1 (clinic-api/contracts/clinic-api-v1.openapi.yaml), backward compatible.
+# Auth: JWT in HttpOnly cookie, CSRF header on writes (rel-005). The caller's account comes from the token, never from the request.
+# While the family_members flag is off, the two new operations answer 404.
+openapi: 3.0.3
+info:
+  title: Family members additions
+  version: 1.1.0-family-members
+paths:
+  /api/me/people:
+    get:
+      summary: People on my account (me first, then family members)
+      operationId: listMyPeople
+      responses:
+        "200":
+          description: The account holder and the active family members
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [people, family_limit]
+                properties:
+                  family_limit:
+                    type: integer
+                    example: 5
+                  people:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Person"
+        "401": { description: Not signed in }
+        "404": { description: Flag off }
+  /api/me/family-members:
+    post:
+      summary: Add a family member to my account
+      operationId: addFamilyMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FamilyMemberIn"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "401": { description: Not signed in }
+        "404": { description: Flag off }
+        "409":
+          description: Limit of 5 reached (FAMILY_LIMIT_REACHED) or duplicate person (FAMILY_DUPLICATE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422": { description: Name empty or birth year out of range }
+  # Extended operations (defined in features 004 and 005; fields added here):
+  #   POST booking request: optional person_id (uuid). Absent means the account holder.
+  #     404 if person_id is not a person of the caller's account. Booking response and
+  #     confirmation include person {id, name}.
+  #   GET appointment list and GET appointment: every appointment includes person {id, name};
+  #     the list covers all persons of the caller's account and nobody else.
+components:
+  schemas:
+    FamilyMemberIn:
+      type: object
+      required: [name, birth_year]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        birth_year:
+          type: integer
+          minimum: 1900
+    Person:
+      type: object
+      required: [id, name, birth_year, is_account_holder]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        birth_year: { type: integer }
+        is_account_holder: { type: boolean }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }

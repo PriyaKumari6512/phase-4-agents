@@ -14,22 +14,39 @@
 # description = "Scope: the requirements and scope documents"
 # files = ["requirements/register.md", "scope/scope.md"]
 
+# --- PDLC Phase 3: design gates that must be approved before Phase 4 starts ---
+# "Phase 4 starts only when both G3A and G3B are approved" (PDLC workflow). The orchestrator
+# and the Task Breakdown agent refuse to run until both are approved and unchanged.
+
+[G3A]
+description = "UX/UI design approval: screens, prototype and design reports (UX/Design Lead + Product Manager)"
+files = ["designs/designs.md"]
+
+[G3B]
+description = "Architecture approval: HLD/LLD, data model and API contract (Solution Architect / Tech Lead)"
+files = ["architecture.md"]
+
 # --- PDLC Phase 4: Task, Sprint & Environment Setup --------------------------
-# After each approval, `agent-engine phase4 publish ...` pushes the approved
-# file to the tracker / GitHub; it refuses while the gate is not approved.
+# Checkpoints are G4 parts 1–4. Publication additionally requires final G4
+# with every checkpoint still approved and every approved artifact unchanged.
 
 [P4-G1]
-description = "Backlog: epics, stories and tasks from the Task Breakdown agent (product owner / tech lead)"
+description = "Task breakdown: tasks, estimates and dependencies for the approved stories (Tech Lead)"
 files = ["backlog/backlog.json"]
 
 [P4-G2]
-description = "Sprint plan from the Sprint Planning agent (delivery manager)"
+description = "Sprint plan and release plan from the Sprint Planning agent (Scrum Master / Engineering Manager)"
 files = ["sprint/sprint-plan.json"]
 
 [P4-G3]
-description = "Task assignments for one sprint from the Work Allocation agent (engineering manager)"
+description = "Task assignments for one sprint from the Work Allocation agent (Engineering Manager)"
 files = ["allocation/assignments.json"]
 
 [P4-G4]
-description = "Infrastructure, GitOps and CI change set from the Infra & Pipeline agent (platform engineer)"
-files = ["infra/intent.json", "infra/manifest.json"]
+description = "Infrastructure, GitOps and CI change set from the Infra & Pipeline agent (DevOps Lead + Solution Architect)"
+files = ["infra/intent.json", "infra/manifest.json", "infra/checks.json", "infra/PR.md"]
+
+# Final G4: the four checkpoint approvals remain independently required.
+[G4]
+description = "Plan and environment approval after G4 parts 1–4: Tech Lead, Engineering Manager / Scrum Master, DevOps Lead and Solution Architect"
+files = ["backlog/backlog.json", "sprint/sprint-plan.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json", "infra/PR.md"]

@@ -39,4 +39,8 @@ dev = [
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
-build-backend = "uv_build"
+build-backend = "build_backend"
+backend-path = ["."]
+
+[tool.uv.build-backend]
+source-include = ["agents/**", "examples/**", "gates.toml", "build_backend.py"]

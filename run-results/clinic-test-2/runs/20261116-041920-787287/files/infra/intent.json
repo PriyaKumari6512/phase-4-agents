@@ -1,0 +1,123 @@
+{
+  "cloud": "aws",
+  "regions": [
+    "us-east-1"
+  ],
+  "environments": [
+    "dev",
+    "stg",
+    "prod"
+  ],
+  "deploy_target": "kubernetes",
+  "components": [
+    {
+      "component_id": "ARCH-001",
+      "name": "taskflow-api",
+      "kind": "service",
+      "needs": [
+        "k8s_workload",
+        "container_registry"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": true,
+      "data_classification": "confidential",
+      "runtime": "Python 3.12, FastAPI",
+      "repo": "acme/taskflow-api",
+      "depends_on": [
+        "ARCH-003",
+        "ARCH-004"
+      ],
+      "secrets": [],
+      "source": "architecture.md Components table, row ARCH-001"
+    },
+    {
+      "component_id": "ARCH-002",
+      "name": "taskflow-web",
+      "kind": "frontend",
+      "needs": [
+        "k8s_workload",
+        "public_endpoint",
+        "container_registry"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": true,
+      "data_classification": "public",
+      "runtime": "Node 22, React",
+      "repo": "acme/taskflow-web",
+      "depends_on": [
+        "ARCH-001"
+      ],
+      "secrets": [],
+      "source": "architecture.md Components table, row ARCH-002 (only public entry point)"
+    },
+    {
+      "component_id": "ARCH-003",
+      "name": "taskflow-db",
+      "kind": "database",
+      "needs": [
+        "postgres"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "confidential",
+      "runtime": "PostgreSQL 16",
+      "repo": null,
+      "depends_on": [],
+      "secrets": [],
+      "source": "architecture.md Components table, row ARCH-003"
+    },
+    {
+      "component_id": "ARCH-004",
+      "name": "taskflow-cache",
+      "kind": "cache",
+      "needs": [
+        "redis"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "internal",
+      "runtime": "Redis 7",
+      "repo": null,
+      "depends_on": [],
+      "secrets": [],
+      "source": "architecture.md Components table, row ARCH-004"
+    },
+    {
+      "component_id": "ARCH-005",
+      "name": "notify-worker",
+      "kind": "worker",
+      "needs": [
+        "k8s_workload"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "confidential",
+      "runtime": "Python 3.12",
+      "repo": "acme/taskflow-api",
+      "depends_on": [
+        "ARCH-003"
+      ],
+      "secrets": [
+        "EMAIL_PROVIDER_API_KEY"
+      ],
+      "source": "architecture.md Components table, row ARCH-005; Key decisions (shared image, email provider key)"
+    }
+  ],
+  "slos": {
+    "api_latency_p95": "300ms",
+    "error_rate": "1%",
+    "availability": "99.5% monthly"
+  },
+  "monthly_budget_usd": 2500.0,
+  "notes": [
+    "Peak 50 rps for 200 teams, so all components are size small.",
+    "Server-sent events and Redis pub/sub are served by taskflow-api and need no extra catalog resource; Postgres GIN full-text search needs none either.",
+    "notify-worker runs the taskflow-api image with a different start command (TODO for a human).",
+    "Email provider key is stored in AWS Secrets Manager and reaches the worker through External Secrets."
+  ]
+}

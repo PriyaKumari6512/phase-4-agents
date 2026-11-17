@@ -1,8 +1,8 @@
 # Infrastructure & Pipeline Setup (PDLC Phase 4, agent 4): architecture.md -> validated IaC, GitOps and CI as a PR.
 description = "Infra & Pipeline: turns architecture.md into validated OpenTofu, GitOps and CI files from the golden-path catalog."
-model = "strong"
-filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
-tools = ["phase4-infra"]
+model = ["strong", "frontier"]
+filesystem = ["ls", "read_file"]
+tools = []
 knowledge = "knowledge"
 verifier = "infra-pipeline/validator"
 max_fix_loops = 2

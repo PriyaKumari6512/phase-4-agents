@@ -1,0 +1,21 @@
+# clinic-api (dev) - values for gitops/charts/app
+name: clinic-api
+image:
+  repository: "ECR_REGISTRY/clinic-test-2/clinic-api"
+  tag: "0.0.0"   # set when a built image is promoted to this environment
+replicas: 1
+http: true
+port: 8000
+healthPath: /health
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPU: 70
+ingress:
+  enabled: true
+  host: ""             # TODO public DNS name for dev
+  certificateArn: ""   # TODO ACM certificate ARN for HTTPS
+envFromSecret: "clinic-api-env"
+env:
+  APP_ENV: "dev"

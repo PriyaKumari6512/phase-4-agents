@@ -85,9 +85,9 @@ def test_later_decision_withdraws_the_approval(project, decision):
 def test_approval_goes_stale_when_an_approved_file_changes(project):
     gates.record_decision(project, G1, "approved", ALICE, BOB)
     inputs = ["scope/scope.md", "gates/G1.approved.json"]
-    assert gates.stale_approvals(project, inputs) == []
+    assert gates.stale_approvals(project, inputs, {"G1": G1}) == []
     (project / "scope/scope.md").write_text("v2", encoding="utf-8")
-    [problem] = gates.stale_approvals(project, inputs)
+    [problem] = gates.stale_approvals(project, inputs, {"G1": G1})
     assert "scope/scope.md changed after G1 was approved" in problem
 
 

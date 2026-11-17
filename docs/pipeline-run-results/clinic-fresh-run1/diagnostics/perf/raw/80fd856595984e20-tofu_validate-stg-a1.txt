@@ -1,0 +1,24 @@
+$ cd envs/stg/core && tofu init -backend=false -input=false -no-color >/dev/null && tofu validate -no-color -json; rc=$?; rm -rf .terraform .terraform.lock.hcl; exit $rc
+exit=1 timed_out=False
+--- stdout ---
+
+--- stderr ---
+
+Error: Failed to download module
+
+  on .terraform/modules/eks/main.tf line 399:
+ 399: module "kms" {
+
+Could not download module "kms" (.terraform/modules/eks/main.tf:399) source
+code from
+{"git::https://github.com/terraform-aws-modules/terraform-aws-kms?ref=28846a0d9ba83629f006847f25f0e69bd05116b1"}:
+error downloading
+'https://github.com/terraform-aws-modules/terraform-aws-kms?ref=28846a0d9ba83629f006847f25f0e69bd05116b1':
+/usr/bin/git exited with 128: Cloning into '.terraform/modules/eks.kms'...
+error: could not write config file
+/work/envs/stg/core/.terraform/modules/eks.kms/.git/config: Permission denied
+fatal: could not set 'remote.origin.fetch' to
+'+refs/heads/*:refs/remotes/origin/*'
+.
+
+

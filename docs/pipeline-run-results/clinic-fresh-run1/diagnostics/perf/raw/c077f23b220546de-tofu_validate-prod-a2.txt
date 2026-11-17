@@ -1,0 +1,18 @@
+$ cd envs/prod/core && tofu init -backend=false -input=false -no-color >/dev/null && tofu validate -no-color -json; rc=$?; rm -rf .terraform .terraform.lock.hcl; exit $rc
+exit=1 timed_out=False
+--- stdout ---
+
+--- stderr ---
+
+Error: Error accessing remote module registry
+
+  on main.tf line 117:
+ 117: module "ecr_clinic_api" {
+
+Failed to retrieve available versions for module "ecr_clinic_api"
+(main.tf:117) from registry.opentofu.org: request failed after 2 attempts:
+Get
+"https://registry.opentofu.org/v1/modules/terraform-aws-modules/ecr/aws/versions":
+context deadline exceeded.
+
+

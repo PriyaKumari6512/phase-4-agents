@@ -1,0 +1,175 @@
+variable "certificate_arn" {
+  description = "ACM certificate ARN for the public HTTPS listener (set per environment before apply)."
+  type        = string
+}
+
+module "alb" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  name               = "${var.project}-${var.environment}"
+  load_balancer_type = "application"
+  vpc_id             = module.network.vpc_id
+  subnets            = module.network.public_subnets
+
+  enable_deletion_protection = var.environment == "prod"
+  drop_invalid_header_fields = true
+
+  security_group_ingress_rules = {
+    https = {
+      description = "HTTPS from the internet"
+      from_port   = 443
+      to_port     = 443
+      ip_protocol = "tcp"
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  }
+  security_group_egress_rules = {
+    vpc = {
+      description = "To services in the VPC"
+      ip_protocol = "-1"
+      cidr_ipv4   = var.vpc_cidr
+    }
+  }
+
+  listeners = {
+    https = {
+      port            = 443
+      protocol        = "HTTPS"
+      ssl_policy      = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+      certificate_arn = var.certificate_arn
+      fixed_response = {
+        content_type = "text/plain"
+        message_body = "Not found"
+        status_code  = "404"
+      }
+      rules = {
+{%- for s in services %}
+        {{ s.name }} = {
+          priority = {{ 10 * loop.index }}
+          actions = [{
+            forward = {
+              target_group_key = "{{ s.name }}"
+            }
+          }]
+          conditions = [{
+            path_pattern = {
+              values = ["{{ s.path }}"]
+            }
+          }]
+        }
+{%- endfor %}
+      }
+    }
+  }
+
+  target_groups = {
+{%- for s in services %}
+    {{ s.name }} = {
+      name_prefix       = "{{ s.prefix }}"
+      protocol          = "HTTP"
+      port              = {{ s.port }}
+      target_type       = "ip"
+      create_attachment = false
+      health_check = {
+        enabled  = true
+        path     = "{{ s.health }}"
+        matcher  = "200"
+        interval = 30
+      }
+    }
+{%- endfor %}
+  }
+}
+
+# Rate limit and AWS managed rules in front of the public services (WAF on the load balancer).
+resource "aws_wafv2_web_acl" "edge" {
+  name  = "${var.project}-${var.environment}-edge"
+  scope = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "rate-limit-per-ip"
+    priority = 1
+    action {
+      block {}
+    }
+    statement {
+      rate_based_statement {
+        limit              = 1000
+        aggregate_key_type = "IP"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "rate-limit-per-ip"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "aws-common"
+    priority = 2
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "aws-common"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "aws-known-bad-inputs"
+    priority = 3
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "aws-known-bad-inputs"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.project}-${var.environment}-edge"
+    sampled_requests_enabled   = true
+  }
+}
+
+resource "aws_cloudwatch_log_group" "edge_waf" {
+  name              = "aws-waf-logs-${var.project}-${var.environment}-edge"
+  retention_in_days = 365
+}
+
+resource "aws_wafv2_web_acl_logging_configuration" "edge" {
+  resource_arn            = aws_wafv2_web_acl.edge.arn
+  log_destination_configs = [aws_cloudwatch_log_group.edge_waf.arn]
+}
+
+resource "aws_wafv2_web_acl_association" "alb" {
+  resource_arn = module.alb.arn
+  web_acl_arn  = aws_wafv2_web_acl.edge.arn
+}
+
+output "alb_dns_name" {
+  value = module.alb.dns_name
+}

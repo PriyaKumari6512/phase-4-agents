@@ -56,10 +56,16 @@ class GitHubTracker(TrackerAdapter):
                  ... on ProjectV2IterationField{ id name configuration{ iterations{ id title startDate duration }
                      completedIterations{ id title startDate duration } } } } } } } }"""
         try:
-            p = self.gql(q, {"o": self.cfg.github_owner, "n": self.cfg.github_project_number})["organization"]["projectV2"]
+            owner = self.gql(q, {"o": self.cfg.github_owner, "n": self.cfg.github_project_number}).get("organization")
+            p = owner.get("projectV2") if owner else None
         except TrackerError:
+            p = None
+        if p is None:
             q2 = q.replace("organization(login:$o)", "user(login:$o)")
-            p = self.gql(q2, {"o": self.cfg.github_owner, "n": self.cfg.github_project_number})["user"]["projectV2"]
+            owner = self.gql(q2, {"o": self.cfg.github_owner, "n": self.cfg.github_project_number}).get("user")
+            p = owner.get("projectV2") if owner else None
+        if p is None:
+            raise TrackerError("GitHub project was not found or is not accessible to this token")
         fields = {f["name"]: f for f in p["fields"]["nodes"] if f}
         iteration = next((f for f in fields.values() if "configuration" in f), None)
         points = next((f for n, f in fields.items() if n.lower() in ("story points", "points", "estimate")
@@ -101,16 +107,62 @@ class GitHubTracker(TrackerAdapter):
             body["body"] = fields["body_md"] + (m.group(0) if m else "")
         if body:
             self.http.patch(f"{self.repo}/issues/{external_id}", json=body)
+        if "labels" in fields:
+            current = self.http.get(f"{self.repo}/issues/{external_id}").json()
+            markers = [x["name"] for x in current.get("labels", []) if re.fullmatch(r"p4-[0-9a-f]{8}", x["name"])]
+            self.http.patch(f"{self.repo}/issues/{external_id}", json={"labels": fields["labels"] + markers})
+        if "parent_id" in fields:
+            if fields["parent_id"]:
+                self.http.post(f"{self.repo}/issues/{fields['parent_id']}/sub_issues",
+                               json={"sub_issue_id": self._issue(external_id)["id"], "replace_parent": True})
+            else:
+                parent = self._parent(external_id)
+                if parent:
+                    self.http.delete(f"{self.repo}/issues/{parent}/sub_issue", json={"sub_issue_id": self._issue(external_id)["id"]})
         if "story_points" in fields:
             self._set_points(external_id, fields["story_points"])
 
     def get_fields(self, external_id: str) -> dict:
         r = self.http.get(f"{self.repo}/issues/{external_id}").json()
-        return {"title": r["title"], "body_md": MARKER_RE.sub("", r.get("body") or ""), "story_points": None,
-                "hours": None}
+        points = None
+        if self.project and self.project["points"]:
+            after = None
+            while True:
+                result = self.gql("""query($id:ID!,$name:String!,$after:String){ node(id:$id){ ... on Issue{
+                    projectItems(first:100,after:$after){ pageInfo{hasNextPage endCursor} nodes{ project{id}
+                    fieldValueByName(name:$name){ ... on ProjectV2ItemFieldNumberValue{ number } } } } } } }""",
+                    {"id": r["node_id"], "name": self.project["points"]["name"], "after": after})
+                page = result["node"]["projectItems"]
+                item = next((n for n in page["nodes"] if n["project"]["id"] == self.project["id"]), None)
+                if item is not None:
+                    points = (item.get("fieldValueByName") or {}).get("number")
+                    break
+                if not page["pageInfo"]["hasNextPage"]:
+                    break
+                after = page["pageInfo"]["endCursor"]
+        return {"title": r["title"], "body_md": MARKER_RE.sub("", r.get("body") or ""), "story_points": points,
+                "hours": None, "parent_id": self._parent(external_id),
+                "labels": [x["name"] for x in r.get("labels", []) if not re.fullmatch(r"p4-[0-9a-f]{8}", x["name"])]}
+
+    def _parent(self, number):
+        try:
+            return str(self.http.get(f"{self.repo}/issues/{number}/parent").json()["number"])
+        except TrackerError as exc:
+            if "-> 404" in str(exc):
+                return None
+            raise
 
     def comparable(self, field: str, value):
-        return None if field in ("story_points", "hours") else value   # points live in the project, not the issue
+        return None if field == "hours" or (field == "story_points" and (not self.project or not self.project["points"])) else value
+
+    def _children(self, number):
+        out, page = [], 1
+        while True:
+            batch = self.http.get(f"{self.repo}/issues/{number}/sub_issues", params={"per_page": 100, "page": page}).json()
+            out.extend(str(s["number"]) for s in batch)
+            if len(batch) < 100:
+                return out
+            page += 1
 
     def find_by_marker(self, marker: str, level: str | None = None) -> ExtObj | None:
         r = self.http.get(f"{self.repo}/issues", params={"labels": marker, "state": "all", "per_page": 5}).json()
@@ -121,8 +173,19 @@ class GitHubTracker(TrackerAdapter):
                        json={"issue_id": self._issue(blocker_id)["id"]})
 
     def blocks_of(self, issue_id: str) -> list[str]:
-        r = self.http.get(f"{self.repo}/issues/{issue_id}/dependencies/blocking").json()
-        return [str(i["number"]) for i in r]
+        out, page = [], 1
+        while True:
+            batch = self.http.get(f"{self.repo}/issues/{issue_id}/dependencies/blocking", params={"per_page":100, "page":page}).json()
+            out.extend(str(i["number"]) for i in batch)
+            if len(batch) < 100:
+                return out
+            page += 1
+
+    def remove_blocks(self, blocker_id: str, blocked_id: str) -> None:
+        self.http.delete(f"{self.repo}/issues/{blocked_id}/dependencies/blocked_by/{self._issue(blocker_id)['id']}")
+
+    def reopen_item(self, issue_id: str) -> None:
+        self.http.patch(f"{self.repo}/issues/{issue_id}", json={"state": "open"})
 
     def item_done(self, issue_id: str) -> bool:
         return self.http.get(f"{self.repo}/issues/{issue_id}").json().get("state") == "closed"
@@ -147,8 +210,7 @@ class GitHubTracker(TrackerAdapter):
 
     def move_to_sprint(self, sprint_id: str, issue_ids: list[str]) -> None:
         for n in issue_ids:
-            subs = self.http.get(f"{self.repo}/issues/{n}/sub_issues", params={"per_page": 100}).json()
-            for target in [n] + [str(s["number"]) for s in subs]:
+            for target in [n] + self._children(n):
                 self.gql("""mutation($p:ID!,$i:ID!,$f:ID!,$v:String!){ updateProjectV2ItemFieldValue(input:{projectId:$p,
                          itemId:$i, fieldId:$f, value:{ iterationId:$v } }){ projectV2Item{ id } } }""",
                          {"p": self.project["id"], "i": self._project_item(target),
@@ -156,9 +218,10 @@ class GitHubTracker(TrackerAdapter):
 
     def move_to_backlog(self, issue_ids: list[str]) -> None:
         for n in issue_ids:
-            self.gql("""mutation($p:ID!,$i:ID!,$f:ID!){ clearProjectV2ItemFieldValue(input:{projectId:$p, itemId:$i,
-                     fieldId:$f}){ projectV2Item{ id } } }""",
-                     {"p": self.project["id"], "i": self._project_item(n), "f": self.project["iteration"]["id"]})
+            for target in [n] + self._children(n):
+                self.gql("""mutation($p:ID!,$i:ID!,$f:ID!){ clearProjectV2ItemFieldValue(input:{projectId:$p, itemId:$i,
+                         fieldId:$f}){ projectV2Item{ id } } }""",
+                         {"p": self.project["id"], "i": self._project_item(target), "f": self.project["iteration"]["id"]})
 
     def assign(self, issue_id: str, account_id: str | None) -> None:
         self.http.patch(f"{self.repo}/issues/{issue_id}", json={"assignees": [account_id] if account_id else []})

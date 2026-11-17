@@ -1,8 +1,8 @@
 # Assignment Validator: read-only judge of the Work Allocation agent's assignments.
 description = "Assignment Validator: checks assignments.json against the sprint plan, skills, capacity and AI safety rules."
-model = "strong"
+model = "fast"
 filesystem = ["ls", "read_file", "glob", "grep"]
-tools = ["phase4-allocation-check"]
+tools = []
 returns = "verdict"
 
 [input]

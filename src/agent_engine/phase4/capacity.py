@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import numpy as np
 
+from agent_engine import perf
 from agent_engine.phase4.contracts import ProjectSettings
 from agent_engine.phase4.calendars import unavailable_days, utc_today
 
@@ -27,22 +28,21 @@ class SprintWindow:
     cap_p85: float = 0.0
     reserved: float = 0.0
     active: bool = False
+    as_of: date | None = None
+    availability_notes: list[str] = field(default_factory=list)
 
 
 def sprint_windows(project: ProjectSettings, today: date | None = None) -> list[SprintWindow]:
     cal = project.calendar
     today = today or utc_today()
     L = cal.sprint_length_days
-    n = 0
-    start = cal.first_sprint_start
-    while start + timedelta(days=L - 1) < today:          # skip finished sprints
-        start += timedelta(days=L)
-        n += 1
+    n = max(0, (today - cal.first_sprint_start).days // L)
+    start = cal.first_sprint_start + timedelta(days=n * L)
     out = []
     for i in range(cal.planning_horizon_sprints):
         s = start + timedelta(days=i * L)
         out.append(SprintWindow(index=i + 1, number=n + i + 1, start=s, end=s + timedelta(days=L - 1),
-                                active=(s <= today)))
+                                active=(s <= today), as_of=today))
     return out
 
 
@@ -60,12 +60,17 @@ def fill_availability(project: ProjectSettings, windows: list[SprintWindow]) -> 
     if not windows:
         return
     ids = [m.calendar_id for m in project.team if m.calendar_id]
-    ooo = unavailable_days(ids, windows[0].start, windows[-1].end)
+    with perf.span("calendar", "unavailable_days", calendars=len(ids), sprints=len(windows)) as sp:
+        ooo = unavailable_days(ids, windows[0].start, windows[-1].end,
+                               {m.calendar_id: m.timezone for m in project.team if m.calendar_id})
+        sp.set(calendars_with_days=len([k for k, v in ooo.items() if v]))
     for w in windows:
+        if getattr(ooo, "warning", ""):
+            w.availability_notes.append(ooo.warning)
         total_days = total_hours = 0.0
         for m in project.team:
             excluded = set(cal.holidays) | set(m.pto_days) | ooo.get(m.calendar_id or "", set())
-            days = len(working_days(w.start, w.end, cal.working_weekdays, excluded))
+            days = len(working_days(max(w.start, w.as_of or w.start), w.end, cal.working_weekdays, excluded))
             frac = m.allocation_pct / 100
             hours = max(0.0, days * m.hours_per_day * frac - cal.ceremony_hours_per_sprint * frac)
             w.hours_by_member[m.member_id] = hours
@@ -92,7 +97,13 @@ def monte_carlo_capacity(rates: list[float], person_days: float, rng: np.random.
 def fill_capacity(project: ProjectSettings, windows: list[SprintWindow], history: list[dict],
                   seed: int = 7) -> list[str]:
     """Sets cap_p50 / cap_p85 / reserved per window. Returns assumptions for the plan."""
-    assumptions: list[str] = []
+    with perf.span("compute", "capacity_simulation", sprints=len(windows), history_sprints=len(history),
+                   samples=SAMPLES, seed=seed):
+        return _fill_capacity(project, windows, history, seed)
+
+
+def _fill_capacity(project: ProjectSettings, windows: list[SprintWindow], history: list[dict], seed: int) -> list[str]:
+    assumptions: list[str] = list(dict.fromkeys(note for w in windows for note in w.availability_notes))
     rng = np.random.default_rng(seed)
     rates = history_rates(history)
     if len(history) >= COLD_START_SPRINTS and not rates:
@@ -126,19 +137,26 @@ def fill_capacity(project: ProjectSettings, windows: list[SprintWindow], history
 
 
 def forecast(points_planned: float, windows: list[SprintWindow], history: list[dict], scope_growth: float = 1.1,
-             seed: int = 11) -> tuple[int, int]:
+             seed: int = 11, censored_out: list[int] | None = None) -> tuple[int, int]:
     """Sprint index (1-based, may exceed the horizon) by which the planned scope finishes at P50/P85."""
     rng = np.random.default_rng(seed)
     rates = history_rates(history)
     caps = [w.cap_p50 for w in windows] or [1.0]
     finish = []
+    censored = 0
     for _ in range(2000):
         remaining = points_planned * scope_growth
         k = 0
         while remaining > 0 and k < 60:
             pd = windows[min(k, len(windows) - 1)].person_days
-            cap = float(rng.choice(rates)) * pd if rates else caps[min(k, len(caps) - 1)] * rng.uniform(0.7, 1.1)
-            remaining -= max(cap, 0.1)
+            w = windows[min(k, len(windows) - 1)]
+            reserve_ratio = w.cap_p50 / (w.cap_p50 + w.reserved) if w.cap_p50 + w.reserved > 0 else 0
+            cap = float(rng.choice(rates)) * pd * reserve_ratio if rates else caps[min(k, len(caps) - 1)] * rng.uniform(0.7, 1.1)
+            remaining -= max(cap, 0)
             k += 1
+        censored += remaining > 0
         finish.append(k)
+    if censored_out is not None:
+        censored_out.append(censored)
+    perf.event("forecast", "censoring", samples=len(finish), unfinished=censored, horizon=60)
     return int(np.percentile(finish, 50)), int(np.percentile(finish, 85))

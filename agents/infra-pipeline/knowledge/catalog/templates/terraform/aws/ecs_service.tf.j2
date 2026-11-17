@@ -1,0 +1,189 @@
+{%- for s in secrets %}
+data "aws_secretsmanager_secret" "{{ name }}_{{ s.key | lower }}" {
+  name = "{{ s.path }}"
+}
+{% endfor %}
+resource "aws_cloudwatch_log_group" "{{ name }}" {
+  name              = "/${var.project}/${var.environment}/{{ component }}"
+  retention_in_days = 365
+}
+
+module "svc_{{ name }}" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  name        = "{{ component }}"
+  cluster_arn = module.ecs_cluster.arn
+  cpu         = {{ cpu }}
+  memory      = {{ memory }}
+
+  desired_count            = {{ replicas }}
+  enable_autoscaling       = true
+  autoscaling_min_capacity = {{ replicas }}
+  autoscaling_max_capacity = {{ max_replicas }}
+
+  enable_execute_command = false
+  subnet_ids             = module.network.private_subnets
+  assign_public_ip       = false
+{%- if secrets %}
+  task_exec_secret_arns = [
+{%- for s in secrets %}
+    data.aws_secretsmanager_secret.{{ name }}_{{ s.key | lower }}.arn,
+{%- endfor %}
+  ]
+{%- endif %}
+
+  container_definitions = {
+    {{ name }} = {
+      image                  = "${local.ecr_registry}/${var.project}/{{ image }}@${var.image_digests["{{ image }}"]}"
+      essential              = true
+      readonlyRootFilesystem = true
+{%- if command %}
+      command                = {{ command }} # TODO set the command this component runs with (it shares the {{ image }} image)
+{%- endif %}
+{%- if http %}
+      portMappings = [{
+        name          = "http"
+        containerPort = {{ port }}
+        protocol      = "tcp"
+      }]
+{%- endif %}
+      environment = [{
+        name  = "APP_ENV"
+        value = var.environment
+      }]
+{%- if secrets %}
+      secrets = [
+{%- for s in secrets %}
+        {
+          name      = "{{ s.key }}"
+          valueFrom = data.aws_secretsmanager_secret.{{ name }}_{{ s.key | lower }}.arn
+        },
+{%- endfor %}
+      ]
+{%- endif %}
+      enable_cloudwatch_logging   = true
+      create_cloudwatch_log_group = false
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.{{ name }}.name
+          awslogs-region        = var.region
+          awslogs-stream-prefix = "{{ component }}"
+        }
+      }
+    }
+  }
+{%- if public %}
+
+  load_balancer = {
+    service = {
+      target_group_arn = module.alb.target_groups["{{ name }}"].arn
+      container_name   = "{{ name }}"
+      container_port   = {{ port }}
+    }
+  }
+
+  security_group_ingress_rules = {
+    alb = {
+      description                  = "HTTP from the load balancer"
+      from_port                    = {{ port }}
+      to_port                      = {{ port }}
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.alb.security_group_id
+    }
+  }
+{%- elif http %}
+
+  security_group_ingress_rules = {
+    vpc = {
+      description = "HTTP from inside the VPC"
+      from_port   = {{ port }}
+      to_port     = {{ port }}
+      ip_protocol = "tcp"
+      cidr_ipv4   = var.vpc_cidr
+    }
+  }
+{%- endif %}
+  security_group_egress_rules = {
+    all = {
+      description = "Outbound to AWS APIs, the database and external providers"
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "{{ name }}_cpu" {
+  alarm_name          = "${var.project}-${var.environment}-{{ component }}-cpu-high"
+  namespace           = "AWS/ECS"
+  metric_name         = "CPUUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 85
+  comparison_operator = "GreaterThanThreshold"
+  dimensions = {
+    ClusterName = module.ecs_cluster.name
+    ServiceName = module.svc_{{ name }}.name
+  }
+}
+{%- if public %}
+
+resource "aws_cloudwatch_metric_alarm" "{{ name }}_5xx" {
+  alarm_name          = "${var.project}-${var.environment}-{{ component }}-5xx-rate"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  threshold           = {{ (error_rate * 100) | round(2) }}
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id          = "rate"
+    expression  = "100 * errors / MAX([requests, 1])"
+    label       = "5xx percent"
+    return_data = true
+  }
+  metric_query {
+    id = "errors"
+    metric {
+      namespace   = "AWS/ApplicationELB"
+      metric_name = "HTTPCode_Target_5XX_Count"
+      period      = 300
+      stat        = "Sum"
+      dimensions = {
+        LoadBalancer = module.alb.arn_suffix
+        TargetGroup  = module.alb.target_groups["{{ name }}"].arn_suffix
+      }
+    }
+  }
+  metric_query {
+    id = "requests"
+    metric {
+      namespace   = "AWS/ApplicationELB"
+      metric_name = "RequestCount"
+      period      = 300
+      stat        = "Sum"
+      dimensions = {
+        LoadBalancer = module.alb.arn_suffix
+        TargetGroup  = module.alb.target_groups["{{ name }}"].arn_suffix
+      }
+    }
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "{{ name }}_p95" {
+  alarm_name          = "${var.project}-${var.environment}-{{ component }}-p95-latency"
+  namespace           = "AWS/ApplicationELB"
+  metric_name         = "TargetResponseTime"
+  extended_statistic  = "p95"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = {{ p95_seconds }}
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  dimensions = {
+    LoadBalancer = module.alb.arn_suffix
+    TargetGroup  = module.alb.target_groups["{{ name }}"].arn_suffix
+  }
+}
+{%- endif %}

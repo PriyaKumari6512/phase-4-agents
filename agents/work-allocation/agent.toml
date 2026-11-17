@@ -1,8 +1,8 @@
 # Work Allocation (PDLC Phase 4, agent 3): approved sprint -> who does each task (people or AI coding agents).
 description = "Work Allocation: assigns one sprint's tasks to people and AI coding agents by skill, ownership and capacity."
-model = "strong"
-filesystem = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
-tools = ["phase4-allocation"]
+model = ["fast", "strong"]
+filesystem = ["ls", "read_file"]
+tools = []
 verifier = "work-allocation/validator"
 max_fix_loops = 2
 request_history = "agent"

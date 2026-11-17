@@ -1,0 +1,33 @@
+data "aws_caller_identity" "current" {}
+
+variable "image_digests" {
+  description = "Immutable image digest per image name (sha256:...). Promotion PRs change only images.auto.tfvars.json."
+  type        = map(string)
+}
+
+locals {
+  ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com"
+}
+
+module "ecs_cluster" {
+  source  = "{{ module.source }}"
+  version = "{{ module.version }}"
+
+  name = "${var.project}-${var.environment}"
+
+  setting = [{
+    name  = "containerInsights"
+    value = "enabled"
+  }]
+
+  default_capacity_provider_strategy = {
+    FARGATE = {
+      weight = 100
+      base   = 1
+    }
+  }
+}
+
+output "ecs_cluster_name" {
+  value = module.ecs_cluster.name
+}

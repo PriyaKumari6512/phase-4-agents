@@ -9,6 +9,7 @@ import pytest
 
 from agent_engine import config, gates
 from agent_engine.phase4 import orchestrator as orch
+from phase4_helpers import make_design_ready
 
 P = "demo"
 PROJECT = {
@@ -16,10 +17,8 @@ PROJECT = {
     "story_point_scale": [1, 2, 3], "hours_per_story_point": 6, "max_story_points_per_story": 3, "deadlines": [],
     "team": [{"id": "a", "name": "Asha"}], "calendar": {"sprint_length_days": 14},
 }
-OUTPUTS = {  # what each fake agent writes
-    "task-breakdown": ["backlog/backlog.json"], "infra-pipeline": ["infra/intent.json", "infra/manifest.json"],
-    "sprint-planning": ["sprint/sprint-plan.json"], "work-allocation": ["allocation/assignments.json"],
-}
+from agent_engine.agent import load_pack
+OUTPUTS = {s.agent: load_pack(s.agent).output_files for s in orch.STAGES}
 
 
 _RUNS = itertools.count(1)  # one counter for every fake agent, so a re-run always writes new content
@@ -48,6 +47,7 @@ def root(tmp_path, monkeypatch):
     (root / "phase4" / "project.json").write_text(json.dumps(PROJECT), encoding="utf-8")
     (root / "prd.md").write_text("prd", encoding="utf-8")
     (root / "architecture.md").write_text("arch", encoding="utf-8")
+    make_design_ready(root)
     return root
 
 
@@ -90,14 +90,14 @@ def test_test_approve_runs_the_whole_chain_in_order(root):
     assert go(fake, test_approve=True) == orch.DONE and len(fake.calls) == 4  # nothing to do the second time
 
 
-def test_a_team_change_reruns_only_planning_and_allocation(root):
+def test_a_team_change_also_invalidates_infra_codeowners(root):
     go(FakeAgents(root), test_approve=True)
     project = json.loads((root / "phase4" / "project.json").read_text(encoding="utf-8"))
     project["team"].append({"id": "b", "name": "Bo"})
     (root / "phase4" / "project.json").write_text(json.dumps(project), encoding="utf-8")
     fake = FakeAgents(root)
     assert go(fake, test_approve=True) == orch.DONE
-    assert fake.calls == ["sprint-planning", "work-allocation"]  # not the backlog, not the infra
+    assert fake.calls == ["infra-pipeline", "sprint-planning", "work-allocation"]
 
 
 def test_a_prd_change_reruns_everything_that_depends_on_it(root):
@@ -120,7 +120,7 @@ def test_requested_changes_go_back_to_the_owning_agent_with_the_comment(root):
 def test_a_partial_result_stops_the_run_and_is_not_test_approved(root):
     fake = FakeAgents(root, status="partial")
     assert go(fake, test_approve=True) == orch.FAILED
-    assert fake.calls == ["task-breakdown"]
+    assert fake.calls == ["task-breakdown", "infra-pipeline"]  # independent work is retained too
     assert not (root / "gates" / "P4-G1.approved.json").exists()
     assert go(FakeAgents(root, status="partial"), test_approve=True, plan_only=True) == orch.WAITING
 
@@ -140,6 +140,6 @@ def test_a_project_run_by_hand_is_adopted_not_rerun(root):
     for agent in OUTPUTS:
         fake(agent, "", P)
     fake.calls.clear()
-    for name in ("P4-G1", "P4-G2", "P4-G3", "P4-G4"):
+    for name in ("P4-G1", "P4-G2", "P4-G3", "P4-G4", "G4"):
         approve(root, name)
     assert go(fake) == orch.DONE and fake.calls == []

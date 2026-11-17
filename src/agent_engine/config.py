@@ -14,16 +14,20 @@ from pathlib import Path
 
 # src/agent_engine/config.py -> repo root is 2 parents up.
 ENGINE_ROOT = Path(__file__).resolve().parents[2]
-OUTPUTS_DIR = Path(os.environ.get("AGENT_ENGINE_OUTPUTS_DIR") or ENGINE_ROOT / "outputs")
-LOGS_DIR = Path(os.environ.get("AGENT_ENGINE_LOGS_DIR") or ENGINE_ROOT / "logs")
+ASSETS_ROOT = ENGINE_ROOT if (ENGINE_ROOT / "agents").is_dir() else Path(__file__).resolve().parent / "_assets"
+WORK_ROOT = ENGINE_ROOT if ASSETS_ROOT == ENGINE_ROOT else Path.cwd()
+OUTPUTS_DIR = Path(os.environ.get("AGENT_ENGINE_OUTPUTS_DIR") or WORK_ROOT / "outputs")
+LOGS_DIR = Path(os.environ.get("AGENT_ENGINE_LOGS_DIR") or WORK_ROOT / "logs")
 # One folder per agent: agent.toml + system_prompt.md (agent.py).
-AGENTS_DIR = Path(os.environ.get("AGENT_ENGINE_AGENTS_DIR") or ENGINE_ROOT / "agents")
+AGENTS_DIR = Path(os.environ.get("AGENT_ENGINE_AGENTS_DIR") or ASSETS_ROOT / "agents")
 # Human approval gates: which project files each gate approves (gates.py).
-GATES_FILE = Path(os.environ.get("AGENT_ENGINE_GATES_FILE") or ENGINE_ROOT / "gates.toml")
+GATES_FILE = Path(os.environ.get("AGENT_ENGINE_GATES_FILE") or ASSETS_ROOT / "gates.toml")
 
 # Used when ANTHROPIC_API_KEY is set.
 ANTHROPIC_STRONG_MODEL = "anthropic:claude-sonnet-5-5"
 ANTHROPIC_FAST_MODEL = "anthropic:claude-haiku-4-5-20251001"
+# Escalation target for work that failed its checks (PDLC: escalate to a bigger model only on failure).
+ANTHROPIC_FRONTIER_MODEL = "anthropic:claude-opus-5-5"
 
 # OpenAI fallback IDs — drift faster than Anthropic's; override via env if superseded.
 OPENAI_STRONG_MODEL = "openai:gpt-5.6-terra"
@@ -50,10 +54,18 @@ def _env_str(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class ModelTiers:
-    """`strong` for the real work, `fast` for cheap subtasks (summarization)."""
+    """`strong` for the real work, `fast` for cheap subtasks (summarization), `frontier` for escalations."""
 
     strong: str
     fast: str
+    frontier: str = ""          # empty = no bigger model configured; escalation then stays on `strong`
+
+
+def _frontier_for(strong: str) -> str:
+    override = os.environ.get("SDLC_AGENT_FRONTIER_MODEL", "").strip()
+    if override:
+        return override
+    return ANTHROPIC_FRONTIER_MODEL if strong.startswith("anthropic:") else ""
 
 
 # --- Anthropic auth mode -------------------------------------------------------
@@ -82,7 +94,7 @@ def resolve_model_tiers() -> ModelTiers:
     strong_override = os.environ.get("SDLC_AGENT_STRONG_MODEL")
     fast_override = os.environ.get("SDLC_AGENT_FAST_MODEL")
     if strong_override and fast_override:
-        return ModelTiers(strong=strong_override, fast=fast_override)
+        return ModelTiers(strong=strong_override, fast=fast_override, frontier=_frontier_for(strong_override))
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         strong, fast = ANTHROPIC_STRONG_MODEL, ANTHROPIC_FAST_MODEL
@@ -97,7 +109,8 @@ def resolve_model_tiers() -> ModelTiers:
             "SDLC_AGENT_FAST_MODEL explicitly for a different provider)."
         )
 
-    return ModelTiers(strong=strong_override or strong, fast=fast_override or fast)
+    return ModelTiers(strong=strong_override or strong, fast=fast_override or fast,
+                      frontier=_frontier_for(strong_override or strong))
 
 
 # --- Virtual paths ---------------------------------------------------------------

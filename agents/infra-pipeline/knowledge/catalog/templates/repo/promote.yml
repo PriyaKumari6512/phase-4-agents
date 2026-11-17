@@ -1,0 +1,63 @@
+name: Promote immutable image
+on:
+  repository_dispatch:
+    types: [image-built]
+  workflow_dispatch:
+    inputs:
+      component:
+        required: true
+        type: string
+      target:
+        required: true
+        type: choice
+        options: [qa, stg, prod]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: gitops-promotion
+  cancel-in-progress: false
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'repository_dispatch' && 'dev' || inputs.target }}
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app.outputs.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install PyYAML==6.0.3
+      - name: Copy approved digest and open promotion PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          COMPONENT: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.component || inputs.component }}
+          TARGET: ${{ github.event_name == 'repository_dispatch' && 'dev' || inputs.target }}
+          DIGEST: ${{ github.event.client_payload.digest }}
+          SOURCE_REPO: ${{ github.event.client_payload.repo }}
+          SOURCE_RUN: ${{ github.event.client_payload.run_id }}
+          EXPECTED_REVIEWER: ${{ inputs.target == 'qa' && vars.QA_APPROVER_ID || inputs.target == 'stg' && vars.CLIENT_APPROVER_ID || vars.DEVOPS_APPROVER_ID }}
+        run: |
+          python scripts/verify-protection.py
+          if [ "$TARGET" = dev ]; then
+            python scripts/verify-build.py
+            python scripts/promote.py "$COMPONENT" "$TARGET" --digest "$DIGEST"
+          else
+            python scripts/promote.py "$COMPONENT" "$TARGET"
+          fi
+          if git diff --quiet; then exit 0; fi
+          branch="promote/${TARGET}/${GITHUB_RUN_ID}"
+          git checkout -b "$branch"
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add -A
+          git commit -m "Promote immutable image to $TARGET"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Promote image to $TARGET" --body "Copy the same approved image digest through the environment chain. Required environment and branch approvals apply."

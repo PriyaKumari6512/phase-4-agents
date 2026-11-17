@@ -17,15 +17,20 @@ spec:
       name: '{{ "{{" }}index .path.segments 2{{ "}}" }}-{{ environment }}'
     spec:
       project: default
-      source:
-        repoURL: {{ repo_url }}
-        targetRevision: HEAD
-        path: gitops/charts/app
-        helm:
-          valueFiles:
-            - '../../apps/{{ "{{" }}index .path.segments 2{{ "}}" }}/{{ environment }}/values.yaml'
+      sources:
+        - repoURL: {{ repo_url }}
+          targetRevision: HEAD
+          path: gitops/charts/app
+          helm:
+            valueFiles:
+              - '../../apps/{{ "{{" }}index .path.segments 2{{ "}}" }}/{{ environment }}/values.yaml'
+        - repoURL: {{ repo_url }}
+          targetRevision: HEAD
+          path: 'gitops/apps/{{ "{{" }}index .path.segments 2{{ "}}" }}/{{ environment }}'
+          directory:
+            exclude: values.yaml
       destination:
-        server: https://kubernetes.default.svc
+        name: {{ project }}-{{ environment }}
         namespace: {{ project }}-{{ environment }}
       syncPolicy:
         automated:
