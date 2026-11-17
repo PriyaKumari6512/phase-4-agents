@@ -14,13 +14,14 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Values.name }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: app
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}@{{ required "image.digest is required" .Values.image.digest }}"
           {{- with .Values.args }}
           args:
             {{- toYaml . | nindent 12 }}

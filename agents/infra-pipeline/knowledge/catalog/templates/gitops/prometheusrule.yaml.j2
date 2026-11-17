@@ -12,7 +12,7 @@ spec:
         - alert: {{ alert_prefix }}PodCrashLooping
           expr: increase(kube_pod_container_status_restarts_total{namespace="{{ project }}-{{ environment }}", pod=~"{{ component }}-.*"}[15m]) > 3
           for: 5m
-          labels: {severity: warning}
+          labels: {severity: warning, project: "{{ project }}", environment: "{{ environment }}", team: platform}
           annotations:
             summary: "{{ component }} pods are restarting repeatedly"
 {%- if http %}
@@ -21,14 +21,14 @@ spec:
             sum(rate(http_server_request_duration_seconds_count{service_name="{{ component }}", http_response_status_code=~"5.."}[5m]))
               / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name="{{ component }}"}[5m])), 1e-9) > {{ error_rate }}
           for: 10m
-          labels: {severity: critical}
+          labels: {severity: critical, project: "{{ project }}", environment: "{{ environment }}", team: platform}
           annotations:
             summary: "{{ component }} 5xx rate above {{ (error_rate * 100) | round(2) }}%"
         - alert: {{ alert_prefix }}HighLatencyP95
           expr: |
             histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="{{ component }}"}[5m]))) > {{ p95_seconds }}
           for: 10m
-          labels: {severity: warning}
+          labels: {severity: warning, project: "{{ project }}", environment: "{{ environment }}", team: platform}
           annotations:
             summary: "{{ component }} p95 latency above {{ p95_seconds }}s"
 {%- endif %}

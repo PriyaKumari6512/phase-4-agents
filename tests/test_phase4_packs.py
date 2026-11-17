@@ -51,8 +51,8 @@ def test_wrong_argument_types_come_back_as_text(tmp_path, monkeypatch):
     from agent_engine.phase4 import tools
 
     monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
-    bad = tools.infra_set_intent.invoke({"project": "p", "intent": "not a dict"})
-    assert isinstance(bad, str) and "intent" in bad
+    bad = tools.backlog_view.invoke({"project": "p", "limit": "not an integer"})
+    assert isinstance(bad, str) and "limit" in bad
 
 
 @pytest.mark.parametrize("text, hit", [

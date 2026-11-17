@@ -156,7 +156,7 @@ def _io_lines(pack: AgentPack, project: str) -> str:
     return ("\n\n" + "\n".join(lines)) if lines else ""
 
 
-STRUCTURED_STAGES = {"task-breakdown": "task_breakdown", "sprint-planning": "sprint_planning", "work-allocation": "work_allocation"}
+STRUCTURED_STAGES = {"task-breakdown": "task_breakdown", "sprint-planning": "sprint_planning", "work-allocation": "work_allocation", "infra-pipeline": "infra_pipeline"}
 
 
 def _agent_message(pack: AgentPack, request: str, project_name: str, request_number: int) -> str:

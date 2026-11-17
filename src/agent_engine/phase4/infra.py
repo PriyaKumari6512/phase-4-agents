@@ -38,10 +38,10 @@ from agent_engine.phase4.contracts import (
 )
 from agent_engine.phase4.settings import get_settings
 
-ENV_CIDR = {"dev": "10.10.0.0/16", "stg": "10.20.0.0/16", "prod": "10.30.0.0/16"}
+ENV_CIDR = {"qa": "10.40.0.0/16", "dev": "10.10.0.0/16", "stg": "10.20.0.0/16", "prod": "10.30.0.0/16"}
 # minimum replicas per size class and environment; autoscaling max = min x MAX_FACTOR
-REPLICAS = {"small": {"dev": 1, "stg": 1, "prod": 2}, "medium": {"dev": 1, "stg": 2, "prod": 3},
-            "large": {"dev": 2, "stg": 2, "prod": 4}}
+REPLICAS = {"small": {"qa": 1, "dev": 1, "stg": 1, "prod": 2}, "medium": {"qa": 1, "dev": 1, "stg": 2, "prod": 3},
+            "large": {"qa": 2, "dev": 2, "stg": 2, "prod": 4}}
 MAX_FACTOR = {"small": 2, "medium": 3, "large": 3}
 RUNTIME_RE = re.compile(r"(python|node|java)[^0-9]*([0-9]+(?:\.[0-9]+)?)?", re.I)
 DEPENDENCY_SECRET = {"database": "DATABASE_URL", "cache": "REDIS_URL", "queue": "QUEUE_URL"}
@@ -236,6 +236,8 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
     out.add(f"gitops/applicationsets/{project}-{env}-platform.yaml",
             j.get_template("gitops/platform-application.yaml.j2").render(project=project, environment=env, repo_url=repo_url),
             "template", "observability")
+    out.add(f"gitops/platform/{env}/access.yaml", j.get_template("gitops/access.yaml.j2").render(
+        project=project, environment=env), "template", "access")
     out.add(f"gitops/platform/{env}/clustersecretstore.yaml",
             j.get_template("gitops/clustersecretstore.yaml.j2").render(region=region), "template", "external-secrets")
     by_id = {c.component_id: c for c in it.components}
@@ -308,6 +310,9 @@ def render(project: str) -> str:
         out.add(".github/workflows/drift.yml", j.get_template("repo/drift.yml.j2").render(
             environments=it.environments, actions=ACTIONS, tofu_version=TOFU_VERSION, region=it.regions[0]),
             "template", None)
+        for document in ("RUNBOOK", "BRANCHING"):
+            out.add(f"docs/{document}.md", j.get_template(f"repo/{document}.md.j2").render(
+                project=project, environments=it.environments), "template", document.lower())
         out.add("CODEOWNERS", j.get_template("repo/CODEOWNERS.j2").render(
             platform_team=" @".join(owners) if owners else "platform-team",
             prod_approvers=" @".join(owners[1:] or owners) if owners else "prod-approvers"), "template", None)
@@ -320,9 +325,20 @@ def render(project: str) -> str:
             if not mod.get("verified"):
                 out.gaps.append(f"module {mod['source']} {mod['version']} is a version range, not a verified pin; "
                                 "confirm it with infra_registry_versions")
-        out.gaps.append("image promotion is not generated: CI builds and pushes images, and a new tag reaches "
-                        "gitops/apps/<component>/<env>/values.yaml through a PR to the infra repo (or Argo CD Image "
-                        "Updater, installed by the platform team)")
+        for name in ("promote.py", "verify-build.py"):
+            out.add(f"scripts/{name}", (catalog_dir() / "templates/repo" / name).read_text(), "template", "promotion")
+        out.add(".github/workflows/promote.yml", (catalog_dir() / "templates/repo/promote.yml").read_text(), "template", "promotion")
+        images = {}
+        repositories = {}
+        for component in it.components:
+            owner = image_owner(component, it.components)
+            if "k8s_workload" in component.needs and owner:
+                name = ident(owner.name).replace("_", "-")
+                images.setdefault(name, []).append(ident(component.name).replace("_", "-"))
+                repositories[name] = owner.repo
+        out.add("promotion.json", json.dumps({"environments": it.environments, "images": images,
+                                               "repositories": repositories}, indent=2), "generated", "promotion")
+        out.gaps.append("Configure GitHub Environments: QA Lead for qa; client sign-off for stg; go/no-go plus DevOps Lead for prod. Enforce protected main and required PR reviews. Configure the GitOps GitHub App; bootstrap digest placeholders cannot be deployed.")
     # CI per code repo: one workflow per container image (+ Claude Code dispatch workflow when that agent is enabled)
     claude = any(a.provider == "claude_code_action" and a.enabled for a in settings.ai_agents)
     ci: dict[str, dict[str, str]] = {}
@@ -338,6 +354,7 @@ def render(project: str) -> str:
         repo_files[f".github/workflows/ci-{name}.yml"] = j.get_template("repo/ci.yml.j2").render(
             component=name, runtime=c.runtime or "unknown", runtime_lang=lang, runtime_version=version,
             actions=ACTIONS, region=it.regions[0], project=project, reusable_workflow=None)
+        repo_files[".github/workflows/promote-dev.yml"] = (catalog_dir() / "templates/repo/notify.yml").read_text().replace("__INFRA_REPO__", settings.infra_repo)
         if claude:
             repo_files[".github/workflows/phase4-claude.yml"] = j.get_template("repo/phase4-claude.yml.j2").render(
                 actions=ACTIONS)
@@ -452,7 +469,7 @@ def validate(project: str) -> str:
                     secret_hits.append(f.path)
         sp.set(hits=len(secret_hits))
     files.write_json(project, files.INFRA_CHECKS, [c.model_dump(mode="json") for c in checks])
-    manifest.checks_passed = bool(checks) and all(c.passed and not c.skipped for c in checks) and not ci_incomplete and not secret_hits and not gone
+    manifest.checks_passed = not deployment_problems(project, manifest) and bool(checks) and all(c.passed and not c.skipped for c in checks) and not ci_incomplete and not secret_hits and not gone
     manifest.checks_skipped = [c.tool for c in checks if c.skipped]
     manifest.checks_incomplete = sandbox.incomplete(checks) + ci_incomplete
     manifest.validation_complete = bool(checks) and not manifest.checks_incomplete
@@ -497,8 +514,17 @@ def render_pr(project: str, m: InfraManifest, checks: list[CheckResult], it: Inf
         lines += ["", "## Files changed by the agent after rendering", ""] + [f"- `{p}`" for p in edited]
     if m.ci_repos:
         lines += ["", "## CI pull requests", ""] + [f"- `{r}`: workflows under `infra/ci/{repo_dir_name(r)}/`" for r in m.ci_repos]
+    lines += ["", "## Operational documentation", "", "- `docs/BRANCHING.md`", "- `docs/RUNBOOK.md`"]
     if m.gaps:
         lines += ["", "## Gaps for a human", ""] + [f"- {g}" for g in m.gaps]
+    readiness_file = "phase4/environment-readiness.json"
+    lines += ["", "## Environment readiness", ""]
+    if files.exists(project, readiness_file):
+        evidence = files.read_json(project, readiness_file)
+        current = evidence.get("manifest_sha256") == files.file_sha(project, files.INFRA_MANIFEST)
+        lines.append(f"Read-only evidence: {'ready' if current and evidence.get('ready') else 'not ready or stale'}; see `{readiness_file}`. Approval alone does not prove provisioning.")
+    else:
+        lines.append("Not checked. Run phase4 check-environments; reviewed PRs are not provisioning evidence.")
     if it.notes:
         lines += ["", "## Notes from the architecture", ""] + [f"- {n}" for n in it.notes]
     return "\n".join(lines) + "\n"
@@ -526,6 +552,23 @@ def registry_versions(source: str, limit: int = 10) -> str:
     return json.dumps({"source": source, "latest": versions[:1], "recent": versions[:limit]})
 
 
+def deployment_problems(project: str, manifest: InfraManifest) -> list[str]:
+    """Local policy checks independent of scanners, including immutable image references."""
+    problems = []
+    for entry in manifest.files:
+        if entry.path.startswith("repo/gitops/apps/") and entry.path.endswith("/values.yaml"):
+            if not files.exists(project, "infra/" + entry.path):
+                continue
+            try:
+                values = yaml.safe_load(files.read_text(project, "infra/" + entry.path))
+                image = values.get("image", {})
+                if "tag" in image or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(image.get("digest", ""))):
+                    problems.append(f"{entry.path}: image must pin a sha256 digest, never a mutable tag")
+            except (ValueError, AttributeError, yaml.YAMLError):
+                problems.append(f"{entry.path}: invalid application values")
+    return problems
+
+
 def check(project: str) -> str:
     manifest = files.read_json(project, files.INFRA_MANIFEST, InfraManifest)
     it = files.read_json(project, files.INFRA_INTENT, InfraIntent)
@@ -551,6 +594,7 @@ def check(project: str) -> str:
     if manifest.checks_incomplete:
         warnings.append("validation incomplete (static checks that did not run to completion): "
                         + ", ".join(manifest.checks_incomplete))
+    problems.extend(deployment_problems(project, manifest))
     covered = {c.component_id for c in it.components}
     if not covered:
         problems.append("intent has no components")

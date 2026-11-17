@@ -15,7 +15,7 @@ from typing import Callable
 from langchain_core.tools import tool
 
 from agent_engine import perf
-from agent_engine.phase4 import files, infra
+from agent_engine.phase4 import files
 
 logger = logging.getLogger(__name__)
 
@@ -90,65 +90,13 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
     return _run("backlog_view", view)
 
 
-# ============================================================================ infra (Agent 4)
-@tool
-def infra_set_intent(project: str, intent: dict) -> str:
-    """Record what the architecture needs: {cloud aws|azure|gcp, regions, environments [dev, stg, prod],
-    deploy_target kubernetes|serverless|vm, slos {name: text}, monthly_budget_usd, notes, components: [{component_id,
-    name, kind service|frontend|worker|database|cache|queue|object_storage|cdn|external_api|other, needs (from
-    k8s_workload, public_endpoint, postgres, mysql, redis, queue, object_storage, container_registry, cdn, external),
-    size_class small|medium|large, public_endpoint, exposes_http, data_classification public|internal|confidential|
-    restricted, runtime, repo, depends_on [component_ids], secrets [extra secret env var names the component needs,
-    e.g. EMAIL_PROVIDER_API_KEY; database/cache/queue URLs come from depends_on], source (where in
-    architecture.md)}]}. A component that shares another component's image (same repo) gets no container_registry
-    need of its own. Checks it against
-    the catalog and org rules and writes infra/intent.json."""
-    return _run("infra_set_intent", lambda: infra.set_intent(project, intent))
+_ALL = [backlog_view]
 
-
-@tool
-def infra_render(project: str) -> str:
-    """Render the golden-path catalog for infra/intent.json into infra/repo/ (OpenTofu per environment, Argo CD,
-    Helm values, ExternalSecrets, alerts, Atlantis, drift workflow, CODEOWNERS) and infra/ci/<owner>__<repo>/ (CI
-    workflows per code repository). Overwrites earlier output. Writes infra/manifest.json and returns gaps."""
-    return _run("infra_render", lambda: infra.render(project))
-
-
-@tool
-def infra_validate(project: str) -> str:
-    """Run the IaC sandbox checks (tofu fmt/validate, tflint, trivy, checkov, actionlint, helm lint, kubeconform,
-    gitleaks, conftest policy tests) on infra/repo and the CI workflows, scan for secret-like values, score risk,
-    and write infra/checks.json, infra/manifest.json and infra/PR.md. Returns failing findings to repair."""
-    return _run("infra_validate", lambda: infra.validate(project))
-
-
-@tool
-def infra_registry_versions(source: str) -> str:
-    """Published versions of a Terraform registry module, newest first, e.g. source
-    'terraform-aws-modules/eks/aws'. Read-only."""
-    return _run("infra_registry_versions", lambda: infra.registry_versions(source))
-
-
-@tool
-def infra_check(project: str) -> str:
-    """Read-only: checks infra/manifest.json against the files on disk and infra/checks.json (intent unchanged,
-    files unchanged since validation, checks passed, PR.md present)."""
-    return _run("infra_check", lambda: infra.check(project))
-
-
-_ALL = [backlog_view,
-        infra_set_intent, infra_render,
-        infra_validate, infra_registry_versions, infra_check]
 def _invalid_arguments(error: Exception) -> str:
     return f"ERROR: invalid arguments: {error}"
 
-
 for _t in _ALL:
-    # Wrong argument types are reported back to the model instead of aborting the whole run.
     _t.handle_validation_error = _invalid_arguments
     _t.handle_tool_error = True
 
-TOOL_FACTORIES: dict[str, Callable[[], list]] = {
-    "phase4-infra": lambda: [infra_set_intent, infra_render, infra_validate, infra_registry_versions],
-    "phase4-infra-check": lambda: [infra_check, infra_registry_versions],
-}
+TOOL_FACTORIES: dict[str, Callable[[], list]] = {}

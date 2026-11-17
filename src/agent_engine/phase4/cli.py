@@ -62,7 +62,7 @@ def add_parser(sub) -> None:
     sc.add_argument("--out", default="schemas")
     d = s.add_parser("dispatch", help="Phase 5: dispatch AI work only after all G4 parts and CI are approved.")
     d.add_argument("--project-name", required=True)
-    for name in ("check-ci", "reconcile"):
+    for name in ("check-ci", "reconcile", "check-environments"):
         command = s.add_parser(name, help="Refresh read-only operational CI / coding-agent outcome evidence.")
         command.add_argument("--project-name", required=True)
 
@@ -84,11 +84,12 @@ def run(args: argparse.Namespace) -> int:
                 acknowledge(root)
             print(json.dumps(result, indent=2))
             return 0  # recovery succeeded; partial stage results still need review
-        if args.phase4_command in ("check-ci", "reconcile"):
+        if args.phase4_command in ("check-ci", "reconcile", "check-environments"):
             from agent_engine.phase4 import readiness
             from agent_engine.runtime import project_lock
             with project_lock(files.project_dir(args.project_name)):
-                fn = readiness.check_ci if args.phase4_command == "check-ci" else readiness.reconcile
+                from agent_engine.phase4.environment_check import check_environments
+                fn = {"check-ci": readiness.check_ci, "reconcile": readiness.reconcile, "check-environments": check_environments}[args.phase4_command]
                 print(json.dumps(fn(args.project_name), indent=2))
             return 0
         if args.phase4_command == "init":

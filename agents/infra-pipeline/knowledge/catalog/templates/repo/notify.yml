@@ -1,0 +1,39 @@
+name: Notify GitOps after CI
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  notify:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: Notify infra repository
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BUILD_REPO: ${{ github.repository }}
+          BUILD_RUN: ${{ github.event.workflow_run.id }}
+          INFRA_REPO: __INFRA_REPO__
+        run: |
+          python - <<'PYTHON'
+          import io, json, os, subprocess, zipfile
+          def api(path):
+              return subprocess.check_output(['gh', 'api', path])
+          repo, run = os.environ['BUILD_REPO'], os.environ['BUILD_RUN']
+          artifacts = json.loads(api(f'repos/{repo}/actions/runs/{run}/artifacts'))['artifacts']
+          for a in artifacts:
+              if not a['name'].startswith('image-') or a['expired']: continue
+              with zipfile.ZipFile(io.BytesIO(api(f"repos/{repo}/actions/artifacts/{a['id']}/zip"))) as z:
+                  payload = json.loads(z.read('image.json'))
+              payload.update(repo=repo, run_id=run)
+              subprocess.run(['gh', 'api', '--method', 'POST', 'repos/' + os.environ['INFRA_REPO'] + '/dispatches', '--input', '-'], input=json.dumps({'event_type':'image-built', 'client_payload': payload}).encode(), check=True)
+          PYTHON

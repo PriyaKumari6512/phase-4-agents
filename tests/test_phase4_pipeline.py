@@ -183,7 +183,7 @@ def test_infra_intent_render_validate_publish_and_ci_readiness(proj, monkeypatch
     assert "ingress:\n  enabled: true" in web and "replicas: 2" in web
     assert "EMAIL_PROVIDER_API_KEY" in (proj / "infra/repo/gitops/apps/notify-worker/dev/externalsecret.yaml").read_text(encoding="utf-8")
     gaps = " ".join(r["gaps"])
-    assert "start command" in gaps and "ingress.host" in gaps and "image promotion" in gaps
+    assert "start command" in gaps and "ingress.host" in gaps and "GitHub Environments" in gaps
     v = json.loads(infra.validate(P))
     assert not v["checks_passed"] and len(v["skipped"]) == 10
     assert v["agent_edited"] == []                            # nothing edited yet (and no CRLF hash drift)

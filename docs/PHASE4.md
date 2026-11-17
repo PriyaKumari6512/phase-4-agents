@@ -10,7 +10,7 @@ deepagents. Each one combines the model's judgement with tools for everything th
 | 3 Work Allocation | `agents/work-allocation/` | which tasks are safe for an AI coding agent, one-line explanation per assignment | hard AI rules, capacity and review budget, Timefold task-assigning service (local CP-SAT fallback), score breakdown, runner-up, post-checks |
 | 4 Infra & Pipeline | `agents/infra-pipeline/` | infra intent from architecture.md, repairing files that fail checks | golden-path catalog rendering (OpenTofu, Argo CD, Helm, ExternalSecrets, PrometheusRule, Atlantis, CI), 10 sandbox checks, secret scan, risk score, PR text |
 
-Agent 4 runs as a deepagent (**knowledge**: the infra catalog at `/knowledge/catalog/`; summarization; the engine's
+All four agents run as code-driven stages (**knowledge**: the infra catalog at `/knowledge/catalog/`; summarization; the engine's
 write guard and lock). Task Breakdown, Sprint Planning and Work Allocation run as structured model calls driven by code instead of a
 tool-using agent: see [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md) and [SPRINT_PLANNING.md](SPRINT_PLANNING.md).
 
@@ -80,7 +80,7 @@ architecture.md ──► infra-pipeline ──► infra/ ──[P4-G4]──►
 | P4-G1 | `backlog/backlog.json` | Tech Lead | `agent-engine phase4 publish backlog`; sprint-planning may run |
 | P4-G2 | `sprint/sprint-plan.json` | Scrum Master / Engineering Manager | `phase4 publish sprint`; work-allocation may run |
 | P4-G3 | `allocation/assignments.json` | Engineering Manager | `phase4 publish assignments` (assignees + owner comments; no dispatch) |
-| P4-G4 | `infra/intent.json`, `infra/manifest.json` | platform engineer | `phase4 publish infra` (infra PR + CI PRs; Atlantis applies after merge) |
+| P4-G4 | `infra/intent.json`, `infra/manifest.json` | DevOps Lead + Solution Architect | `phase4 publish infra` (infra PR + CI PRs; Atlantis applies after merge) |
 
 An approval pins the sha256 of the approved files: if a file changes afterwards, the next agent and `publish`
 refuse until the gate is approved again. Feedback works the engine's way: `--decision changes_requested`, then run
@@ -102,7 +102,7 @@ uv run agent-engine phase4 publish backlog --project-name taskflow
 uv run agent-engine run "Plan the sprints." --agent sprint-planning --project-name taskflow
 uv run agent-engine gate P4-G2 --project-name taskflow --decision approved --approver "Dana" --submitted-by "Rahul"
 uv run agent-engine run "Assign sprint 1." --agent work-allocation --project-name taskflow
-uv run agent-engine run "Set up dev, stg and prod." --agent infra-pipeline --project-name taskflow
+uv run agent-engine run "Set up dev, qa, stg and prod." --agent infra-pipeline --project-name taskflow
 uv run agent-engine phase4 mine-profiles --project-name taskflow --repo ../taskflow-api --name acme/taskflow-api
 ```
 
@@ -178,3 +178,5 @@ earlier Phase 4 implementation but need credentials and were not run; `PHASE4_PR
 tracker write everything as files instead.
 
 Work Allocation now uses checked small-model eligibility, structured risk routing and deterministic explanations. See [WORK_ALLOCATION.md](WORK_ALLOCATION.md). Phase 5 execution is explicit through `phase4 dispatch` and requires all four current gate approvals.
+
+Infra now includes QA, immutable-digest promotion, branching/runbook documents, checked intent and bounded repair. See [INFRA_PIPELINE.md](INFRA_PIPELINE.md). Operational evidence is collected by `phase4 check-environments`; missing scanners or readiness sources never count as passed.

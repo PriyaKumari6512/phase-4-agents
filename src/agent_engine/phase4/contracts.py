@@ -538,7 +538,7 @@ class AssignmentPlan(Strict):
 # ============================================================================ Agent 4: infra
 CheckTool = Literal["tofu_fmt", "tofu_validate", "tofu_test", "tflint", "trivy", "checkov", "conftest",
                     "infracost", "actionlint", "helm_lint", "kubeconform", "gitleaks"]
-Env = Literal["dev", "stg", "prod"]
+Env = Literal["dev", "qa", "stg", "prod"]
 Need = Literal["k8s_workload", "public_endpoint", "postgres", "mysql", "redis", "queue", "object_storage",
                "container_registry", "cdn", "external"]
 
@@ -589,7 +589,7 @@ class InfraIntentComponent(Strict):
 class InfraIntent(Strict):
     cloud: Literal["aws", "azure", "gcp"]
     regions: list[str] = Field(min_length=1)
-    environments: list[Env] = Field(default=["dev", "stg", "prod"], min_length=1)
+    environments: list[Env] = Field(default=["dev", "qa", "stg", "prod"], min_length=1)
     deploy_target: Literal["kubernetes", "serverless", "vm"] = "kubernetes"
     components: list[InfraIntentComponent]
     slos: dict[str, str] = {}

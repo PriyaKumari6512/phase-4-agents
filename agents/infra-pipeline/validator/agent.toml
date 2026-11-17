@@ -2,7 +2,7 @@
 description = "Infra Validator: checks the generated infrastructure against architecture.md, the catalog and the checks."
 model = "strong"
 filesystem = ["ls", "read_file", "glob", "grep"]
-tools = ["phase4-infra-check"]
+tools = []
 knowledge = "../knowledge"
 returns = "verdict"
 

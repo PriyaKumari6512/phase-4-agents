@@ -69,7 +69,7 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "infra-pipeline", "P4-G4", ("architecture.md",), (),
         ("project_name", "tracker", "code_repos", "infra_repo"),
-        request="Set up dev, stg and prod.",
+        request="Set up dev, qa, stg and prod.",
     ),
     Stage(
         "sprint-planning", "P4-G2", ("backlog/backlog.json",), ("phase4/history.json",),

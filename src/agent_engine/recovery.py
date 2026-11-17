@@ -87,7 +87,7 @@ def evaluation(pack) -> dict[str, str]:
     domains = {
         "task-breakdown": ("task_breakdown", "structured", "story_import", "backlog", "contracts", "files", "textsim",
                            "skills_taxonomy"),
-        "infra-pipeline": ("infra", "sandbox", "settings", "contracts", "files", "tools"),
+        "infra-pipeline": ("infra_pipeline", "structured", "infra", "sandbox", "settings", "contracts", "files", "tools"),
         "sprint-planning": ("sprint_planning", "structured", "sprint", "sprint_model", "capacity", "calendars", "settings",
                             "contracts", "files"),
         "work-allocation": ("work_allocation", "structured", "allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),
