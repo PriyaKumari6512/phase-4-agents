@@ -116,6 +116,10 @@ def test_generation_and_enrichment_without_agent_tools(proj, monkeypatch):
     count = calls.count(workflow.Generated)
     asyncio.run(workflow.generate(P, 'Build backlog', []))
     assert calls.count(workflow.Generated) == count
+    plans_before = calls.count(workflow.Plan)
+    files.write_text(P, 'backlog/implementation-contract.md', 'Reviewed source-backed contract amendment')
+    asyncio.run(workflow.generate(P, 'Build backlog', []))
+    assert calls.count(workflow.Plan) == plans_before + 1
 
 
 def test_unrelated_requirement_edit_reuses_feature_checkpoint(proj):
@@ -154,3 +158,24 @@ def test_typed_findings_keep_all_affected_ids(proj):
     b = files.read_json(P, files.BACKLOG, Backlog)
     assert len(unestimated['item_ids']) == sum(i.level in ('story', 'task') for i in b.items)
     assert not human
+
+
+def test_history_change_invalidates_completed_feature(proj):
+    from agent_engine.phase4 import feature_jobs
+    f = _features()[0]
+    backlog.set_features(P, [f]); speckit.init(P)
+    files.write_text(P, f['feature_dir'] + '/plan.md', '# Existing plan\n')
+    status = feature_jobs.status(P, f['feature_dir'])
+    feature_jobs.checkpoint(P, f['feature_dir'], status['input_sha256'])
+    assert feature_jobs.status(P, f['feature_dir'])['reusable']
+    path = files.path(P, files.HISTORY)
+    path.write_text(path.read_text() + '\n')
+    assert not feature_jobs.status(P, f['feature_dir'])['reusable']
+
+
+def test_global_section_citing_other_requirement_is_retained(proj):
+    files.path(P, files.PRD).write_text('# Security policy\nAll endpoints require authentication, including FR-002.\n## FR-001\nSave\n## FR-002\nDelete\n')
+    evidence = packet(P, ['FR-001'])[files.PRD]
+    text = ''.join(s['text'] for s in evidence)
+    assert 'All endpoints require authentication' in text
+    assert 'Delete' not in text

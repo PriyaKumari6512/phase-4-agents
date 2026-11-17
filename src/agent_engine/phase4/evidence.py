@@ -28,7 +28,11 @@ def packet(project, requirement_ids=()):
         offset = 0
         for piece in pieces:
             ids = set(REQ_ID_RE.findall(piece))
-            explicit_local = ids and all(i.startswith(('FR-', 'US-')) for i in ids)
+            # Merely mentioning an ID does not make a section local: a global
+            # policy can cite an unrelated requirement as an example.
+            heading = piece.split('\n', 1)[0]
+            explicit_heading = re.match(r'^#{1,6}\s+(?:\*\*)?(?:FR|US)-\d{1,4}\b', heading)
+            explicit_local = bool(explicit_heading) and ids and all(i.startswith(('FR-', 'US-')) for i in ids)
             if source != files.PRD or not selected or not explicit_local or ids & selected:
                 sections.append({'start': offset, 'end': offset + len(piece), 'text': piece,
                                  'sha256': hashlib.sha256(piece.encode()).hexdigest()})

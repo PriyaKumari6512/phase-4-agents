@@ -41,6 +41,7 @@ def stage(proj, tmp_path, monkeypatch):
     async def review(project, callbacks):
         return await cli._stream(None, "review", callbacks, "task-breakdown/validator-verify")
     async def repair(project, gaps, callbacks):
+        assert gaps, "resumed repairs must receive retained findings"
         return await cli._stream(None, str(gaps), callbacks, "task-breakdown-fix")
     monkeypatch.setattr(workflow, "generate", generate)
     monkeypatch.setattr(workflow, "review", review)

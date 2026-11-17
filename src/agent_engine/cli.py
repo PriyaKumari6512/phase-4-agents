@@ -418,7 +418,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         if kind == "verify":
                             operation = workflow.review(project_name, pass_callbacks)
                         elif kind == "fix" and workflow.generation_supported(project_name):
-                            operation = workflow.repair(project_name, report.get("verdict", {}).get("gaps", []), pass_callbacks)
+                            operation = workflow.repair(project_name, (report.get("verdict", {}).get("gaps") or (recovery_record or {}).get("gaps", [])), pass_callbacks)
                         elif kind == "write" and workflow.generation_supported(project_name):
                             operation = workflow.generate(project_name, request, pass_callbacks)
                         else:

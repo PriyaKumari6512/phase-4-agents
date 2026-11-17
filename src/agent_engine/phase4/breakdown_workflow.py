@@ -201,11 +201,12 @@ async def generate(project, request, callbacks):
     plan_sources = {k: v for k, v in sources.items() if k != 'backlog/implementation-contract.md'}
     if 'requests/task-breakdown.md' in plan_sources:
         plan_sources['requests/task-breakdown.md'] = feature_jobs._requests(files.project_dir(project))
+    contract_identity = files.file_sha(project, 'backlog/implementation-contract.md') if files.exists(project, 'backlog/implementation-contract.md') else None
     planner_identity = {'schema': Plan.model_json_schema(), 'implementation': Path(__file__).read_text(),
                         'model': model_spec('strong')}
     def plan_identity(features):
         return digest({'sources': plan_sources, 'settings': settings(project), 'request': request,
-                       'existing': features, 'planner': planner_identity})
+                       'existing': features, 'planner': planner_identity, 'contract': contract_identity})
     plan_key = plan_identity(existing)
     saved = _load(project, 'plans', plan_key)
     plan = Plan.model_validate(saved) if saved else await _call(Plan,
@@ -228,6 +229,7 @@ async def generate(project, request, callbacks):
         files.write_text(project, contract, plan.implementation_contract)
     # Store the post-registration identity too: registering features and writing
     # the derived contract must not invalidate an otherwise unchanged plan.
+    contract_identity = files.file_sha(project, contract)
     _save(project, 'plans', plan_identity(plan.features.model_dump(mode='json')), plan.model_dump(mode='json'))
     concurrency = _positive('AGENT_ENGINE_HELPER_CONCURRENCY', 9)
     if concurrency > 32:
@@ -238,7 +240,8 @@ async def generate(project, request, callbacks):
             status = feature_jobs.status(project, f.feature_dir)
             evidence = packet(project, f.requirement_ids)
             identity = digest({'feature': f.model_dump(), 'inputs': status['input_sha256'], 'settings': settings(project),
-                               'schema': Generated.model_json_schema(), 'model': model_spec('strong')})
+                               'schema': Generated.model_json_schema(), 'model': model_spec('strong'),
+                               'history': history_evidence(project, f)})
             saved = _load(project, 'generation', identity)
             if status['reusable'] and saved:
                 return saved['patches']

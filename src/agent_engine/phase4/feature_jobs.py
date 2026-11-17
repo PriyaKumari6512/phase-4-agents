@@ -63,7 +63,7 @@ def inputs(project: str, directory: str) -> dict[str, str]:
     result = {"feature": _digest(selected.model_dump(mode="json")),
               files.PROJECT_SETTINGS: _digest({k: settings[k] for k in SETTINGS_KEYS}),
               "requests:effective": _requests(root)}
-    for rel in (files.PRD, files.ARCHITECTURE, ".specify/memory/constitution.md", ".specify/engine-policy.json",
+    for rel in (files.PRD, files.ARCHITECTURE, files.HISTORY, ".specify/memory/constitution.md", ".specify/engine-policy.json",
                 "backlog/implementation-contract.md"):
         p = files.path(project, rel)
         if rel == files.PRD:
