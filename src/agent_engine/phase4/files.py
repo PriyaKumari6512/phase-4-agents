@@ -132,6 +132,10 @@ def read_json(project: str, rel: str, model: type[M] | None = None):
     if model is None:
         return data
     try:
+        from agent_engine.phase4.contracts import ProjectSettings
+        if model is ProjectSettings:
+            from agent_engine.phase4.settings import project_overrides
+            data = project_overrides(data)
         parsed = model.model_validate(data)
         if hasattr(parsed, "project") and parsed.project != project:
             raise ProjectError(f"artifact belongs to project {parsed.project!r}, not {project!r}")

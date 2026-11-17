@@ -7,7 +7,7 @@ from datetime import date, datetime, time, timezone
 from functools import cached_property
 
 from agent_engine.phase4.contracts import TrackerConfig
-from agent_engine.phase4.settings import get_settings
+from agent_engine.phase4.settings import get_settings, get_jira_options
 
 from .adf import adf_to_text, markdown_to_adf
 from .base import ExtObj, HttpClient, TrackerAdapter, TrackerError
@@ -24,14 +24,71 @@ class JiraTracker(TrackerAdapter):
         if not (s.jira_email and s.jira_api_token) and http is None:
             raise TrackerError("JIRA_EMAIL and JIRA_API_TOKEN are required for the Jira tracker")
         self.cfg = cfg
+        self.options = get_jira_options()
         self.http = http or HttpClient(cfg.jira_base_url.rstrip("/"), {"Accept": "application/json"},
-                                       auth=(s.jira_email, s.jira_api_token))
+                                       auth=(s.jira_email, s.jira_api_token),
+                                       min_write_interval_s=self.options.min_write_interval,
+                                       timeout=self.options.timeout, max_retries=self.options.max_retries,
+                                       retry_rejected_posts=True)
+
+    def prepare(self) -> None:
+        # cached_property alone does not serialize its first evaluation on Python 3.13.
+        self.issue_types
+        self.estimation_field
+
+    def preflight(self, accounts: dict[str, str] | None = None) -> dict:
+        """Read-only checks before expensive generation; no issues/sprints are created."""
+        self.http.get("/rest/api/3/myself")
+        self.http.get(f"/rest/api/3/project/{self.cfg.jira_project_key}")
+        board = self.http.get(f"/rest/agile/1.0/board/{self.cfg.jira_board_id}").json()
+        if board.get("type") != "scrum":
+            raise TrackerError("JIRA_BOARD_ID must select a Scrum board; this pipeline publishes sprints")
+        permissions = ["BROWSE_PROJECTS", "CREATE_ISSUES", "EDIT_ISSUES", "LINK_ISSUES", "ASSIGN_ISSUES", "MANAGE_SPRINTS_PERMISSION"]
+        actual = self.http.get("/rest/api/3/mypermissions", params={
+            "projectKey": self.cfg.jira_project_key, "permissions": ",".join(permissions)}).json().get("permissions", {})
+        missing = [p for p in permissions if not actual.get(p, {}).get("havePermission")]
+        if missing:
+            raise TrackerError("Jira user lacks permissions: " + ", ".join(missing))
+        self.prepare()
+        if not self.estimation_field or not re.fullmatch(r"customfield_[0-9]+", self.estimation_field):
+            raise TrackerError("Configure board story-point estimation or JIRA_STORY_POINTS_FIELD_ID before publishing estimates")
+        for role, type_id in self.issue_types.items():
+            core = {"summary", "description", "project", "issuetype", "labels"}
+            if role in ("story", "task"):
+                core.add("parent")
+            core.add("timetracking" if role == "task" else self.estimation_field if role == "story" else "")
+            fields = self._metadata(f"/rest/api/3/issue/createmeta/{self.cfg.jira_project_key}/issuetypes/{type_id}", "fields")
+            extras = self.options.create_fields.get(role, {})
+            required = [f.get("fieldId") or f.get("key") for f in fields if f.get("required") and not f.get("hasDefaultValue")]
+            missing = sorted(f for f in required if f and f not in core and f not in extras)
+            if missing:
+                raise TrackerError(f"Jira {role} needs extra create fields {missing}; configure JIRA_CREATE_FIELDS")
+        for member, account in (accounts or {}).items():
+            if not account:
+                raise TrackerError(f"No Jira account ID for {member}; set JIRA_ACCOUNT_MAP")
+            users = self.http.get("/rest/api/3/user/assignable/search", params={
+                "project": self.cfg.jira_project_key, "accountId": account, "maxResults": 1}).json()
+            if not any(u.get("accountId") == account and u.get("active", True) for u in users):
+                raise TrackerError(f"Jira account for {member} is not assignable in this project; check JIRA_ACCOUNT_MAP and permissions")
+        return {"tracker": "jira", "project": self.cfg.jira_project_key, "board_id": self.cfg.jira_board_id,
+                "concurrency": self.options.concurrency, "checks": "passed"}
+
+    def _metadata(self, url: str, key: str) -> list[dict]:
+        values, start = [], 0
+        while True:
+            page = self.http.get(url, params={"startAt": start, "maxResults": 100}).json()
+            rows = page.get(key) or page.get("values") or []
+            values.extend(rows)
+            start += len(rows)
+            if (page.get("isLast") is True or not rows or
+                    ("total" in page and start >= page["total"]) or
+                    ("total" not in page and "isLast" not in page)):
+                return values
 
     # ---- discovery ----
     @cached_property
     def issue_types(self) -> dict[str, str]:
-        r = self.http.get(f"/rest/api/3/issue/createmeta/{self.cfg.jira_project_key}/issuetypes").json()
-        values = r.get("issueTypes") or r.get("values") or []
+        values = self._metadata(f"/rest/api/3/issue/createmeta/{self.cfg.jira_project_key}/issuetypes", "issueTypes")
         out: dict[str, str] = {}
         for t in values:
             name = t["name"].lower()
@@ -41,6 +98,11 @@ class JiraTracker(TrackerAdapter):
                 out["epic"] = t["id"]
             elif name == "story":
                 out["story"] = t["id"]
+        for role, type_id in self.options.issue_type_ids.items():
+            chosen = next((t for t in values if str(t["id"]) == type_id), None)
+            if chosen is None or bool(chosen.get("subtask")) != (role == "task"):
+                raise TrackerError(f"JIRA_ISSUE_TYPE_IDS {role} must name an available {'subtask' if role == 'task' else 'standard'} issue type")
+            out[role] = type_id
         missing = {"epic", "story", "task"} - set(out)
         if missing:
             raise TrackerError(f"Jira project lacks issue types for {missing}: {[t['name'] for t in values]}")
@@ -48,6 +110,8 @@ class JiraTracker(TrackerAdapter):
 
     @cached_property
     def estimation_field(self) -> str | None:
+        if self.options.story_points_field:
+            return self.options.story_points_field
         cfg = self.http.get(f"/rest/agile/1.0/board/{self.cfg.jira_board_id}/configuration").json()
         return ((cfg.get("estimation") or {}).get("field") or {}).get("fieldId")
 
@@ -69,7 +133,7 @@ class JiraTracker(TrackerAdapter):
         return f
 
     def create(self, payload: dict) -> ExtObj:
-        fields = self._fields(payload) | {
+        fields = self.options.create_fields.get(payload["level"], {}) | self._fields(payload) | {
             "project": {"key": self.cfg.jira_project_key},
             "issuetype": {"id": self.issue_types[payload["level"]]},
             "labels": [l.replace(" ", "-") for l in payload.get("labels", [])] + [payload["_marker"]],

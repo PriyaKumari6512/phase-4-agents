@@ -38,6 +38,10 @@ agent-engine/
 backlog, a sprint plan, task assignments and infrastructure, each behind a human gate. Inputs, outputs, gates and
 commands: [docs/PHASE4.md](docs/PHASE4.md).
 
+For one ENV-configured command covering generation through Jira publication, use
+`uv run agent-engine pipeline`. Setup, automatic testing approvals, concurrency and recovery:
+[docs/PIPELINE_JIRA.md](docs/PIPELINE_JIRA.md).
+
 ---
 
 ## 1. Setup

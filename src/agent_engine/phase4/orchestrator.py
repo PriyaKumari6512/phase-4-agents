@@ -103,6 +103,8 @@ def _input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
     project = root / PROJECT_FILE
     if project.is_file():
         data = json.loads(project.read_text(encoding="utf-8"))
+        from agent_engine.phase4.settings import project_overrides
+        data = project_overrides(data)
         if stage.project_keys is not None:
             data = {k: data.get(k) for k in stage.project_keys}
         digests[PROJECT_FILE] = _digest_json(data)
@@ -112,7 +114,7 @@ def _input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
         if (root / f"gates/P4-G4{APPROVED_SUFFIX}").is_file() and manifest.is_file():  # CI-ready repos let AI take tasks
             digests["infra/manifest.json"] = file_digest(manifest)
     if stage.agent == "infra-pipeline" and project.is_file():
-        digests[PROJECT_FILE] = _digest_json(json.loads(project.read_text(encoding="utf-8")))
+        digests[PROJECT_FILE] = _digest_json(project_overrides(json.loads(project.read_text(encoding="utf-8"))))
         from agent_engine.phase4.infra import catalog_dir
         catalog = catalog_dir()
         for p in sorted(catalog.rglob("*")):
@@ -191,7 +193,8 @@ class Step:
     resume_action: str = ""
 
 
-def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None) -> list[Step]:
+def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
+           verified_test_approval: bool = False) -> list[Step]:
     """The decision table: one Step per agent, from the current files and gate decisions (no side effects)."""
     root, gates = _root(project), gates if gates is not None else load_gates()
     state = load_state(root)
@@ -213,6 +216,10 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None) 
             steps.append(Step(stage, "waiting_gate", "; ".join(waiting)))
             continue
         status, record = gate_state(root, gate)
+        if verified_test_approval and status == "approved":
+            from agent_engine.phase4.approval_policy import automated, test_publication_allowed
+            if automated(record) and not test_publication_allowed(project, stage.gate, record):
+                status = "pending"  # renew old test approvals only after current automated review
         request = stage.request.format(sprint=sprint)
         if status not in ("changes_requested", "rejected", "approved"):
             from agent_engine.agent import load_pack
@@ -371,12 +378,15 @@ def run_agent(agent: str, request: str, project: str, *, outputs_dir: Path | Non
     }
 
 
-def _approve(root: Path, step: Step, gates: dict[str, Gate], status: str) -> None:
+def _approve(root: Path, step: Step, gates: dict[str, Gate], status: str, verified_test_approval: bool = False) -> None:
+    from agent_engine.phase4.approval_policy import TEST_ORIGIN
+    source = "PHASE4_AUTO_APPROVE_FOR_TESTING" if verified_test_approval else "--test-approve"
     record_decision(
         root, gates[step.stage.gate], "approved",
-        {"name": "Orchestrator (automated test approval)", "role": "NOT a human sign-off"},
+        {"name": "Orchestrator (automated test approval)", "role": "NOT a human sign-off",
+         **({"automation": TEST_ORIGIN} if verified_test_approval else {})},
         {"name": f"{step.stage.agent} agent"},
-        f"Automated test approval by the orchestrator (--test-approve), not a human review. Validator: {status}.",
+        f"Automated test approval by the orchestrator ({source}), not a human review. Validator: {status}.",
     )
 
 
@@ -408,6 +418,7 @@ def _observe_approvals(root: Path, gates: dict[str, Gate]) -> None:
 def orchestrate(
     project: str, sprint: int = 1, test_approve: bool = False, publish: bool = False, plan_only: bool = False,
     runner: Runner = run_agent, out: Callable[[str], None] = print, parallel_independent: bool = False,
+    verified_test_approval: bool = False,
 ) -> int:
     pipeline_id = perf.new_id()
     perf.set_pipeline(pipeline_id)
@@ -425,7 +436,8 @@ def orchestrate(
                                 execution_mode="publication_authorized" if publish else "generation_only",
                                 extra={"test_approve": test_approve, "sprint": sprint})
         with project_lock(_root(project), "orchestrator"):
-            code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out, parallel_independent)
+            code = _orchestrate(project, sprint, test_approve, publish, plan_only, runner, out, parallel_independent,
+                                verified_test_approval)
         sp.set(exit_code=code, outcome={DONE: "done", FAILED: "failed", WAITING: "waiting"}.get(code, str(code)))
         if code == FAILED:
             sp.set_status("failed", category="pipeline_outcome")
@@ -433,7 +445,8 @@ def orchestrate(
 
 
 def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, plan_only: bool, runner: Runner,
-                 out: Callable[[str], None], parallel_independent: bool = False) -> int:
+                 out: Callable[[str], None], parallel_independent: bool = False,
+                 verified_test_approval: bool = False) -> int:
     with perf.span("orchestrator", "preflight"):
         root, gates = _root(project), load_gates()
         if not (root / PROJECT_FILE).is_file():
@@ -456,7 +469,7 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
     failed_attempts: set[str] = set()
     for _ in range(MAX_STEPS):
         with perf.span("orchestrator", "assess") as asp:
-            steps = assess(project, sprint, gates)
+            steps = assess(project, sprint, gates, verified_test_approval=verified_test_approval)
             asp.set(actions={s.stage.agent: s.action for s in steps})
         # Existing outputs of a project run by hand: take them as up to date.
         for s in steps:
@@ -534,9 +547,26 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
         pending = [s for s in steps if s.action == "gate_pending"]
         if pending:
             approvable = [s for s in pending if state.get(s.stage.agent, {}).get("status") in ("success", "adopted")]
+            if test_approve and verified_test_approval:
+                from agent_engine.agent import load_pack
+                from agent_engine.phase4.approval_policy import current_review
+                verified = []
+                prepared = False
+                for s in approvable:
+                    if current_review(project, s.stage.gate):
+                        verified.append(s)
+                    elif not recovery.path(root, s.stage.agent).exists():
+                        # Legacy files are reviewed in place, never approved merely because they exist.
+                        with project_lock(root):
+                            recovery.save(root, load_pack(s.stage.agent), s.request or s.stage.request.format(sprint=sprint),
+                                          perf.new_id(), "review_pending")
+                        prepared = True
+                approvable = verified
+                if prepared and not verified:
+                    continue
             if test_approve and approvable:
                 for s in approvable:
-                    _approve(root, s, gates, state[s.stage.agent]["status"])
+                    _approve(root, s, gates, state[s.stage.agent]["status"], verified_test_approval)
                     perf.event("gate_decision", s.stage.gate, decision="approved", automated=True,
                                decided_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
                     out(f">>> TEST-approved {s.stage.gate} (not a human sign-off)")

@@ -58,6 +58,17 @@ def snapshot(root: Path, pack) -> dict[str, str]:
             result["generator:" + rel.as_posix()] = file_digest(p)
     if pack.name in ("sprint-planning", "work-allocation"):
         result["planning_date"] = datetime.now(timezone.utc).date().isoformat()
+    if pack.name in ("infra-pipeline", "sprint-planning", "work-allocation") and (root / "phase4/project.json").is_file():
+        from agent_engine.phase4.settings import project_overrides
+        import hashlib
+        raw = json.loads((root / "phase4/project.json").read_text(encoding="utf-8-sig"))
+        effective = project_overrides(raw)
+        integration = {"tracker": effective.get("tracker"),
+                       "accounts": [(m.get("member_id"), m.get("tracker_account_id")) for m in effective.get("team", [])]}
+        original = {"tracker": raw.get("tracker"),
+                    "accounts": [(m.get("member_id"), m.get("tracker_account_id")) for m in raw.get("team", [])]}
+        if integration != original:
+            result["integration_settings"] = hashlib.sha256(json.dumps(integration, sort_keys=True).encode()).hexdigest()
     return result
 
 
@@ -76,8 +87,8 @@ def evaluation(pack) -> dict[str, str]:
     domains = {
         "task-breakdown": ("backlog", "contracts", "files", "speckit_parse", "textsim", "skills_taxonomy", "tools"),
         "infra-pipeline": ("infra", "sandbox", "settings", "contracts", "files", "tools"),
-        "sprint-planning": ("sprint", "sprint_model", "capacity", "calendars", "contracts", "files", "tools"),
-        "work-allocation": ("allocation", "alloc_solver", "capacity", "calendars", "readiness", "contracts", "files", "tools"),
+        "sprint-planning": ("sprint", "sprint_model", "capacity", "calendars", "settings", "contracts", "files", "tools"),
+        "work-allocation": ("allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),
     }
     selected = [base / rel for rel in common] + [base / "phase4" / (name + ".py") for name in domains.get(pack.name, ())]
     for p in selected:

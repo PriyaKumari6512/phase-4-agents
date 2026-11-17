@@ -6,7 +6,7 @@
   infra        (P4-G4)  one infra PR (infra/repo) + one CI PR per code repository (infra/ci/<repo>)
 
 Every command refuses unless the gate is approved and the approved files are unchanged since. Writes are
-exactly-once: publish/external-ids.json maps every local id to its tracker id (adopting items found by marker
+recorded durably: publish/external-ids.json maps every local id to its tracker id (adopting items found by marker
 label after a crash), and the last payload sent is kept so fields a human edited in the tracker are never
 overwritten (three-way merge). Nothing is ever deleted: items that left the backlog are closed as won't-do.
 Each run writes a report to publish/<what>.json.
@@ -18,6 +18,11 @@ import hashlib
 import json
 import logging
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar, copy_context
+from copy import deepcopy
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 from typing import Any
@@ -35,6 +40,7 @@ from agent_engine.phase4.contracts import (
     WorkItem,
 )
 from agent_engine.phase4.trackers.base import ExtObj, TrackerAdapter, TrackerError
+from agent_engine.phase4.settings import get_settings, get_jira_options
 from agent_engine.runtime import project_lock
 
 log = logging.getLogger(__name__)
@@ -42,6 +48,7 @@ EXTERNAL_IDS = "publish/external-ids.json"
 OWNED_FIELDS = ("title", "body_md", "story_points", "hours", "labels", "parent_id")
 ORDER = {"epic": 0, "story": 1, "task": 2}
 GATE_FOR = {"backlog": "P4-G1", "sprint": "P4-G2", "assignments": "P4-G3", "infra": "P4-G4"}
+_resources: ContextVar[ExitStack | None] = ContextVar("publisher_resources", default=None)
 
 
 class PublishError(RuntimeError):
@@ -63,8 +70,9 @@ def require_gate(project: str, what: str) -> dict:
     if stale:
         raise PublishError("; ".join(stale) + f". Get {gate} approved again.")
     record = files.read_json(project, approval)
-    if "NOT a human sign-off" in str((record.get("approver") or {}).get("role", "")):
-        raise PublishError("automated test approvals cannot authorize publication")
+    from agent_engine.phase4.approval_policy import automated, test_publication_allowed
+    if automated(record) and not test_publication_allowed(project, gate, record):
+        raise PublishError("automated test approvals cannot authorize publication without PHASE4_AUTO_APPROVE_FOR_TESTING=true and a current verified review")
     if what == "backlog":
         backlog = files.read_json(project, files.BACKLOG, Backlog)
         for rel, digest in backlog.sources.items():
@@ -82,8 +90,12 @@ def serialized(fn):
     def call(project, *args, **kwargs):
         if blocked := perf.publication_blocked():
             raise PublishError(blocked)
-        with project_lock(files.project_dir(project)):
-            return fn(project, *args, **kwargs)
+        with project_lock(files.project_dir(project)), ExitStack() as resources:
+            token = _resources.set(resources)
+            try:
+                return fn(project, *args, **kwargs)
+            finally:
+                _resources.reset(token)
     return call
 
 
@@ -97,6 +109,15 @@ class ExternalIds:
         settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
         self.destination = _sha(settings.tracker.model_dump())[:16]
         self.kind = settings.tracker.kind.value
+        self._lock = threading.RLock()
+        self._operations: dict[tuple[str, str], threading.RLock] = {}
+
+    @contextmanager
+    def operation(self, system: str, key: str):
+        with self._lock:
+            lock = self._operations.setdefault((self.namespace(system), key), threading.RLock())
+        with lock:
+            yield
 
     def namespace(self, system):
         # A dispatch belongs to the project/task, with its actual repo/provider
@@ -104,15 +125,23 @@ class ExternalIds:
         return system if system.startswith(("local", "dispatch")) else f"{system}:{self.destination}"
 
     def get(self, system: str, local_id: str) -> dict | None:
-        return self.data.get(self.namespace(system), {}).get(local_id)
+        with self._lock:
+            return deepcopy(self.data.get(self.namespace(system), {}).get(local_id))
 
     def put(self, system: str, local_id: str, ext_id: str, key: str | None, payload: dict) -> None:
-        self.data.setdefault(self.namespace(system), {})[local_id] = {"id": ext_id, "key": key, "payload_sha256": _sha(payload),
-                                                       "last_payload": payload}
-        self.save()               # saved after every write, so a crash never loses a mapping already created
+        with self._lock:
+            self.data.setdefault(self.namespace(system), {})[local_id] = {"id": ext_id, "key": key, "payload_sha256": _sha(payload),
+                                                           "last_payload": deepcopy(payload)}
+            self.save()           # persist each acknowledged mapping before reporting success
+
+    def remove(self, system: str, local_id: str) -> None:
+        with self._lock:
+            self.data.get(self.namespace(system), {}).pop(local_id, None)
+            self.save()
 
     def save(self) -> None:
-        files.write_json(self.project, EXTERNAL_IDS, self.data)
+        with self._lock:
+            files.write_json(self.project, EXTERNAL_IDS, self.data)
 
 
 def _sha(obj: Any) -> str:
@@ -151,6 +180,11 @@ def three_way(current: dict, last: dict, new: dict, comparable=None) -> tuple[di
 
 
 def ensure(adapter: TrackerAdapter, ids: ExternalIds, project: str, local_id: str, payload: dict) -> dict:
+    with ids.operation(adapter.system, local_id):
+        return _ensure(adapter, ids, project, local_id, payload)
+
+
+def _ensure(adapter: TrackerAdapter, ids: ExternalIds, project: str, local_id: str, payload: dict) -> dict:
     system = adapter.system
     row = ids.get(system, local_id)
     if row is None:
@@ -172,20 +206,35 @@ def ensure(adapter: TrackerAdapter, ids: ExternalIds, project: str, local_id: st
     if ids.get(pending, local_id):
         raise PublishError(f"ambiguous previous create for {local_id}; reconcile the destination marker before retrying")
     ids.put(pending, local_id, "pending", None, {"marker": marker(project, local_id)})
-    created = adapter.create(payload | {"_marker": marker(project, local_id)})
+    try:
+        created = adapter.create(payload | {"_marker": marker(project, local_id)})
+    except TrackerError as exc:
+        if exc.rejected:
+            ids.remove(pending, local_id)
+        raise
     ids.put(system, local_id, created.id, created.key, payload)
     return {"id": created.id, "key": created.key, "created": True, "kept_human_edits": []}
 
 
 def _once(ids, system, key, action):
     """Durable outbox: an ambiguous response is never silently replayed."""
+    with ids.operation(system, key):
+        return _once_locked(ids, system, key, action)
+
+
+def _once_locked(ids, system, key, action):
     row = ids.get(system, key)
     if row:
         if row["id"] == "pending":
             raise PublishError(f"ambiguous {system} operation {key}; reconcile with the remote before retrying")
         return row
     ids.put(system, key, "pending", None, {})
-    result = action()
+    try:
+        result = action()
+    except TrackerError as exc:
+        if exc.rejected:
+            ids.remove(system, key)
+        raise
     ext_id = result.id if isinstance(result, ExtObj) else str(result or "done")
     ids.put(system, key, ext_id, result.key if isinstance(result, ExtObj) else None, {})
     return ids.get(system, key)
@@ -306,6 +355,13 @@ class LocalTracker(TrackerAdapter):
 
 
 def tracker_for(project: str, settings: ProjectSettings) -> TrackerAdapter:
+    tracker = _tracker_for(project, settings)
+    if resources := _resources.get():
+        resources.callback(tracker.close)
+    return tracker
+
+
+def _tracker_for(project: str, settings: ProjectSettings) -> TrackerAdapter:
     kind = settings.tracker.kind
     if kind == TrackerKind.LOCAL:
         return LocalTracker(project)
@@ -319,6 +375,26 @@ def tracker_for(project: str, settings: ProjectSettings) -> TrackerAdapter:
         from agent_engine.phase4.trackers.github import GitHubTracker
         return GitHubTracker(settings.tracker)
     raise PublishError(f"unsupported tracker {kind}")
+
+
+def _parallel_jira(tracker, rows, action):
+    """Bounded, ordered results; local/other adapters retain serial behavior.
+
+    Each submitted task carries the caller's project/diagnostic context. A
+    failure cancels queued work and joins in-flight requests before closing HTTP.
+    """
+    rows = list(rows)
+    workers = get_jira_options().concurrency if tracker.system == "jira" else 1
+    if workers == 1 or len(rows) < 2:
+        return [action(row) for row in rows]
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="jira-publish") as pool:
+        futures = [pool.submit(copy_context().run, action, row) for row in rows]
+        try:
+            return [future.result() for future in futures]
+        except BaseException:
+            for future in futures:
+                future.cancel()
+            raise
 
 
 # ============================================================================ backlog
@@ -363,22 +439,27 @@ def publish_backlog(project: str) -> dict:
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
     backlog = files.read_json(project, files.BACKLOG, Backlog)
     tracker = tracker_for(project, settings)
+    tracker.prepare()
     ids = ExternalIds(project)
     items = backlog.by_id()
     ext: dict[str, str] = {}
     report = {"tracker": tracker.system, "created": 0, "updated_or_unchanged": 0, "kept_human_edits": {},
               "links": 0, "closed": 0}
-    for item in sorted(backlog.items, key=lambda i: (ORDER[i.level], i.item_id)):
+    def publish_item(item):
         closed_key = ids.get(f"{tracker.system}_closed", item.item_id)
         if closed_key is not None:
             tracker.reopen_item(closed_key["id"])
-            ids.data[ids.namespace(f"{tracker.system}_closed")].pop(item.item_id)
-            ids.save()
+            ids.remove(f"{tracker.system}_closed", item.item_id)
         res = ensure(tracker, ids, project, item.item_id, payload_for(item, ext.get(item.parent_id) if item.parent_id else None))
-        ext[item.item_id] = res["id"]
-        report["created" if res["created"] else "updated_or_unchanged"] += 1
-        if res["kept_human_edits"]:
-            report["kept_human_edits"][item.item_id] = res["kept_human_edits"]
+        return item.item_id, res
+
+    for level in ORDER:
+        wave = sorted((i for i in backlog.items if i.level == level), key=lambda i: i.item_id)
+        for item_id, res in _parallel_jira(tracker, wave, publish_item):
+            ext[item_id] = res["id"]
+            report["created" if res["created"] else "updated_or_unchanged"] += 1
+            if res["kept_human_edits"]:
+                report["kept_human_edits"][item_id] = res["kept_human_edits"]
     link_sys = f"{tracker.system}_link"
     wanted_links = {f"{d.on_id}->{item.item_id}" for item in backlog.items for d in item.dependencies
                     if d.on_id in ext and items[d.on_id].level == item.level}
@@ -388,14 +469,21 @@ def publish_backlog(project: str) -> dict:
             tracker.remove_blocks(source, target)
             ids.data[ids.namespace(link_sys)].pop(key)
             ids.save()
-    for item in backlog.items:
-        if item.level == "epic":
-            continue
+    def publish_links(item):
+        count = 0
         for d in item.dependencies:
-            if d.on_id in ext and items[d.on_id].level == item.level and ids.get(link_sys, f"{d.on_id}->{item.item_id}") is None:
-                tracker.add_blocks(ext[d.on_id], ext[item.item_id])
-                ids.put(link_sys, f"{d.on_id}->{item.item_id}", f"{ext[d.on_id]}->{ext[item.item_id]}", None, {})
-                report["links"] += 1
+            key = f"{d.on_id}->{item.item_id}"
+            if d.on_id in ext and items[d.on_id].level == item.level:
+                with ids.operation(link_sys, key):
+                    if ids.get(link_sys, key) is None:
+                        source, target = ext[d.on_id], ext[item.item_id]
+                        # Read-back adopts an accepted link after an interrupted response.
+                        if target not in tracker.blocks_of(source):
+                            tracker.add_blocks(source, target)
+                        ids.put(link_sys, key, f"{source}->{target}", None, {})
+                        count += 1
+        return count
+    report["links"] = sum(_parallel_jira(tracker, (i for i in backlog.items if i.level != "epic"), publish_links))
     closed_sys = f"{tracker.system}_closed"
     for local_id, row in list(ids.data.get(ids.namespace(tracker.system), {}).items()):
         if local_id not in items and ids.get(closed_sys, local_id) is None:
@@ -416,29 +504,34 @@ def publish_sprint(project: str) -> dict:
     ids = ExternalIds(project)
     report = {"tracker": tracker.system, "sprints": 0, "moved": 0, "to_backlog": 0, "missing_in_tracker": []}
 
-    def ext(story_id: str) -> str | None:
+    external = {}
+    for story_id in dict.fromkeys([sid for sp in plan.sprints for sid in sp.story_ids] + [d.story_id for d in plan.deferred]):
         row = ids.get(tracker.system, story_id)
         if row is None:
             report["missing_in_tracker"].append(story_id)
-            return None
-        return row["id"]
+        else:
+            external[story_id] = row["id"]
 
     sprint_sys = f"{tracker.system}_sprint"
-    for sp in plan.sprints:
-        if not sp.story_ids:
-            continue
+    def publish_slot(sp):
         row = ids.get(sprint_sys, f"sprint:{sp.start.isoformat()}")
         if row is None or row.get("id") == "pending":
             row = _once(ids, sprint_sys, f"sprint:{sp.start.isoformat()}", lambda: tracker.create_sprint(sp.name, sp.start, sp.end, sp.goal))
             sid = row["id"]
         else:
             sid = row["id"]
-        report["sprints"] += 1
-        moved = [e for e in (ext(s) for s in sp.story_ids) if e]
+        moved = [external[s] for s in sp.story_ids if s in external]
         if moved:
             tracker.move_to_sprint(sid, moved)
-            report["moved"] += len(moved)
-    deferred = [e for e in (ext(d.story_id) for d in plan.deferred) if e]
+        return len(moved)
+    nonempty = [sp for sp in plan.sprints if sp.story_ids]
+    # Defend the concurrency boundary even for manually edited plan artifacts.
+    selected = [sid for sp in nonempty for sid in sp.story_ids] + [d.story_id for d in plan.deferred]
+    if len(selected) != len(set(selected)):
+        raise PublishError("a story appears in multiple sprint/deferred destinations")
+    counts = _parallel_jira(tracker, nonempty, publish_slot)
+    report["sprints"], report["moved"] = len(counts), sum(counts)
+    deferred = [external[d.story_id] for d in plan.deferred if d.story_id in external]
     if deferred:
         try:
             tracker.move_to_backlog(deferred)
@@ -487,20 +580,33 @@ def publish_assignments(project: str) -> dict:
             worker = payload.get("worker_id")
             active[worker] = active.get(worker, 0) + 1
     report["deferred_dispatches"] = []
+    def assign_human(a):
+        row = ids.get(tracker.system, a.task_id)
+        if row is None:
+            return a.task_id, 0
+        with ids.operation(f"{tracker.system}_assign", a.task_id):
+            account = accounts.get(a.worker_id)
+            if tracker.system == "jira" and not account:
+                raise PublishError(f"No Jira account ID for {a.worker_id}; set JIRA_ACCOUNT_MAP")
+            prev = ids.get(f"{tracker.system}_assign", a.task_id)
+            if prev is not None and prev["id"] == a.worker_id and prev.get("last_payload", {}).get("account_id") == account:
+                return None, 0
+            tracker.assign(row["id"], account)
+            if a.explanation:
+                _comment(tracker, ids, row["id"], f"Assigned by PDLC Phase 4 (approved at P4-G3): {a.explanation}")
+            ids.put(f"{tracker.system}_assign", a.task_id, a.worker_id, None, {"account_id": account})
+            return None, 1
+    for missing, count in _parallel_jira(tracker, (a for a in ap.assignments if a.worker_kind == "human"), assign_human):
+        if missing:
+            report["missing_in_tracker"].append(missing)
+        report["assigned"] += count
+    # AI dispatch remains ordered: predecessor completion and worker limits are shared constraints.
     for a in ap.assignments:
+        if a.worker_kind == "human":
+            continue
         row = ids.get(tracker.system, a.task_id)
         if row is None:
             report["missing_in_tracker"].append(a.task_id)
-            continue
-        if a.worker_kind == "human":
-            prev = ids.get(f"{tracker.system}_assign", a.task_id)
-            if prev is not None and prev["id"] == a.worker_id:
-                continue                                  # already assigned to the same person
-            tracker.assign(row["id"], accounts.get(a.worker_id))
-            if a.explanation:
-                _comment(tracker, ids, row["id"], f"Assigned by PDLC Phase 4 (approved at P4-G3): {a.explanation}")
-            ids.put(f"{tracker.system}_assign", a.task_id, a.worker_id, None, {})
-            report["assigned"] += 1
             continue
         if ids.get("dispatch", a.task_id) is not None:
             continue                                      # each AI task is dispatched once

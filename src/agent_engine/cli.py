@@ -685,6 +685,7 @@ def main() -> None:
     gate_parser.add_argument("--submitted-by", required=True, help="Name of the person who submitted the work.")
     gate_parser.add_argument("--comment", default="", help="Reason, or the changes requested.")
     sub.add_parser("list", help="List the available agent packs.")
+    sub.add_parser("pipeline", help="Run the complete pipeline using .env/config only; see docs/PIPELINE_JIRA.md.")
     phase4_cli.add_parser(sub)
     perf_parser = sub.add_parser("perf", help="Offline performance diagnostics (no model or network calls).")
     perf_sub = perf_parser.add_subparsers(dest="perf_command", required=True)
@@ -701,6 +702,9 @@ def main() -> None:
 
         raise SystemExit(perf_summary.cli(args))
     command = args.command if args.command != "phase4" else f"phase4 {args.phase4_command}"
+    if args.command == "pipeline":
+        from agent_engine.phase4.pipeline import configure_environment
+        configure_environment()
     perf.init(command)
     code: int | None = None
     try:
@@ -717,6 +721,9 @@ def main() -> None:
 
 
 def _dispatch(args: argparse.Namespace) -> int | None:
+    if args.command == "pipeline":
+        from agent_engine.phase4.pipeline import run
+        return run()
     if args.command == "phase4":
         raise SystemExit(phase4_cli.run(args))
     if args.command == "list":
