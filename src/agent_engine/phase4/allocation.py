@@ -405,14 +405,19 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
                 runner_up_worker_id=_runner_up(tt, wid, workers, loads), pinned=tid in pins,
                 explanation="Pinned by the approver." if tid in pins else ""))
     unassigned = []
+    left = set(res.unassigned)
     for tid in res.unassigned:
         t = tin_by[tid]
+        waiting = [p for p in t.predecessors if p in left]
         if not any(set(t.required_skills) <= set(w.skills) for w in workers):
             needed = [s for s in t.required_skills if not s.startswith("not-vetoed")]
             missing = [s for s in needed if not any(s in w.skills for w in workers)]
             why = (f"Nobody has {', '.join(missing)}." if missing else
                    f"Nobody has all of {', '.join(needed)} together; pair two people or split the task.")
             code = "no_skill_match"
+        elif waiting:   # the solver may only schedule a task after its predecessors (task links and story order)
+            code, why = "blocked", (f"Waits for {', '.join(sorted(waiting)[:6])}"
+                                    f"{' and others' if len(waiting) > 6 else ''}, which could not be assigned this sprint.")
         elif HUMAN_TAG in t.required_skills and not eligibility[tid].eligible:
             code, why = "capacity", f"Human capacity is used up and the task is not AI-eligible ({eligibility[tid].reason})."
         else:

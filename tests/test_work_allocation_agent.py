@@ -131,3 +131,22 @@ def test_a_depended_on_story_keeps_only_its_backend_away_from_ai(proj):
     # A story nobody depends on keeps its backend eligible on this signal.
     be_of_leaf = next(t for t in b.tasks_of('BM-4') if t.discipline == 'BE')
     assert not any('depend' in r for r in allocation.risk_reasons(be_of_leaf, b, settings))
+
+
+def test_tasks_behind_an_unassignable_predecessor_are_reported_blocked(proj):
+    """BM-3 comes after BM-2. If nobody can do BM-2's work, BM-3's tasks are blocked, not short of capacity."""
+    from agent_engine.phase4 import sprint
+    from agent_engine.phase4.contracts import AssignmentPlan
+    built(proj)
+    doc = json.loads((proj / files.BACKLOG).read_text())
+    for item in doc["items"]:
+        if item.get("parent_id") == "BM-2" and item["level"] == "task":
+            item["skills_required"] = ["ux-design"]          # a skill nobody on the example team has
+    (proj / files.BACKLOG).write_text(json.dumps(doc))
+    sprint.solve(P, as_of="2026-11-05")
+    allocation.solve(P, 1, {}, {}, {}, [])
+    ap = files.read_json(P, files.ASSIGNMENTS, AssignmentPlan)
+    reasons = {u.task_id: (u.reason_code, u.explanation) for u in ap.unassigned}
+    assert all(reasons[t][0] == "no_skill_match" for t in reasons if t.startswith("BM-2-"))
+    blocked = {t: r for t, r in reasons.items() if t.startswith("BM-3-")}
+    assert blocked and all(code == "blocked" and "Waits for BM-2-" in why for code, why in blocked.values())
