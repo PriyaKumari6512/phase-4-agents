@@ -2,13 +2,13 @@
 
 ## Bootstrap and ownership
 
-DevOps Lead and Solution Architect review generated IaC and all remaining gaps before merge. This change set does not provision resources itself. Create encrypted, versioned remote state and its restricted IAM role first; apply {{ environments[0] }}/core before the shared ECR registries are used. Apply each environment through Atlantis after reviewed plans. Register Argo CD clusters named {{ project }}-<environment>; install the external-secrets operator, Load Balancer Controller, DNS, telemetry collector and Prometheus CRDs before syncing platform applications.
+DevOps Lead and Solution Architect review generated IaC and all remaining gaps before merge. This change set does not provision resources itself. Create encrypted, versioned remote state and its restricted IAM role first; apply {{ environments[0] }}/core before the shared ECR registries are used. Apply each environment through Atlantis after reviewed plans.{% if kubernetes %} Register Argo CD clusters named {{ project }}-<environment>; install the external-secrets operator, Load Balancer Controller, DNS, telemetry collector and Prometheus CRDs before syncing platform applications.{% else %} Services run on ECS Fargate in each environment's cluster; set the ACM certificate and DNS for the load balancer before the first apply.{% endif %}
 
 ## Access and secrets
 
-CI authenticates to AWS with GitHub OIDC, never static AWS keys. Scope the trust subject to the repository and protected main branch; scope ECR write to the generated image repositories. Grant ECR authorization-token access only as required by AWS. Atlantis uses a separate state/apply role. Disable standing cluster creator admin after explicit operational access is configured. Human access uses SSO groups with environment-specific RBAC; production access is audited and time limited.
+CI authenticates to AWS with GitHub OIDC, never static AWS keys. Scope the trust subject to the repository and protected main branch; scope ECR write to the generated image repositories. Grant ECR authorization-token access only as required by AWS. Atlantis uses a separate state/apply role. {% if kubernetes %}Disable standing cluster creator admin after explicit operational access is configured. {% endif %}Human access uses SSO groups with environment-specific {% if kubernetes %}RBAC{% else %}IAM roles; ECS Exec stays disabled{% endif %}; production access is audited and time limited.
 
-ExternalSecrets hold paths, never values. Create the references listed in infra/PR.md in AWS Secrets Manager. Scope the external-secrets service account IAM policy to /{{ project }}/<environment>/* and bind its OIDC identity. Rotate values in the secret store, wait for ExternalSecrets refresh, and roll deployments only when the application requires it. Never paste values in prompts, PRs or logs.
+{% if kubernetes %}ExternalSecrets hold paths, never values. Create the references listed in infra/PR.md in AWS Secrets Manager. Scope the external-secrets service account IAM policy to /{{ project }}/<environment>/* and bind its OIDC identity. Rotate values in the secret store, wait for ExternalSecrets refresh, and roll deployments only when the application requires it.{% else %}Task definitions reference Secrets Manager entries by name, never values. Create the references listed in infra/PR.md before the first apply; only each service's execution role may read its own entries. After rotating a value, force a new deployment of the service so tasks read it.{% endif %} Never paste values in prompts, PRs or logs.
 
 ## Build and promotion
 
@@ -18,13 +18,13 @@ Configure QA_APPROVER_ID, CLIENT_APPROVER_ID and DEVOPS_APPROVER_ID with the exp
 
 CI builds once, records sha and digest in image.json, and notifies this repo only after the run succeeds. Dev verifies the source run and artifact. Manual promotion takes only component and target: it copies the predecessor digest with no rebuild. Workloads sharing an image move together. The all-zero initial digest is a bootstrap placeholder, not a deployable image. Configure real ECR registry addresses, public DNS/certificates and worker commands before apply.
 
-Review and merge the promotion PR. Argo CD syncs the exact digest. Check deployment health and the matching revision before advancing to the next environment. Never rebuild between UAT and production.
+Review and merge the promotion PR. {% if kubernetes %}Argo CD syncs the exact digest.{% else %}The promotion PR changes only envs/<environment>/core/images.auto.tfvars.json; Atlantis plans it and applies the new task definition with the exact digest after approval.{% endif %} Check deployment health and the matching revision before advancing to the next environment. Never rebuild between UAT and production.
 
 ## Rollback and operations
 
-Revert the relevant promotion merge in Git, review it, and sync Argo CD to the previous digest. Do not mutate an image tag. Database rollback requires a separate reviewed migration and backup restore plan; test restores in QA before incidents. Backups and restore ownership remain deployment-specific bootstrap requirements.
+Revert the relevant promotion merge in Git, review it, and {% if kubernetes %}sync Argo CD to the previous digest{% else %}apply it through Atlantis to return to the previous digest{% endif %}. Do not mutate an image tag. Database rollback requires a separate reviewed migration and backup restore plan; test restores in QA before incidents. Backups and restore ownership remain deployment-specific bootstrap requirements.
 
-Alert rules are generated for each workload and environment. Connect Prometheus/Alertmanager routes to the team's on-call receiver and publish dashboard, tracing and incident links in the deployment record. HTTP services use latency/error alerts; workers use availability alerts. Confirm OTEL_EXPORTER_OTLP_ENDPOINT and operator health.
+Alert rules are generated for each workload and environment. {% if kubernetes %}Connect Prometheus/Alertmanager routes{% else %}Connect the CloudWatch alarms (CPU; 5xx rate and p95 latency at the load balancer){% endif %} to the team's on-call receiver and publish dashboard, tracing and incident links in the deployment record. HTTP services use latency/error alerts; workers use availability alerts. {% if kubernetes %}Confirm OTEL_EXPORTER_OTLP_ENDPOINT and operator health.{% else %}Logs go to CloudWatch Logs per service.{% endif %}
 
 ## Readiness evidence
 

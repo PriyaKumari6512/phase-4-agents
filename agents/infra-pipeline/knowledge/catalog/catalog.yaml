@@ -1,5 +1,5 @@
 # Golden-path catalog. Owned by the platform team; the agent never adds entries itself.
-# Module versions: "verified" pins were checked against the registry on 2026-11-04. Others are major-version
+# Module versions: "verified" pins were checked against the registry on 2026-11-04 (ECS and ALB pins on 2026-11-17). Others are major-version
 # constraints; the agent checks them with the infra_registry_versions tool (Terraform registry API)
 # and `tofu init` in the sandbox fails loudly if a pin is wrong.
 version: 1
@@ -7,9 +7,10 @@ defaults:
   required_tags: [project, environment, owner, managed-by]
   allowed_regions: [us-east-1, us-west-2, eu-west-1, eu-central-1, ap-south-1]
 size_classes:
-  small:  {db_instance: db.t4g.small,  cache_node: cache.t4g.small,  node_instance: t3.large,  nodes_min: 2, nodes_max: 4}
-  medium: {db_instance: db.m7g.large,  cache_node: cache.m7g.large,  node_instance: m6i.xlarge, nodes_min: 3, nodes_max: 6}
-  large:  {db_instance: db.r7g.xlarge, cache_node: cache.r7g.large,  node_instance: m6i.2xlarge, nodes_min: 3, nodes_max: 10}
+  # task_cpu / task_memory: one ECS Fargate task (CPU units, MiB) when deploy_target is ecs_fargate.
+  small:  {db_instance: db.t4g.small,  cache_node: cache.t4g.small,  node_instance: t3.large,  nodes_min: 2, nodes_max: 4,  task_cpu: 512,  task_memory: 1024}
+  medium: {db_instance: db.m7g.large,  cache_node: cache.m7g.large,  node_instance: m6i.xlarge, nodes_min: 3, nodes_max: 6,  task_cpu: 1024, task_memory: 2048}
+  large:  {db_instance: db.r7g.xlarge, cache_node: cache.r7g.large,  node_instance: m6i.2xlarge, nodes_min: 3, nodes_max: 10, task_cpu: 2048, task_memory: 4096}
 templates:
   - id: aws-network
     applies_to: {cloud: aws, need: network}
@@ -19,6 +20,24 @@ templates:
     applies_to: {cloud: aws, need: k8s_cluster}
     module: {source: terraform-aws-modules/eks/aws, version: "~> 21.0", verified: false}
     template: terraform/aws/eks.tf.j2
+  # deploy_target ecs_fargate: services and workers run as ECS Fargate services (need ecs_service);
+  # public HTTP services sit behind one Application Load Balancer with WAF per environment.
+  - id: aws-ecs-cluster
+    applies_to: {cloud: aws, need: ecs_cluster}
+    module: {source: terraform-aws-modules/ecs/aws//modules/cluster, version: "7.6.3", verified: true}
+    template: terraform/aws/ecs_cluster.tf.j2
+  - id: aws-ecs-service
+    applies_to: {cloud: aws, need: ecs_service}
+    module: {source: terraform-aws-modules/ecs/aws//modules/service, version: "7.6.3", verified: true}
+    template: terraform/aws/ecs_service.tf.j2
+  - id: aws-alb
+    applies_to: {cloud: aws, need: load_balancer}
+    module: {source: terraform-aws-modules/alb/aws, version: "10.5.1", verified: true}
+    template: terraform/aws/alb.tf.j2
+  - id: aws-cloudfront-static
+    applies_to: {cloud: aws, need: cdn}
+    template: terraform/aws/cloudfront.tf.j2
+    edge_template: terraform/aws/cdn_edge.tf.j2   # once per environment: us-east-1 provider alias and CloudFront WAF
   - id: aws-ecr
     applies_to: {cloud: aws, need: container_registry}
     module: {source: terraform-aws-modules/ecr/aws, version: "~> 2.0", verified: false}

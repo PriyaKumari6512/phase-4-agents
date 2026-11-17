@@ -335,6 +335,7 @@ class WorkItem(Strict):
     ai_eligibility_reason: str = ""
     source_refs: list[SourceRef] = []
     open_questions: list[str] = []
+    deferred_criteria: list[str] = []    # stories: acceptance criteria a gate reviewer decided not to build now
 
 
 class Feature(Strict):
@@ -539,7 +540,7 @@ class AssignmentPlan(Strict):
 CheckTool = Literal["tofu_fmt", "tofu_validate", "tofu_test", "tflint", "trivy", "checkov", "conftest",
                     "infracost", "actionlint", "helm_lint", "kubeconform", "gitleaks"]
 Env = Literal["dev", "qa", "stg", "prod"]
-Need = Literal["k8s_workload", "public_endpoint", "postgres", "mysql", "redis", "queue", "object_storage",
+Need = Literal["k8s_workload", "ecs_service", "public_endpoint", "postgres", "mysql", "redis", "queue", "object_storage",
                "container_registry", "cdn", "external"]
 
 
@@ -590,7 +591,7 @@ class InfraIntent(Strict):
     cloud: Literal["aws", "azure", "gcp"]
     regions: list[str] = Field(min_length=1)
     environments: list[Env] = Field(default=["dev", "qa", "stg", "prod"], min_length=1)
-    deploy_target: Literal["kubernetes", "serverless", "vm"] = "kubernetes"
+    deploy_target: Literal["kubernetes", "ecs_fargate", "serverless", "vm"] = "kubernetes"
     components: list[InfraIntentComponent]
     slos: dict[str, str] = {}
     monthly_budget_usd: float | None = None

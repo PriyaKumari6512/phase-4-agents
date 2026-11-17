@@ -1,4 +1,4 @@
-"""Update GitOps values with an immutable digest, preserving the promotion chain."""
+"""Update the deployed image digest (GitOps values, or ECS images.auto.tfvars.json), preserving the promotion chain."""
 import argparse
 import json
 from pathlib import Path
@@ -13,9 +13,13 @@ def promote(root, component, target, digest=None):
     envs = inventory['environments']
     index = envs.index(target)
     members = inventory['images'][component]
+    ecs = inventory.get('deploy_target') == 'ecs_fargate'
     if index:
         before = envs[index - 1]
-        digests = {yaml.safe_load((root / f'gitops/apps/{name}/{before}/values.yaml').read_text())['image']['digest'] for name in members}
+        if ecs:
+            digests = {json.loads((root / f'envs/{before}/core/images.auto.tfvars.json').read_text())['image_digests'][component]}
+        else:
+            digests = {yaml.safe_load((root / f'gitops/apps/{name}/{before}/values.yaml').read_text())['image']['digest'] for name in members}
         if len(digests) != 1:
             raise ValueError('Shared image workloads have different predecessor digests')
         previous = digests.pop()
@@ -24,6 +28,14 @@ def promote(root, component, target, digest=None):
         digest = previous
     if not digest or not re.fullmatch(r'sha256:[0-9a-f]{64}', digest) or digest == 'sha256:' + '0' * 64:
         raise ValueError('A real immutable build digest is required')
+    if ecs:
+        path = root / f'envs/{target}/core/images.auto.tfvars.json'
+        data = json.loads(path.read_text())
+        if component not in data['image_digests']:
+            raise ValueError('Expected exactly one image digest field')
+        data['image_digests'][component] = digest
+        path.write_text(json.dumps(data, indent=2) + '\n')
+        return
     for name in members:
         path = root / f'gitops/apps/{name}/{target}/values.yaml'
         text = path.read_text()

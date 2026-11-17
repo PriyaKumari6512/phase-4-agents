@@ -148,7 +148,7 @@ def _validate(backlog: Backlog, settings: ProjectSettings, stories: list) -> lis
             continue
         covered = {r.req_id for t in items.values() if t.level == "task"
                    for r in t.source_refs if t.parent_id == s.key or r.anchor == s.key}   # shared work counts
-        gaps = [c.ac_id for c in s.acceptance_criteria if c.ac_id not in covered]
+        gaps = [c.ac_id for c in s.acceptance_criteria if c.ac_id not in covered and c.ac_id not in items[s.key].deferred_criteria]
         if gaps:
             issue("acceptance_coverage", f"{s.key}: no task covers {', '.join(gaps)}", [s.key])
         if not s.acceptance_criteria:

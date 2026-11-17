@@ -1,0 +1,74 @@
+# CloudFront-scope resources must live in us-east-1: one provider alias and one shared web ACL for every static site.
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+  default_tags {
+    tags = local.tags
+  }
+}
+
+resource "aws_wafv2_web_acl" "cdn" {
+  provider = aws.us_east_1
+  name     = "${var.project}-${var.environment}-cdn"
+  scope    = "CLOUDFRONT"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "aws-common"
+    priority = 1
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "aws-common"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "aws-known-bad-inputs"
+    priority = 2
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "aws-known-bad-inputs"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.project}-${var.environment}-cdn"
+    sampled_requests_enabled   = true
+  }
+}
+
+resource "aws_cloudwatch_log_group" "cdn_waf" {
+  provider          = aws.us_east_1
+  name              = "aws-waf-logs-${var.project}-${var.environment}-cdn"
+  retention_in_days = 365
+}
+
+resource "aws_wafv2_web_acl_logging_configuration" "cdn" {
+  provider                = aws.us_east_1
+  resource_arn            = aws_wafv2_web_acl.cdn.arn
+  log_destination_configs = [aws_cloudwatch_log_group.cdn_waf.arn]
+}

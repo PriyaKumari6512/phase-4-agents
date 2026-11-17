@@ -167,3 +167,122 @@ def test_generated_promotion_refuses_unprotected_environment(proj):
         module.verify('qa', '123', 'example/infra', 'head', lambda path: permissive)
     with pytest.raises(ValueError, match='go/no-go'):
         module.verify('prod', '123', 'example/infra', 'head', lambda path: environment if '/environments/' in path else {'statuses':[]})
+
+
+def _ecs_intent():
+    """The gym architecture's shape: static web on CloudFront, API on ECS Fargate behind a public ALB, RDS."""
+    intent = _intent()
+    intent['deploy_target'] = 'ecs_fargate'
+    intent['environments'] = ['dev', 'qa', 'stg', 'prod']
+    api, web, worker = intent['components'][:3]
+    api['needs'] = ['ecs_service', 'container_registry', 'public_endpoint']
+    api['public_endpoint'] = True
+    web.update(needs=['object_storage', 'cdn'], repo=None)
+    worker['needs'] = ['ecs_service']
+    return intent
+
+
+def test_ecs_fargate_renders_services_load_balancer_and_static_site(proj, monkeypatch):
+    infra.set_intent(P, _ecs_intent())
+    infra.render(P)
+    core = files.read_text(P, 'infra/repo/envs/prod/core/main.tf')
+    for expected in ('module "ecs_cluster"', 'module "svc_taskflow_api"', 'module "svc_notify_worker"',
+                     'module "alb"', 'aws_wafv2_web_acl_association', 'aws_cloudfront_distribution" "taskflow_web"',
+                     'web_acl_id', 'module "db_taskflow_db"', '"/api/*"'):
+        assert expected in core, expected
+    assert 'module "eks"' not in core
+    # Secrets are references by name; the worker shares the API image and needs its command set.
+    assert f'name = "/{P}/prod/notify-worker/EMAIL_PROVIDER_API_KEY"' in core and 'TODO-start-command' in core
+    paths = {f['path'] for f in files.read_json(P, files.INFRA_MANIFEST)['files']}
+    assert not any(p.startswith('repo/gitops/') for p in paths)
+    assert {'repo/envs/dev/core/images.auto.tfvars.json', 'repo/promotion.json'} <= paths
+    gaps = ' '.join(files.read_json(P, files.INFRA_MANIFEST)['gaps'])
+    assert 'certificate_arn' in gaps and 'Argo CD' not in gaps
+    runbook = files.read_text(P, 'infra/repo/docs/RUNBOOK.md')
+    assert 'ECS Fargate' in runbook and 'Argo CD' not in runbook
+    seen = {}
+    from agent_engine.phase4 import sandbox
+    def fake(wd, envs, **kw):
+        seen.setdefault('only', kw.get('only'))
+        return [infra.CheckResult(tool=t, passed=True, outcome='passed', summary='mock')
+                for t in sandbox.ALL_TOOLS if kw.get('only') is None or t in kw['only']]
+    monkeypatch.setattr(sandbox, 'run_checks', fake)
+    result = json.loads(infra.validate(P))
+    assert result['checks_passed'] and result['validation_complete']
+    assert not seen['only'] & {'helm_lint', 'kubeconform'}             # nothing Kubernetes to lint on ECS
+
+
+def test_ecs_promotion_moves_the_digest_through_the_tfvars_files(proj):
+    import importlib.util
+    infra.set_intent(P, _ecs_intent())
+    infra.render(P)
+    root = files.path(P, 'infra/repo')
+    spec = importlib.util.spec_from_file_location('generated_promote_ecs', root / 'scripts/promote.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    digest = 'sha256:' + 'c' * 64
+    module.promote(root, 'taskflow-api', 'dev', digest)
+    module.promote(root, 'taskflow-api', 'qa')
+    for env in ('dev', 'qa'):
+        tfvars = json.loads((root / f'envs/{env}/core/images.auto.tfvars.json').read_text())
+        assert tfvars == {'image_digests': {'taskflow-api': digest}}
+    with pytest.raises(ValueError, match='exactly'):
+        module.promote(root, 'taskflow-api', 'stg', 'sha256:' + 'd' * 64)
+    tfvars = root / 'envs/prod/core/images.auto.tfvars.json'
+    tfvars.write_text(json.dumps({'image_digests': {'taskflow-api': 'latest'}}))
+    manifest = files.read_json(P, files.INFRA_MANIFEST, infra.InfraManifest)
+    assert any('must pin a sha256 digest' in p for p in infra.deployment_problems(P, manifest))
+
+
+@pytest.mark.parametrize('change, message', [
+    (lambda i: i['components'][0].update(needs=['k8s_workload', 'container_registry']), 'needs k8s_workload but deploy_target is ecs_fargate'),
+    (lambda i: i['components'][1].update(needs=['cdn']), 'also needs object_storage'),
+    (lambda i: i.update(deploy_target='serverless'), 'needs ecs_service but deploy_target is serverless'),
+])
+def test_ecs_intent_mismatches_are_rejected(proj, change, message):
+    intent = _ecs_intent()
+    change(intent)
+    with pytest.raises(files.ProjectError, match=message):
+        infra.set_intent(P, intent)
+
+
+def test_kubernetes_intent_cannot_use_ecs_services(proj):
+    intent = _intent()
+    intent['components'][0]['needs'] = ['ecs_service', 'container_registry']
+    with pytest.raises(files.ProjectError, match='needs ecs_service but deploy_target is kubernetes'):
+        infra.set_intent(P, intent)
+
+
+def test_repair_that_deletes_infrastructure_is_refused():
+    """A repair once returned a 4-line dev main.tf: valid Terraform, fewer checkov findings, no environment."""
+    from agent_engine.phase4.infra_pipeline import removed_blocks
+    before = ('terraform {\n}\nprovider "aws" {\n}\nmodule "network" {\n}\nresource "aws_s3_bucket" "logs" {\n}\n'
+              'data "aws_caller_identity" "current" {}\n')
+    assert removed_blocks(before, 'terraform {\n}\n') == [
+        'data aws_caller_identity current', 'module network', 'provider aws', 'resource aws_s3_bucket logs']
+    hardened = before.replace('resource "aws_s3_bucket" "logs" {\n}', 'resource "aws_s3_bucket" "logs" {\n  force_destroy = false\n}')
+    assert removed_blocks(before, hardened + 'resource "aws_s3_bucket_versioning" "logs" {\n}\n') == []
+
+
+def test_accepted_checkov_risks_come_only_from_the_catalog(proj, monkeypatch, tmp_path):
+    import shutil
+    infra.set_intent(P, _intent())
+    infra.render(P)
+    assert not files.exists(P, 'infra/repo/.checkov.yaml')               # default catalog accepts nothing
+    catalog = tmp_path / 'catalog'
+    shutil.copytree(infra.catalog_dir(), catalog)
+    (catalog / 'templates/repo/checkov.yaml').write_text('# justification per check\nskip-check:\n  - CKV_TF_1\n')
+    monkeypatch.setattr(infra, 'catalog_dir', lambda: catalog)
+    infra.render(P)
+    assert 'CKV_TF_1' in files.read_text(P, 'infra/repo/.checkov.yaml')
+    assert any('CKV_TF_1' in g for g in files.read_json(P, files.INFRA_MANIFEST)['gaps'])
+    mock_passed_checks(monkeypatch)
+    infra.validate(P)
+    assert '`CKV_TF_1`' in files.read_text(P, files.INFRA_PR)
+
+
+def test_repair_guard_ignores_attributes_named_like_blocks():
+    from agent_engine.phase4.infra_pipeline import removed_blocks
+    before = 'module "x" {\n  data = 1\n  output = "y"\n}\nlocals {\n}\n'
+    assert removed_blocks(before, 'module "x" {\n}\nlocals {\n}\n') == []
+    assert removed_blocks(before, 'module "x" {\n}\n') == ['locals']

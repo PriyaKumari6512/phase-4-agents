@@ -82,7 +82,7 @@ def build_story_backlog(root: Path) -> None:
         both = [f"{us}.AC1", f"{us}.AC2"]
         slug = noun.replace(" ", "_")
         results[key] = tb.StoryBreakdown(story_key=key, estimate_rationale="DB, API, screen and tests.",
-                                         reference_ticket_ids=[], open_questions=[], tasks=[
+                                         reference_ticket_ids=[], open_questions=[], deferred_criteria=[], tasks=[
             _task("T1", "DB", f"Bookmark table for {noun}", 2, ["postgres"], [f"migrations/{slug}.sql"], []),
             _task("T2", "BE", f"API to {noun} bookmarks", 4, ["backend-python", "api-design"], [f"app/bookmarks/{slug}.py"],
                   both, ["T1"]),

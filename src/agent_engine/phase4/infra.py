@@ -45,6 +45,11 @@ REPLICAS = {"small": {"qa": 1, "dev": 1, "stg": 1, "prod": 2}, "medium": {"qa": 
 MAX_FACTOR = {"small": 2, "medium": 3, "large": 3}
 RUNTIME_RE = re.compile(r"(python|node|java)[^0-9]*([0-9]+(?:\.[0-9]+)?)?", re.I)
 DEPENDENCY_SECRET = {"database": "DATABASE_URL", "cache": "REDIS_URL", "queue": "QUEUE_URL"}
+# deploy target -> the need a service/worker uses to run there. Other targets have no workload template.
+WORKLOAD_NEED = {"kubernetes": "k8s_workload", "ecs_fargate": "ecs_service"}
+WORKLOAD_NEEDS = set(WORKLOAD_NEED.values())
+APP_PORT, HEALTH_PATH = 8080, "/healthz"
+GITOPS_TOOLS = {"helm_lint", "kubeconform"}     # Kubernetes manifests only; nothing to check on ECS
 
 
 def parse_runtime(runtime: str | None) -> tuple[str, str]:
@@ -139,8 +144,12 @@ def set_intent(project: str, intent: dict) -> str:
             problems.append(f"{c.name} handles restricted data and must not have a public endpoint")
         if c.kind == "database" and not ({"postgres", "mysql"} & set(c.needs)):
             problems.append(f"{c.name} is a database but needs neither postgres nor mysql")
-        if "k8s_workload" in c.needs and it.deploy_target != "kubernetes":
-            problems.append(f"{c.name} needs k8s_workload but deploy_target is {it.deploy_target}")
+        for target, need in WORKLOAD_NEED.items():
+            if need in c.needs and it.deploy_target != target:
+                problems.append(f"{c.name} needs {need} but deploy_target is {it.deploy_target}")
+        if "cdn" in c.needs and "object_storage" not in c.needs:
+            problems.append(f"{c.name} needs cdn: this catalog serves static sites from the component's own "
+                            "bucket, so it also needs object_storage")
         if c.public_endpoint and "public_endpoint" not in c.needs:
             warnings.append(f"{c.name}: public_endpoint is true but 'public_endpoint' is not in needs")
         if c.repo and settings.code_repos and c.repo not in settings.code_repos:
@@ -154,8 +163,13 @@ def set_intent(project: str, intent: dict) -> str:
             problems.append(f"region {r} is not on the org allow-list {sorted(allowed)}")
     if it.cloud != "aws":
         problems.append(f"cloud {it.cloud}: this catalog only implements AWS; no substitute topology will be generated")
-    if it.deploy_target != "kubernetes" and any(c.kind in ("service", "worker") for c in it.components):
+    if it.deploy_target not in WORKLOAD_NEED and any(c.kind in ("service", "worker") for c in it.components):
         problems.append(f"deploy_target {it.deploy_target} has no workload template in this catalog")
+    workload = WORKLOAD_NEED.get(it.deploy_target)
+    for c in it.components:
+        if workload and c.kind in ("service", "worker") and workload not in c.needs:
+            warnings.append(f"{c.name}: a {c.kind} on {it.deploy_target} normally needs {workload}; "
+                            "without it nothing runs it")
     if problems:
         raise files.ProjectError("intent rejected: " + "; ".join(problems))
     files.write_json(project, files.INFRA_INTENT, it)
@@ -205,15 +219,36 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
     blocks = [j.get_template("terraform/aws/base.tf.j2").render(
         project=project, environment=env, region=region, owner=settings.project_name,
         vpc_cidr=ENV_CIDR.get(env, "10.40.0.0/16"), state_bucket=f"{project}-tfstate")]
-    needs_cluster = it.deploy_target == "kubernetes" and any("k8s_workload" in c.needs for c in it.components)
-    for need in (["network", "k8s_cluster"] if needs_cluster else ["network"]):
+    ecs = [c for c in it.components if "ecs_service" in c.needs] if it.deploy_target == "ecs_fargate" else []
+    # API services first so their /api/* rule wins over a public frontend's catch-all.
+    public_ecs = sorted((c for c in ecs if c.public_endpoint and c.exposes_http), key=lambda c: c.kind != "service")
+    core = ["network"]
+    if it.deploy_target == "kubernetes" and any("k8s_workload" in c.needs for c in it.components):
+        core.append("k8s_cluster")
+    if ecs:
+        core.append("ecs_cluster")
+    for need in core:
         e = _entry("aws", need)
         blocks.append(j.get_template(e["template"]).render(module=e["module"], size=cat["size_classes"][largest]))
         out.modules[e["id"]] = e["module"]
+    cdn = _entry("aws", "cdn")
+    if cdn and cdn.get("edge_template") and any("cdn" in c.needs for c in it.components):
+        blocks.append(j.get_template(cdn["edge_template"]).render())
+    if public_ecs:
+        e = _entry("aws", "load_balancer")
+        blocks.append(j.get_template(e["template"]).render(module=e["module"], services=[
+            {"name": ident(c.name), "prefix": ident(c.name).replace("_", "")[:5] or "app", "port": APP_PORT,
+             "health": HEALTH_PATH, "path": _route(c)}
+            for c in public_ecs]))
+        out.modules[e["id"]] = e["module"]
+        if env == it.environments[0]:
+            out.gaps.append("public services: set certificate_arn (ACM, HTTPS listener) per environment and point DNS at "
+                            "the load balancer; listener rules route " + ", ".join(
+                                f"{_route(c)} to {c.name}" for c in public_ecs) + " - adjust if the API uses other paths")
     for c in it.components:
         name = ident(c.name)
         for need in c.needs:
-            if need in ("k8s_workload", "public_endpoint", "external"):
+            if need in ("k8s_workload", "ecs_service", "public_endpoint", "external"):
                 continue
             if need == "container_registry" and env != it.environments[0]:
                 continue  # shared registry has one state owner, not one conflicting owner per environment
@@ -221,14 +256,22 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
             if e is None:
                 out.gaps.append(f"{c.name}: no catalog template for '{need}' (left for human follow-up)")
                 continue
-            if "module" not in e:
-                continue
-            blocks.append(j.get_template(e["template"]).render(module=e["module"], size=size_of[c.component_id],
+            if "module" not in e and not e["template"].startswith("terraform/"):
+                continue  # rendered outside Terraform (Kubernetes manifests)
+            blocks.append(j.get_template(e["template"]).render(module=e.get("module"), size=size_of[c.component_id],
                                                                  name=name, component=ident(c.name).replace("_", "-"), db_name=name[:60]))
-            out.modules[e["id"]] = e["module"]
+            if "module" in e:
+                out.modules[e["id"]] = e["module"]
             if e.get("stateful"):
                 out.stateful.append(f"{env}:{e['id']}:{c.name}")
+            if need == "cdn" and env == it.environments[0]:
+                out.gaps.append(f"{c.name}: static site on CloudFront; the workflow that uploads its build to the bucket "
+                                "and invalidates the CDN is not generated, and custom DNS/certificate are not set")
+    if ecs:
+        blocks += _render_ecs(out, project, it, env, ecs, size_of)
     out.add(f"envs/{env}/core/main.tf", "\n".join(blocks), "module_call", "aws-core")
+    if it.deploy_target != "kubernetes":
+        return
     repo_url = f"https://github.com/{settings.infra_repo}.git" if settings.infra_repo else "REPLACE_WITH_INFRA_REPO_URL"
     out.add(f"gitops/applicationsets/{project}-{env}.yaml",
             j.get_template("gitops/applicationset.yaml.j2").render(project=project, environment=env, repo_url=repo_url),
@@ -282,6 +325,52 @@ def _render_env(out: _Out, project: str, settings: ProjectSettings, it: InfraInt
                     error_rate=_slo_error_rate(it.slos), p95_seconds=_slo_p95(it.slos)), "template", "observability")
 
 
+def _route(c) -> str:
+    return "/api/*" if c.kind == "service" else "/*"
+
+
+def _render_ecs(out: _Out, project: str, it: InfraIntent, env: str, ecs: list, size_of: dict) -> list[str]:
+    """ECS Fargate services and the env's image digest file (the only file promotion changes)."""
+    j, e = _jinja(), _entry("aws", "ecs_service")
+    by_id = {c.component_id: c for c in it.components}
+    blocks, digests = [], {}
+    for c in ecs:
+        name, component = ident(c.name), ident(c.name).replace("_", "-")
+        keys = [DEPENDENCY_SECRET[by_id[d].kind] for d in c.depends_on if d in by_id and by_id[d].kind in DEPENDENCY_SECRET]
+        keys += [k for k in c.secrets if k not in keys]
+        secrets = [SecretRef(name=k, store="aws_secrets_manager", path=f"/{project}/{env}/{component}/{k}") for k in keys]
+        out.secrets += secrets
+        owner = image_owner(c, it.components)
+        if owner is None:
+            out.gaps.append(f"{c.name}: no component in its repository builds a container image "
+                            "(add container_registry to its needs)")
+        image = ident((owner or c).name).replace("_", "-")
+        digests[image] = "sha256:" + "0" * 64
+        shares_image = owner is not None and owner is not c
+        if shares_image and env == it.environments[0]:
+            out.gaps.append(f"{c.name} runs the {image} image: set its command in envs/<env>/core/main.tf (module svc_{name})")
+        replicas = REPLICAS[c.size_class][env]
+        size = size_of[c.component_id]
+        blocks.append(j.get_template(e["template"]).render(
+            module=e["module"], name=name, component=component, image=image,
+            command='["TODO-start-command"]' if shares_image else "", cpu=size["task_cpu"], memory=size["task_memory"],
+            replicas=replicas, max_replicas=replicas * MAX_FACTOR[c.size_class], http=c.exposes_http,
+            public=c.public_endpoint and c.exposes_http, port=APP_PORT,
+            secrets=[{"key": s.name, "path": s.path} for s in secrets],
+            error_rate=_slo_error_rate(it.slos), p95_seconds=_slo_p95(it.slos)))
+        out.modules[e["id"]] = e["module"]
+    out.add(f"envs/{env}/core/images.auto.tfvars.json", json.dumps({"image_digests": digests}, indent=2) + "\n",
+            "generated", "promotion")
+    return blocks
+
+
+def accepted_checkov_risks() -> list[str]:
+    accepted = catalog_dir() / "templates" / "repo" / "checkov.yaml"
+    if not accepted.is_file():
+        return []
+    return [str(x) for x in (yaml.safe_load(accepted.read_text(encoding="utf-8")) or {}).get("skip-check", [])]
+
+
 def render(project: str) -> str:
     """Re-renders everything from intent.json. Overwrites infra/repo and infra/ci (agent edits there are lost)."""
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
@@ -295,16 +384,25 @@ def render(project: str) -> str:
         for env in it.environments:
             with perf.span("compute", "infra.render_env", env=env, components=len(it.components)):
                 _render_env(out, project, settings, it, env)
-        chart_dir = catalog_dir() / "templates" / "gitops" / "chart"
-        for p in sorted(chart_dir.rglob("*")):
-            if p.is_file():
-                out.add(f"gitops/charts/app/{p.relative_to(chart_dir).as_posix()}", p.read_text(encoding="utf-8"),
-                        "template", "k8s-workload")
-        out.gaps.append(f"bootstrap: register Argo CD clusters named {', '.join(project + '-' + e for e in it.environments)}; install platform CRDs before syncing platform applications")
+        kubernetes = it.deploy_target == "kubernetes"
+        if kubernetes:
+            chart_dir = catalog_dir() / "templates" / "gitops" / "chart"
+            for p in sorted(chart_dir.rglob("*")):
+                if p.is_file():
+                    out.add(f"gitops/charts/app/{p.relative_to(chart_dir).as_posix()}", p.read_text(encoding="utf-8"),
+                            "template", "k8s-workload")
+            out.gaps.append(f"bootstrap: register Argo CD clusters named {', '.join(project + '-' + e for e in it.environments)}; install platform CRDs before syncing platform applications")
+        else:
+            out.gaps.append("alarms: connect the generated CloudWatch alarms to the team's on-call SNS topic (alarm_actions)")
         out.gaps.append(f"shared container registries are owned only by {it.environments[0]}/core state; apply that state before image builds for other environments")
         owners = [m.github_login for m in settings.team if m.github_login and m.role.lower() in PLATFORM_ROLES]
         out.add(".trivyignore", (catalog_dir() / "templates" / "repo" / "trivyignore").read_text(encoding="utf-8"),
                 "template", None)
+        accepted = catalog_dir() / "templates" / "repo" / "checkov.yaml"
+        if accepted.is_file():  # platform-owned accepted checkov risks; none in the default catalog
+            out.add(".checkov.yaml", accepted.read_text(encoding="utf-8"), "template", "accepted-risks")
+            out.gaps.append("checkov: the catalog accepts these checks as known risks (.checkov.yaml skip-check); "
+                            "review the list and its justification: " + ", ".join(accepted_checkov_risks()))
         out.add("atlantis.yaml", j.get_template("repo/atlantis.yaml.j2").render(
             project=project, environments=it.environments), "template", None)
         out.add(".github/workflows/drift.yml", j.get_template("repo/drift.yml.j2").render(
@@ -312,15 +410,16 @@ def render(project: str) -> str:
             "template", None)
         for document in ("RUNBOOK", "BRANCHING"):
             out.add(f"docs/{document}.md", j.get_template(f"repo/{document}.md.j2").render(
-                project=project, environments=it.environments), "template", document.lower())
+                project=project, environments=it.environments, kubernetes=kubernetes), "template", document.lower())
         out.add("CODEOWNERS", j.get_template("repo/CODEOWNERS.j2").render(
             platform_team=" @".join(owners) if owners else "platform-team",
             prod_approvers=" @".join(owners[1:] or owners) if owners else "prod-approvers"), "template", None)
         if not owners:
             out.gaps.append("CODEOWNERS: nobody in phase4/project.json has role devops/platform/sre; replace the "
                             "@platform-team placeholders")
-        out.gaps.append("platform add-ons (external-secrets operator, kube-prometheus-stack, OpenTelemetry Collector) "
-                        "are installed by the platform team's cluster bootstrap; their chart versions are not pinned here")
+        if kubernetes:
+            out.gaps.append("platform add-ons (external-secrets operator, kube-prometheus-stack, OpenTelemetry Collector) "
+                            "are installed by the platform team's cluster bootstrap; their chart versions are not pinned here")
         for mod in out.modules.values():
             if not mod.get("verified"):
                 out.gaps.append(f"module {mod['source']} {mod['version']} is a version range, not a verified pin; "
@@ -332,11 +431,11 @@ def render(project: str) -> str:
         repositories = {}
         for component in it.components:
             owner = image_owner(component, it.components)
-            if "k8s_workload" in component.needs and owner:
+            if WORKLOAD_NEEDS & set(component.needs) and owner:
                 name = ident(owner.name).replace("_", "-")
                 images.setdefault(name, []).append(ident(component.name).replace("_", "-"))
                 repositories[name] = owner.repo
-        out.add("promotion.json", json.dumps({"environments": it.environments, "images": images,
+        out.add("promotion.json", json.dumps({"deploy_target": it.deploy_target, "environments": it.environments, "images": images,
                                                "repositories": repositories}, indent=2), "generated", "promotion")
         out.gaps.append("Configure GitHub Environments: QA Lead for qa; client sign-off for stg; go/no-go plus DevOps Lead for prod. Enforce protected main and required PR reviews. Configure the GitOps GitHub App; bootstrap digest placeholders cannot be deployed.")
     # CI per code repo: one workflow per container image (+ Claude Code dispatch workflow when that agent is enabled)
@@ -443,7 +542,8 @@ def validate(project: str) -> str:
     with perf.span("fs", "infra.refresh_manifest_hashes", files=len(manifest.files)):
         gone = _refresh_manifest(project, manifest)
     workdir = files.path(project, files.INFRA_REPO_DIR)
-    checks = sandbox.run_checks(workdir, list(it.environments)) if workdir.is_dir() else []
+    only = None if it.deploy_target == "kubernetes" else set(sandbox.ALL_TOOLS) - GITOPS_TOOLS
+    checks = sandbox.run_checks(workdir, list(it.environments), only=only) if workdir.is_dir() else []
     ci_root = files.path(project, files.INFRA_CI_DIR)
     ci_findings = []
     ci_incomplete = []
@@ -504,6 +604,10 @@ def render_pr(project: str, m: InfraManifest, checks: list[CheckResult], it: Inf
               f"| {c.repo or '-'} |" for c in it.components]
     lines += ["", "## Checks", "", "| Tool | Result | Summary |", "|---|---|---|"]
     lines += [f"| {c.tool} | {'skipped' if c.skipped else ('pass' if c.passed else 'FAIL')} | {c.summary} |" for c in checks]
+    if files.exists(project, f"{files.INFRA_REPO_DIR}/.checkov.yaml"):
+        lines += ["", "## Accepted checkov risks (catalog .checkov.yaml)", "",
+                  "These checks are skipped by the platform's accepted-risk list; each needs a recorded justification.", ""]
+        lines += [f"- `{c}`" for c in accepted_checkov_risks()]
     if m.secrets_refs:
         lines += ["", "## Secrets to create (references only, never values)", ""]
         lines += [f"- `{s.name}` in {s.store} at `{s.path}`" for s in m.secrets_refs]
@@ -566,6 +670,16 @@ def deployment_problems(project: str, manifest: InfraManifest) -> list[str]:
                     problems.append(f"{entry.path}: image must pin a sha256 digest, never a mutable tag")
             except (ValueError, AttributeError, yaml.YAMLError):
                 problems.append(f"{entry.path}: invalid application values")
+        elif entry.path.startswith("repo/envs/") and entry.path.endswith("/images.auto.tfvars.json"):
+            if not files.exists(project, "infra/" + entry.path):
+                continue
+            try:
+                digests = json.loads(files.read_text(project, "infra/" + entry.path))["image_digests"]
+                for image, digest in digests.items():
+                    if not re.fullmatch(r"sha256:[0-9a-f]{64}", str(digest)):
+                        problems.append(f"{entry.path}: {image} must pin a sha256 digest, never a mutable tag")
+            except (ValueError, KeyError, TypeError, AttributeError):
+                problems.append(f"{entry.path}: invalid image digests")
     return problems
 
 

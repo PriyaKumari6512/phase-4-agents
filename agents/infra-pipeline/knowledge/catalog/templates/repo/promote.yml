@@ -57,7 +57,7 @@ jobs:
           git checkout -b "$branch"
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          git add gitops/
+          git add -A
           git commit -m "Promote immutable image to $TARGET"
           git push origin "$branch"
           gh pr create --base main --head "$branch" --title "Promote image to $TARGET" --body "Copy the same approved image digest through the environment chain. Required environment and branch approvals apply."

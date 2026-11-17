@@ -77,12 +77,18 @@ class TaskDraft(_Record):
     open_questions: list[str]
 
 
+class DeferredCriterion(_Record):
+    ac_id: str                                        # a story acceptance criterion no task implements yet
+    reason: str                                       # the reviewer decision it follows
+
+
 class StoryBreakdown(_Record):
     story_key: str
     tasks: list[TaskDraft]
     estimate_rationale: str
     reference_ticket_ids: list[str]                   # history tickets actually used as analogies; else empty
     open_questions: list[str]
+    deferred_criteria: list[DeferredCriterion]        # only when reviewer_request says not to build them; else empty
 
 
 class CrossDependency(_Record):
@@ -239,7 +245,9 @@ def _targets(request: str, keys: set[str]) -> set[str] | None:
 
 
 # ---------------------------------------------------------------------------------------------- checks on one result
-def check_breakdown(story: ImportedStory, result: StoryBreakdown, settings: ProjectSettings) -> list[str]:
+def check_breakdown(story: ImportedStory, result: StoryBreakdown, settings: ProjectSettings,
+                    deferrable: bool = False) -> list[str]:
+    """`deferrable`: a gate reviewer's request names this story, so it may leave criteria unplanned on purpose."""
     errors = []
     if result.story_key != story.key:
         errors.append(f"story_key must be {story.key}, got {result.story_key}")
@@ -267,7 +275,17 @@ def check_breakdown(story: ImportedStory, result: StoryBreakdown, settings: Proj
             errors.append(f"{where}: repo {t.repo!r} is not one of {settings.code_repos}")
         if not [s for s in t.skills if s in taxonomy or skills_taxonomy.normalize(s)]:
             errors.append(f"{where}: needs 1-2 skills from the taxonomy")
-    if uncovered := sorted(ac_ids - {c for t in result.tasks for c in t.covers}):
+    deferred = {d.ac_id for d in result.deferred_criteria}
+    if result.deferred_criteria and not deferrable:
+        errors.append("deferred_criteria is only for criteria a reviewer_request says not to build; cover every criterion")
+    if bad := sorted(deferred - ac_ids):
+        errors.append(f"deferred_criteria names acceptance criteria not in the story {bad}")
+    if not all(d.reason.strip() for d in result.deferred_criteria):
+        errors.append("each deferred criterion needs the reviewer decision as its reason")
+    covered = {c for t in result.tasks for c in t.covers}
+    if both := sorted(deferred & covered):
+        errors.append(f"acceptance criteria {both} are both deferred and covered by a task")
+    if uncovered := sorted(ac_ids - covered - deferred):
         errors.append(f"no task covers acceptance criteria {uncovered}")
     graph = {t.local_id: set(t.depends_on) for t in result.tasks}
     seen, stack = set(), set()
@@ -331,12 +349,12 @@ async def breakdown_story(project, story, settings, prefix, callbacks, *, reques
         payload["findings_to_fix"] = list(findings)
     human = "Break this approved story into tasks.\n" + json.dumps(payload, ensure_ascii=False, indent=1)
     result = await _invoke(StoryBreakdown, prefix, human, callbacks, spec)
-    errors = check_breakdown(story, result, settings)
+    errors = check_breakdown(story, result, settings, deferrable=bool(request))
     if errors:
         retry = human + "\n\nYour previous answer failed these checks; return a corrected complete answer:\n- " + \
             "\n- ".join(errors) + "\n\nPrevious answer:\n" + result.model_dump_json()
         result = await _invoke(StoryBreakdown, prefix, retry, callbacks, spec)
-        errors = check_breakdown(story, result, settings)
+        errors = check_breakdown(story, result, settings, deferrable=bool(request))
         if errors:
             raise files.ProjectError(f"{story.key}: task breakdown still fails checks: " + "; ".join(errors))
     valid_refs = {r["key"] for r in analogies["references"]}
@@ -419,7 +437,9 @@ def story_items(story: ImportedStory, epic_id: str, result: StoryBreakdown, sett
                              for c in story.acceptance_criteria],
         definition_of_done=list(settings.definition_of_done), components=list(story.components),
         source_refs=[SourceRef(req_id=r, source="story", anchor=story.key) for r in story.requirement_ids],
-        open_questions=list(result.open_questions))
+        open_questions=[*result.open_questions,
+                        *(f"{d.ac_id} is not planned (reviewer decision): {d.reason}" for d in result.deferred_criteria)],
+        deferred_criteria=[d.ac_id for d in result.deferred_criteria])
     story_item.estimate = _story_estimate(story, tasks, result, settings)
     return [story_item, *tasks]
 
@@ -608,6 +628,17 @@ def apply_cross(items: list[WorkItem], snap: StorySnapshot, settings: ProjectSet
 
 
 # ---------------------------------------------------------------------------------------------- stage operations
+def _generation_request(project: str, keys: set[str], key: str) -> str:
+    """The stage request a story was last generated under (results saved before requests were recorded)."""
+    from agent_engine import recovery
+    try:
+        request = json.loads(recovery.path(files.project_dir(project), "task-breakdown").read_text(encoding="utf-8"))["request"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return ""
+    targets = _targets(request, keys)
+    return request if targets is None or key in targets else ""
+
+
 def _current(project: str) -> dict:
     return _load(project, "current.json") or {}
 
@@ -624,9 +655,16 @@ async def _results(project: str, snap: StorySnapshot, settings: ProjectSettings,
     todo = []
     for story in snap.stories:
         story_request = request if targets is None or story.key in targets else ""
-        base = _base_identity(project, story, settings, prefix, story_request, identity_spec)
         fix = (repairs or {}).get(story.key)
         record = _load(project, "stories", current.get(story.key, "") + ".json") if current.get(story.key) else None
+        if not story_request:
+            # A reviewer request stays with its story (e.g. a decision to defer criteria) until a newer request names
+            # the story: repairs and rebuilds must not fall back to a result generated before the decision.
+            if record and "request" in record:
+                story_request = record["request"]
+            elif fix:
+                story_request = _generation_request(project, keys, story.key)
+        base = _base_identity(project, story, settings, prefix, story_request, identity_spec)
         if not fix and record and record.get("base") == base:
             results[story.key] = StoryBreakdown.model_validate(record["result"])
             continue
@@ -647,7 +685,8 @@ async def _results(project: str, snap: StorySnapshot, settings: ProjectSettings,
             result = await breakdown_story(project, story, settings, prefix, callbacks, request=story_request,
                                            findings=fix or (), spec=spec)
             record_id = base if not fix else _digest({"base": base, "findings": fix})
-            _save(project, {"base": base, "findings": fix or [], "model": spec, "result": result.model_dump(mode="json")},
+            _save(project, {"base": base, "request": story_request, "findings": fix or [], "model": spec,
+                            "result": result.model_dump(mode="json")},
                   "stories", record_id + ".json")
             return story.key, record_id, result
 
@@ -755,7 +794,11 @@ async def review(project: str, callbacks=None):
             payload = {"items": [{"story": _story_view(stories[k]) if k in stories else by[k].model_dump(mode="json"),
                                   "tasks": [t.model_dump(mode="json", exclude={"definition_of_done"})
                                             for t in doc.tasks_of(k)],
-                                  "flagged": flags[k]} for k in batch]}
+                                  "flagged": flags[k],
+                                  **({"decided_by_reviewer": {
+                                      "deferred_criteria": by[k].deferred_criteria,
+                                      "decisions": [q for q in by[k].open_questions if "(reviewer decision)" in q]}}
+                                     if k in by and by[k].deferred_criteria else {})} for k in batch]}
             identity = _digest({"payload": payload, "rules": rules, "prefix": _digest(prefix), "model": spec,
                                 "schema": LightReview.model_json_schema()})
             saved = _load(project, "reviews", identity + ".json")

@@ -56,6 +56,11 @@ def snapshot(root: Path, pack) -> dict[str, str]:
         rel = p.relative_to(pack.dir)
         if p.is_file() and "validator" not in rel.parts and "__pycache__" not in rel.parts:
             result["generator:" + rel.as_posix()] = file_digest(p)
+    if pack.name == "infra-pipeline":
+        # The golden-path catalog may live outside the pack (PHASE4_INFRA_CATALOG_DIR); it shapes every file rendered.
+        from agent_engine.perf_manifest import tree_digest
+        from agent_engine.phase4.infra import catalog_dir
+        result["infra-catalog"] = tree_digest(catalog_dir()).get("sha256", "missing")
     if pack.name in ("sprint-planning", "work-allocation"):
         result["planning_date"] = datetime.now(timezone.utc).date().isoformat()
     if pack.name in ("infra-pipeline", "sprint-planning", "work-allocation") and (root / "phase4/project.json").is_file():

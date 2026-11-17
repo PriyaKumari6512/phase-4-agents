@@ -14,3 +14,6 @@ For each flagged item decide, using the story, its tasks, the architecture and t
 - `warning`: a human should look, but the task is usable (e.g. an estimate that depends on an open decision).
 Return no finding for an item that is fine. Never ask for new requirements, numbers or technologies the inputs do
 not contain; missing decisions are open questions, not defects. Each finding names one item id and one concrete fix.
+When an item carries `decided_by_reviewer`, a gate reviewer has already decided those acceptance criteria will not be
+built now. A conflict between such a criterion and the PRD or architecture is settled: never report it as blocking.
+Report a task only if it still implements a deferred criterion or contradicts the recorded decision.

@@ -44,7 +44,7 @@ def proj(tmp_path, monkeypatch):
 
 
 def good(story_key, us):
-    return tb.StoryBreakdown(story_key=story_key, estimate_rationale="Two layers and a test.", reference_ticket_ids=[],
+    return tb.StoryBreakdown(story_key=story_key, estimate_rationale="Two layers and a test.", reference_ticket_ids=[], deferred_criteria=[],
                              open_questions=[], tasks=[
         tb.TaskDraft(local_id="T1", discipline="DB", title="Add users.password_hash column", description="Migration.",
                      acceptance_criteria=["Given the migration, When applied, Then the column exists."], covers=[],
@@ -548,3 +548,87 @@ def test_findings_without_story_ids_rebuild_from_retained_results(proj, monkeypa
     run(tb.repair(P, [old], []))
     assert len(fake.calls) == calls                       # rebuilt from retained results, no new story calls
     assert json.loads(backlog.validate_report(P, write=False))["ready_for_review"]
+
+
+def test_only_a_reviewer_decision_may_leave_a_criterion_unplanned(proj):
+    """A gate decision ("do not build US-001.AC2") is expressed as a deferred criterion, never as a missing one."""
+    from agent_engine.phase4 import files as phase4_files
+    from agent_engine.phase4.contracts import ProjectSettings
+    snap = tb.StorySnapshot.model_validate(snapshot())
+    story = next(s for s in snap.stories if s.key == "GR-9")
+    settings = phase4_files.read_json(P, phase4_files.PROJECT_SETTINGS, ProjectSettings)
+    result = good("GR-9", "US-001")
+    for t in result.tasks:
+        t.covers = [c for c in t.covers if c != "US-001.AC2"]
+    assert any("no task covers acceptance criteria ['US-001.AC2']" in e for e in tb.check_breakdown(story, result, settings))
+    result.deferred_criteria = [tb.DeferredCriterion(ac_id="US-001.AC2", reason="Out of scope per PRD section 3 (P4-G1 decision)")]
+    assert any("only for criteria a reviewer_request" in e for e in tb.check_breakdown(story, result, settings))
+    assert tb.check_breakdown(story, result, settings, deferrable=True) == []
+    items = tb.story_items(story, "GR-1", result, settings)
+    assert any("US-001.AC2 is not planned (reviewer decision)" in q for q in items[-1].open_questions + items[0].open_questions)
+    story_item = next(i for i in items if i.level == "story")
+    assert story_item.deferred_criteria == ["US-001.AC2"]     # backlog validation counts it as decided, not missing
+    result.tasks[1].covers.append("US-001.AC2")
+    assert any("both deferred and covered" in e for e in tb.check_breakdown(story, result, settings, deferrable=True))
+
+
+def test_a_repair_keeps_the_reviewer_request_the_story_was_generated_with(proj, monkeypatch):
+    import asyncio
+    seen = []
+    async def fake(project, story, settings, prefix, callbacks, *, request="", findings=(), spec=None):
+        seen.append((story.key, request, tuple(findings)))
+        us = "US-001" if story.key == "GR-9" else "US-002"
+        return good(story.key, us)
+    monkeypatch.setattr(tb, "breakdown_story", fake)
+    monkeypatch.setattr(tb, "_invoke", FakeModel())
+    asyncio.run(tb.generate(P, "Gate P4-G1 decision: do not build US-001.AC2 in GR-9.", []))
+    assert ("GR-9", "Gate P4-G1 decision: do not build US-001.AC2 in GR-9.", ()) in seen
+    assert ("GR-10", "", ()) in seen
+    seen.clear()
+    finding = json.dumps({"rule": "review", "severity": "blocking", "item_ids": ["GR-9-T02"], "message": "Fix T2"})
+    asyncio.run(tb.repair(P, [finding], []))
+    assert [(k, r) for k, r, f in seen] == [("GR-9", "Gate P4-G1 decision: do not build US-001.AC2 in GR-9.")]
+
+
+
+def test_the_light_review_sees_reviewer_decisions(proj, monkeypatch):
+    """Without the decision the reviewer re-flags a settled conflict and the repair undoes the deferral."""
+    import asyncio
+    async def fake(project, story, settings, prefix, callbacks, *, request="", findings=(), spec=None):
+        result = good(story.key, "US-001" if story.key == "GR-9" else "US-002")
+        if story.key == "GR-9":
+            for t in result.tasks:
+                t.covers = [c for c in t.covers if c != "US-001.AC2"]
+                t.acceptance_criteria = ["Given it, When run, Then the result is fast."]        # flags a review
+            result.deferred_criteria = [tb.DeferredCriterion(ac_id="US-001.AC2", reason="Out of scope (P4-G1)")]
+        return result
+    monkeypatch.setattr(tb, "breakdown_story", fake)
+    model = FakeModel()
+    monkeypatch.setattr(tb, "_invoke", model)
+    asyncio.run(tb.generate(P, "P4-G1 decision for GR-9: defer US-001.AC2.", []))
+    asyncio.run(tb.review(P))
+    payloads = [c for c in model.review_calls]
+    assert payloads and any('"decided_by_reviewer"' in str(c) and "US-001.AC2" in str(c) for c in payloads)
+
+
+def test_stories_outside_a_repair_keep_their_decided_result(proj, monkeypatch):
+    """Repairing GR-10 must not swap GR-9 back to a result generated before the reviewer's decision."""
+    import asyncio
+    calls = []
+    async def fake(project, story, settings, prefix, callbacks, *, request="", findings=(), spec=None):
+        calls.append((story.key, request, bool(findings)))
+        result = good(story.key, "US-001" if story.key == "GR-9" else "US-002")
+        result.open_questions = [f"made with request: {request!r}"]
+        return result
+    monkeypatch.setattr(tb, "breakdown_story", fake)
+    monkeypatch.setattr(tb, "_invoke", FakeModel())
+    asyncio.run(tb.generate(P, "", []))                                   # before any decision
+    asyncio.run(tb.generate(P, "P4-G1 decision for GR-9: follow the PRD.", []))
+    calls.clear()
+    finding = json.dumps({"rule": "review", "severity": "blocking", "item_ids": ["GR-10-T02"], "message": "Fix T2"})
+    asyncio.run(tb.repair(P, [finding], []))
+    assert calls == [("GR-10", "", True)]
+    from agent_engine.phase4 import files as phase4_files
+    from agent_engine.phase4.contracts import Backlog
+    gr9 = phase4_files.read_json(P, phase4_files.BACKLOG, Backlog).by_id()["GR-9"]
+    assert any("P4-G1 decision for GR-9" in q for q in gr9.open_questions)

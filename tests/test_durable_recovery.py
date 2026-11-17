@@ -540,3 +540,20 @@ def test_infra_retained_state_merges_only_for_infra(parallel_root):
         return result
     parallel.run_pair(parallel_root, steps(), run)
     assert (parallel_root / ".engine-infra-pipeline" / ("b" * 64 + ".json")).is_file()
+
+
+def test_an_infra_catalog_change_invalidates_retained_infra_work(tmp_path, monkeypatch):
+    """A retained infra repair must not resume after the catalog (possibly outside the pack) changed."""
+    import shutil
+    from agent_engine import recovery
+    from agent_engine.agent import load_pack
+    from agent_engine.phase4 import infra
+    root = tmp_path / "proj"
+    root.mkdir()
+    catalog = tmp_path / "catalog"
+    shutil.copytree(infra.catalog_dir(), catalog)
+    monkeypatch.setattr(infra, "catalog_dir", lambda: catalog)
+    pack = load_pack("infra-pipeline")
+    before = recovery.input_identity(root, pack)
+    (catalog / "templates/repo/checkov.yaml").write_text("skip-check: []\n")
+    assert recovery.input_identity(root, pack)["infra-catalog"] != before["infra-catalog"]

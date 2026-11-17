@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from langchain_core.messages import AIMessage
@@ -11,6 +12,16 @@ from agent_engine.phase4.contracts import InfraIntent, InfraManifest
 from agent_engine.phase4.structured import invoke as _invoke
 
 _tier = ContextVar('infra_tier', default='strong')
+_TF_BLOCK = re.compile(r'(?m)^\s*(?:(resource|module|data|variable|output|provider)((?:\s+"[^"]+")+)|(locals|terraform)())\s*\{')
+
+
+def removed_blocks(before: str, after: str) -> list[str]:
+    """Terraform blocks present before a repair and missing after it. A repair fixes findings in place; it never
+    deletes infrastructure (an empty file is valid Terraform and would silently 'pass' every scanner)."""
+    def blocks(text):
+        return {f"{kind or bare}{names or empty}".replace('"', '').strip()
+                for kind, names, bare, empty in _TF_BLOCK.findall(text)}
+    return sorted(blocks(before) - blocks(after))
 
 class Edit(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -124,6 +135,11 @@ async def repair(project, gaps, callbacks=None):
             return ['Repair must change the failing content']
         if any(p.search(e.content) for e in result.edits for p in infra.SECRET_PATTERNS):
             return ['Secrets must remain references only']
+        removed = {e.path: removed_blocks(content[e.path], e.content) for e in result.edits if e.path.endswith('.tf')}
+        removed = {path: gone for path, gone in removed.items() if gone}
+        if removed:
+            return [f'Return each file complete; keep every block and fix findings in place. {path} drops: '
+                    + ', '.join(gone[:10]) for path, gone in removed.items()]
         return []
     result = await _call(project, Repairs, 'Repair only the supplied generated files to resolve the scanner findings. Preserve the catalog topology, digest promotion, approvals and secret references.',
                          {'files': content, 'gaps': gaps, 'checks': [c for c in checks if not c.get('passed')]}, callbacks, check)
