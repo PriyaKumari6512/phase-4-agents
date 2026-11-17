@@ -146,3 +146,24 @@ def test_repair_pauses_without_complete_scanners(proj, monkeypatch):
     monkeypatch.setattr(ip, '_invoke', lambda *a: pytest.fail('Missing scanners cannot be repaired by a model'))
     with pytest.raises(files.ProjectError, match='scanners'):
         asyncio.run(ip.repair(P, ['missing tools']))
+
+
+def test_generated_promotion_refuses_unprotected_environment(proj):
+    import importlib.util
+    infra.set_intent(P, _intent())
+    infra.render(P)
+    path = files.path(P, 'infra/repo/scripts/verify-protection.py')
+    spec = importlib.util.spec_from_file_location('verify_protection', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pytest.raises(ValueError, match='protection'):
+        module.verify('qa', '123', 'example/infra', 'head', lambda path: {})
+    environment = {'can_admins_bypass':False, 'protection_rules':[{'type':'required_reviewers','prevent_self_review':True,'reviewers':[{'reviewer':{'id':123}}]}]}
+    module.verify('qa', '123', 'example/infra', 'head', lambda path: environment)
+    import copy
+    permissive = copy.deepcopy(environment)
+    permissive['protection_rules'][0]['reviewers'].append({'reviewer':{'id':456}})
+    with pytest.raises(ValueError, match='protection'):
+        module.verify('qa', '123', 'example/infra', 'head', lambda path: permissive)
+    with pytest.raises(ValueError, match='go/no-go'):
+        module.verify('prod', '123', 'example/infra', 'head', lambda path: environment if '/environments/' in path else {'statuses':[]})

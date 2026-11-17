@@ -161,6 +161,8 @@ def source_manifest(project: str, settings: ProjectSettings | None = None) -> di
     settings = settings or _settings(project)
     out = {rel: files.file_sha(project, rel) for rel in (files.STORIES, files.ARCHITECTURE, files.PRD)
            if files.exists(project, rel)}
+    for rel in context_documents(project):
+        out[rel] = files.file_sha(project, rel)
     if files.exists(project, files.HISTORY):
         out[files.HISTORY] = history_tickets_digest(files.read_text(project, files.HISTORY))
     out[files.PROJECT_SETTINGS] = "settings:" + _digest(backlog.source_settings(settings))
@@ -178,6 +180,12 @@ def _rules() -> str:
     return load_pack("task-breakdown").system_prompt
 
 
+def context_documents(project: str) -> list[str]:
+    root = files.project_dir(project)
+    return [rel for rel in ("designs/designs.md", "api/openapi.yaml", "api/openapi.yml", "api/openapi.json")
+            if (root / rel).is_file()]
+
+
 def prompt_prefix(project: str, settings: ProjectSettings) -> str:
     """The part shared by every story call; sent once as a cached prefix."""
     parts = [_rules(),
@@ -187,6 +195,8 @@ def prompt_prefix(project: str, settings: ProjectSettings) -> str:
                        (files.PRD, "Approved PRD (prd.md): defines the A-, PD-, NFR- and FR- ids stories refer to")):
         if files.exists(project, rel):
             parts.append(f"## {title}\n\n" + files.read_text(project, rel))
+    for rel in context_documents(project):
+        parts.append(f"## Approved context ({rel})\n\n" + files.read_text(project, rel))
     return "\n\n".join(parts)
 
 

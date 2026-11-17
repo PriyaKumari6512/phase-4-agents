@@ -239,3 +239,10 @@ def test_ai_agents_only_get_eligible_tasks_once_ci_is_operational(proj, monkeypa
         if a.worker_kind == "ai_agent":
             assert ap.eligibility[a.task_id].eligible
     assert {a["task_id"] for a in out["assignments"]} | {u["task_id"] for u in out["unassigned"]} >= candidates
+
+
+@pytest.fixture(autouse=True)
+def _isolate_component_publication(monkeypatch):
+    # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
+    from agent_engine.phase4 import publish
+    monkeypatch.setattr(publish, "require_final_gate", lambda project: {})

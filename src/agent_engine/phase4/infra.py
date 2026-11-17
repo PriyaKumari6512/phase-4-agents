@@ -325,7 +325,7 @@ def render(project: str) -> str:
             if not mod.get("verified"):
                 out.gaps.append(f"module {mod['source']} {mod['version']} is a version range, not a verified pin; "
                                 "confirm it with infra_registry_versions")
-        for name in ("promote.py", "verify-build.py"):
+        for name in ("promote.py", "verify-build.py", "verify-protection.py"):
             out.add(f"scripts/{name}", (catalog_dir() / "templates/repo" / name).read_text(), "template", "promotion")
         out.add(".github/workflows/promote.yml", (catalog_dir() / "templates/repo/promote.yml").read_text(), "template", "promotion")
         images = {}

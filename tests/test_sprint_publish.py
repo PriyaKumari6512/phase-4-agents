@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import pytest
 from datetime import date
 
 from agent_engine import gates
@@ -97,3 +98,10 @@ def test_without_a_match_a_new_sprint_is_created(proj, monkeypatch):
     monkeypatch.setattr(publish, "_tracker_for", lambda *a: board)
     report = publish.publish_sprint(P)
     assert report["adopted"] == [] and len(board.created) == report["sprints"] >= 1
+
+
+@pytest.fixture(autouse=True)
+def _isolate_component_publication(monkeypatch):
+    # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
+    from agent_engine.phase4 import publish
+    monkeypatch.setattr(publish, "require_final_gate", lambda project: {})

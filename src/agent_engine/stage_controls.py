@@ -49,7 +49,13 @@ class StageBudget:
     callback_accounting: bool = False
 
     @classmethod
-    def from_env(cls):
+    def from_env(cls, stage="task-breakdown"):
+        if stage != "task-breakdown":
+            prefix = "AGENT_ENGINE_" + stage.upper().replace("-", "_")
+            return cls(_number(prefix + "_MAX_CALLS", 16, integer=True),
+                       _number(prefix + "_MAX_INPUT_TOKENS", 1000000, integer=True),
+                       _number(prefix + "_MAX_OUTPUT_TOKENS", 64000, integer=True),
+                       _number(prefix + "_TIMEOUT_SECONDS", 1800))
         return cls(_number("AGENT_ENGINE_BREAKDOWN_MAX_CALLS", 1000, integer=True),
                    _number("AGENT_ENGINE_BREAKDOWN_MAX_INPUT_TOKENS", 30000000, integer=True),
                    _number("AGENT_ENGINE_BREAKDOWN_MAX_OUTPUT_TOKENS", 2000000, integer=True),

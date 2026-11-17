@@ -18,7 +18,7 @@ from agent_engine.runtime import atomic_json
 
 DIRECTORIES = {"task-breakdown": ("backlog",), "infra-pipeline": ("infra",),
                "sprint-planning": ("sprint",), "work-allocation": ("allocation",)}
-OPTIONAL = {"task-breakdown": ("phase4/history.json",), "infra-pipeline": (),
+OPTIONAL = {"task-breakdown": ("phase4/history.json", "designs/designs.md", "api/openapi.yaml", "api/openapi.yml", "api/openapi.json"), "infra-pipeline": (),
             "sprint-planning": ("phase4/history.json", "phase4/ci-readiness.json", "phase4/committed-work.json"),
             "work-allocation": ("phase4/skill-profiles.json", "phase4/agent-outcomes.json",
                                 "phase4/ci-readiness.json", "phase4/committed-work.json", "infra/manifest.json")}

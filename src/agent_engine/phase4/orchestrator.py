@@ -60,7 +60,7 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "task-breakdown", "P4-G1",
         ("phase4/stories.json", "prd.md", "architecture.md", f"gates/G3A{APPROVED_SUFFIX}", f"gates/G3B{APPROVED_SUFFIX}"),
-        ("phase4/history.json",),
+        ("phase4/history.json", "designs/designs.md", "api/openapi.yaml", "api/openapi.yml", "api/openapi.json"),
         ("project_name", "code_repos", "infra_repo", "definition_of_done", "story_point_scale",
          "hours_per_story_point", "max_story_points_per_story", "deadlines"),
         upstream=("G3A", "G3B"),
@@ -627,6 +627,20 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
         out(f"STOP: no end after {MAX_STEPS} steps; check the project folder.")
         return FAILED
 
+    final_status, final_record = gate_state(root, gates["G4"])
+    if final_status != "approved":
+        if test_approve:
+            record_decision(root, gates["G4"], "approved",
+                            {"name": "Orchestrator test", "role": "NOT a human sign-off", "automation": "phase4-env-test-mode"},
+                            {"name": "Phase 4 agents"})
+            out(">>> TEST-approved final G4 (not a human sign-off)")
+        else:
+            if final_status == "rejected":
+                out("Final G4 rejected: return to design gates G3A/G3B before replanning.")
+            elif final_status == "changes_requested":
+                out("Final G4 changes requested: request changes at P4-G1 for plan issues or P4-G4 for environment issues, then rerun.")
+            out('WAITING for final G4. Record agent-engine gate G4 --decision approved with the human approver and submitted-by, then rerun.')
+            return WAITING
     out(f"\nALL DONE for {project}: every output exists and every gate is approved. Agents run this time: "
         f"{', '.join(ran) or 'none'}.")
     if publish:

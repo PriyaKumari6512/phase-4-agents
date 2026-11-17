@@ -292,7 +292,7 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
             repo = t.repo or (settings.code_repos[0] if len(settings.code_repos) == 1 else None)
             verdict = (ai_verdicts or {}).get(t.item_id, {})
             allowed, shadow = [], False
-            failures = []
+            failures = risk_reasons(t, backlog, settings)
             for agent in agents:
                 reason = "; ".join(risk_reasons(t, backlog, settings)) or hard_checks(t, agent.max_task_hours, repo, ready)
                 merged, n = stats.get((agent.provider, t.type), (0, 0))

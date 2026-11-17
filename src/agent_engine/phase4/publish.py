@@ -92,12 +92,32 @@ def require_gate(project: str, what: str) -> dict:
     return record
 
 
+def require_final_gate(project: str) -> dict:
+    """Final G4 supplements, never replaces, the individual maker-checker approvals."""
+    for part in ("backlog", "sprint", "assignments", "infra"):
+        require_gate(project, part)
+    gate = load_gates()["G4"]
+    if not files.exists(project, gate.approval_file):
+        raise PublishError("Final G4 is not approved; obtain plan and environment sign-off after all four checkpoints")
+    stale = stale_approvals(files.project_dir(project), [gate.approval_file])
+    if stale:
+        raise PublishError("Final G4 is stale: " + "; ".join(stale))
+    record = files.read_json(project, gate.approval_file)
+    from agent_engine.phase4.approval_policy import automated, testing_enabled
+    if automated(record):
+        settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+        if not testing_enabled() or settings.tracker.kind != TrackerKind.LOCAL or get_settings().phase4_pr_mode != "local":
+            raise PublishError("Automated G4 cannot authorize live publication")
+    return record
+
+
 def serialized(fn):
     @wraps(fn)
     def call(project, *args, **kwargs):
         if blocked := perf.publication_blocked():
             raise PublishError(blocked)
         with project_lock(files.project_dir(project)), ExitStack() as resources:
+            require_final_gate(project)
             token = _resources.set(resources)
             try:
                 return fn(project, *args, **kwargs)
@@ -696,6 +716,19 @@ def publish_assignments(project: str) -> dict:
 # ============================================================================ assignments + AI dispatch
 @serialized
 def dispatch_assignments(project: str) -> dict:
+    from agent_engine.phase4.environment_check import EVIDENCE, SOURCES
+    if not files.exists(project, EVIDENCE):
+        raise PublishError("Phase 5 requires current environment readiness evidence")
+    evidence = files.read_json(project, EVIDENCE)
+    try:
+        observed = datetime.fromisoformat(evidence.get("observed_at", ""))
+        fresh = observed.tzinfo is not None and timedelta(0) <= datetime.now(timezone.utc) - observed <= timedelta(hours=24)
+    except ValueError:
+        fresh = False
+    if not (fresh and evidence.get("ready") is True
+            and evidence.get("manifest_sha256") == files.file_sha(project, files.INFRA_MANIFEST)
+            and files.exists(project, SOURCES) and evidence.get("sources_sha256") == files.file_sha(project, SOURCES)):
+        raise PublishError("Phase 5 environment readiness is incomplete or stale")
     for part in ("backlog", "sprint", "assignments", "infra"):
         require_gate(project, part)
     from agent_engine.phase4 import dispatch

@@ -220,8 +220,9 @@ async def _owned_run(request: str, agent_name: str, project_name: str, resume_ve
                      resume: bool = False, review_existing: bool = False) -> int:
     from agent_engine.stage_controls import StageBudget, active_stage_budget
     budget_token = None
-    if agent_name in ("task-breakdown", "task-breakdown/validator"):
-        budget_token = active_stage_budget.set(StageBudget.from_env())
+    stage_name = agent_name.split("/", 1)[0]
+    if stage_name in STRUCTURED_STAGES:
+        budget_token = active_stage_budget.set(StageBudget.from_env(stage_name))
     with perf.span("stage", agent_name, agent=agent_name, project=project_name,
                    invocation_id=os.environ.get(perf.ENV_INVOCATION)) as stage:
         try:
@@ -663,13 +664,24 @@ def _add_inputs(files: list[str], project_name: str, round_number: int | None) -
 
 
 def _gate(name: str, project_name: str, decision: str, approver: dict, submitted_by: dict, comment: str) -> int:
+    from agent_engine.phase4.publish import PublishError
     try:
         gates = load_gates()
         if name not in gates:
             raise ValueError(f"no gate {name!r} in gates.toml (defined: {', '.join(gates) or 'none'})")
         gate = gates[name]
+        if name == "G4" and decision == "approved":
+            from agent_engine.phase4.publish import require_gate
+            for part in ("backlog", "sprint", "assignments", "infra"):
+                require_gate(project_name, part)
         record = record_decision(OUTPUTS_DIR / project_name, gate, decision, approver, submitted_by, comment)
-    except ValueError as e:
+        if name == "G4" and decision == "changes_requested":
+            target = "P4-G4" if any(word in comment.lower() for word in ("infra", "environment", "pipeline")) else "P4-G1"
+            record_decision(OUTPUTS_DIR / project_name, gates[target], decision, approver, submitted_by, comment)
+        if name == "G4" and decision == "rejected":
+            for target in ("G3A", "G3B"):
+                record_decision(OUTPUTS_DIR / project_name, gates[target], decision, approver, submitted_by, comment)
+    except (ValueError, PublishError) as e:
         print(f"ERROR: {e}")
         return 1
     # Evidence for human-wait accounting: when the decision was recorded (no names or comments).

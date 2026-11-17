@@ -141,6 +141,13 @@ async def review(project, callbacks=None):
     ap = _previous(project)
     flags = {tid: v.model_dump() for tid, v in ap.eligibility.items()
              if (v.eligible or v.shadow) and (len(v.reason.strip()) < 15 or 'looks simple' in v.reason.lower())}
+    for assignment in ap.assignments:
+        text = assignment.explanation.lower()
+        if assignment.score_breakdown.get('ownership', 0) == 0 and any(word in text for word in (' owns ', 'code owner', 'codeowner')):
+            flags[assignment.task_id] = {'explanation': assignment.explanation, 'scores': assignment.score_breakdown,
+                                          'reason': 'claims ownership without evidence'}
+        if 'runner-up' in text and assignment.runner_up_worker_id is None:
+            flags[assignment.task_id] = {'explanation': assignment.explanation, 'reason': 'claims a runner-up where none exists'}
     if not problems and flags:
         def valid(r):
             return ['Review names an unflagged task'] if any(f.task_id not in flags for f in r.findings) else []

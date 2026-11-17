@@ -12,7 +12,7 @@ Environments are dev, qa, stg and prod. The generated manifest tracks every file
 
 CI records immutable image metadata as an Actions artifact. A workflow_run notification sends a dev promotion event only after CI completes successfully. The infra workflow verifies the source repository, successful main push run, workflow path and digest artifact before opening a promotion PR. Higher environments copy the predecessor digest, including shared-image workers; no rebuild occurs. Local checks reject mutable tags.
 
-The initial all-zero digest is an explicit bootstrap placeholder. Real ECR registry addresses, DNS/certificates and worker commands require deployment configuration. Configure the GitOps App, protected main and GitHub Environment protections before use. The generated runbook explains QA Lead, client UAT, go/no-go and DevOps approvals; a reviewer list alone does not enforce multiple required approvals.
+The initial all-zero digest is an explicit bootstrap placeholder. Real ECR registry addresses, DNS/certificates and worker commands require deployment configuration. Configure the GitOps App, protected main and GitHub Environment protections before use. Promotion preflight verifies the configured reviewer ID, self-review prevention and no administrator bypass; production also checks the separate production/go-no-go status. Configure QA_APPROVER_ID, CLIENT_APPROVER_ID and DEVOPS_APPROVER_ID. The generated runbook explains QA Lead, client UAT, go/no-go and DevOps approvals; a reviewer list alone does not enforce multiple required approvals.
 
 ## Runbook and readiness
 
@@ -23,3 +23,5 @@ Generated `docs/BRANCHING.md` and `docs/RUNBOOK.md` cover trunk-based developmen
 ## Verification limits
 
 Tests use fake models, scanners and API clients with network blocked. Real OpenTofu/scanner execution, GitHub App permissions, environment protection settings, Atlantis apply and Argo provisioning must be verified in the deployment environment. A generated or approved PR is never described as a provisioned environment. Azure/GCP require reviewed network, compute, data, secrets, IAM, CI and policy catalog entries before support can be enabled.
+
+Publication also requires every Phase 4 checkpoint and final G4 approval; see [PHASE4.md](PHASE4.md). Phase 5 dispatch additionally requires current environment readiness.

@@ -132,3 +132,10 @@ def test_story_points_are_written_only_when_asked_and_only_where_empty(proj, jir
     monkeypatch.setenv("PHASE4_WRITE_STORY_POINTS", "always")
     with pytest.raises(publish.PublishError, match="never or if_empty"):
         publish.publish_backlog(P)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_component_publication(monkeypatch):
+    # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
+    from agent_engine.phase4 import publish
+    monkeypatch.setattr(publish, "require_final_gate", lambda project: {})

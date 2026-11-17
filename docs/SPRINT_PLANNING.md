@@ -57,3 +57,5 @@ deferrals with reasons, the forecast, the approved priority order, assumptions a
 After P4-G2, `agent-engine phase4 publish sprint` moves the stories into Jira sprints, **reusing sprints that already
 exist on the board** (same start date, an active sprint covering the start, same name, then undated future sprints
 in order) and filling only their empty dates and goal ([PIPELINE_JIRA.md](PIPELINE_JIRA.md)).
+
+Publication also requires every Phase 4 checkpoint and final G4 approval; see [PHASE4.md](PHASE4.md). Phase 5 dispatch additionally requires current environment readiness.

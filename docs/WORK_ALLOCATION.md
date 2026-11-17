@@ -27,3 +27,5 @@ Outputs: `allocation/problem.json`, `allocation/assignments.json`, `allocation/a
 ## Verification limits
 
 Unit and CLI tests use fake models, local trackers and blocked HTTP. No live Jira writes, provider dispatches or paid model calls were used for this alignment.
+
+Publication also requires every Phase 4 checkpoint and final G4 approval; see [PHASE4.md](PHASE4.md). Phase 5 dispatch additionally requires current environment readiness.

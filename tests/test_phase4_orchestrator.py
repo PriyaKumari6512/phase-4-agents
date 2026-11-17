@@ -140,6 +140,6 @@ def test_a_project_run_by_hand_is_adopted_not_rerun(root):
     for agent in OUTPUTS:
         fake(agent, "", P)
     fake.calls.clear()
-    for name in ("P4-G1", "P4-G2", "P4-G3", "P4-G4"):
+    for name in ("P4-G1", "P4-G2", "P4-G3", "P4-G4", "G4"):
         approve(root, name)
     assert go(fake) == orch.DONE and fake.calls == []

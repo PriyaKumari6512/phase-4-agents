@@ -60,3 +60,5 @@ and links dependent tasks; epics and stories are never created, edited, linked o
 The shared stage budget still applies: `AGENT_ENGINE_BREAKDOWN_MAX_CALLS`, `..._MAX_INPUT_TOKENS`,
 `..._MAX_OUTPUT_TOKENS`, `..._TIMEOUT_SECONDS`. Story calls run with `AGENT_ENGINE_HELPER_CONCURRENCY` (default 9),
 reviews with `AGENT_ENGINE_BREAKDOWN_REVIEW_CONCURRENCY` (default 4).
+
+Publication also requires every Phase 4 checkpoint and final G4 approval; see [PHASE4.md](PHASE4.md). Phase 5 dispatch additionally requires current environment readiness.

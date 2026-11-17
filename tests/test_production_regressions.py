@@ -329,3 +329,10 @@ def test_jira_link_direction_is_checked_by_readback():
     tracker.blocks_of = lambda issue: []
     with pytest.raises(TrackerError, match="read-back"):
         tracker.add_blocks("before", "after")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_component_publication(monkeypatch):
+    # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
+    from agent_engine.phase4 import publish
+    monkeypatch.setattr(publish, "require_final_gate", lambda project: {})

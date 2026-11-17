@@ -89,7 +89,7 @@ def test_phase4_publishing_never_constructs_dispatch_adapter(proj, monkeypatch):
     publish.publish_backlog(P)
     monkeypatch.setattr(dispatch, 'adapter_for', lambda *a: pytest.fail('Phase 4 cannot dispatch'))
     publish.publish_assignments(P)
-    with pytest.raises(publish.PublishError, match='P4-G4'):
+    with pytest.raises(publish.PublishError, match='readiness'):
         publish.dispatch_assignments(P)
 
 
@@ -108,3 +108,10 @@ def test_cli_work_allocation_uses_structured_stage(proj, monkeypatch, tmp_path):
     monkeypatch.setattr(cli, 'build_langfuse_handler', lambda: None)
     monkeypatch.setattr(cli, 'build_agent', lambda *a, **k: pytest.fail('Structured stage must not build a deep agent'))
     assert asyncio.run(cli._run('Assign sprint 1.', 'work-allocation', P)) == 0
+
+
+@pytest.fixture(autouse=True)
+def _isolate_component_publication(monkeypatch):
+    # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
+    from agent_engine.phase4 import publish
+    monkeypatch.setattr(publish, "require_final_gate", lambda project: {})

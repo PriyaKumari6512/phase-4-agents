@@ -24,9 +24,10 @@ def check_environments(project):
     if not sources.get('environments') or parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
         evidence['errors'].append('Configure environment-sources.json and ARGOCD_SERVER (HTTPS); no readiness is assumed')
     else:
-        github = github_http()
-        argo = httpx.Client(base_url=server, headers={'Authorization': 'Bearer ' + os.environ.get('ARGOCD_TOKEN', '')}, timeout=20)
+        github = argo = None
         try:
+            github = github_http()
+            argo = httpx.Client(base_url=server, headers={'Authorization': 'Bearer ' + os.environ.get('ARGOCD_TOKEN', '')}, timeout=20)
             repo = manifest.infra_repo
             info = github.get(f'/repos/{repo}').json()
             head = github.get(f"/repos/{repo}/commits/{info['default_branch']}").json()['sha']
@@ -81,8 +82,10 @@ def check_environments(project):
         except Exception as exc:
             evidence['errors'].append('Read-only evidence check failed: ' + type(exc).__name__)
         finally:
-            github.close()
-            argo.close()
+            if github is not None:
+                github.close()
+            if argo is not None:
+                argo.close()
     files.write_json(project, EVIDENCE, evidence)
     if files.exists(project, files.INFRA_CHECKS):
         from agent_engine.phase4.contracts import CheckResult

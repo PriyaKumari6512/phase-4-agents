@@ -75,7 +75,10 @@ async def generate(project, request, callbacks=None):
     settings = files.read_json(project, files.PROJECT_SETTINGS)
     payload = {'architecture': architecture, 'request': request,
                'code_repos': settings.get('code_repos', []), 'catalog': infra.load_catalog()}
-    await _call(project, InfraIntent, load_pack('infra-pipeline').system_prompt, payload, callbacks, check)
+    rules = load_pack('infra-pipeline').system_prompt + '\nApproved architecture:\n' + architecture + '\nCatalog:\n' + json.dumps(infra.load_catalog(), sort_keys=True)
+    payload.pop('architecture')
+    payload.pop('catalog')
+    await _call(project, InfraIntent, rules, payload, callbacks, check)
     infra.render(project)
     result = json.loads(infra.validate(project))
     return {'messages': [AIMessage(content=json.dumps(result))]}

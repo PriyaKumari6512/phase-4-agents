@@ -509,3 +509,10 @@ def test_jira_human_assignments_are_parallel_and_follow_account_map_changes(proj
     monkeypatch.setenv("JIRA_ACCOUNT_MAP", '{"m-alice":"updated-account"}')
     assert publish.publish_assignments(P)["assigned"] == 2
     assert all(account == "updated-account" for issue, account in tracker.assigned[-2:])
+
+
+@pytest.fixture(autouse=True)
+def _isolate_component_publication(monkeypatch):
+    # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
+    from agent_engine.phase4 import publish
+    monkeypatch.setattr(publish, "require_final_gate", lambda project: {})

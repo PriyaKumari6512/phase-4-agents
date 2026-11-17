@@ -43,7 +43,9 @@ jobs:
           DIGEST: ${{ github.event.client_payload.digest }}
           SOURCE_REPO: ${{ github.event.client_payload.repo }}
           SOURCE_RUN: ${{ github.event.client_payload.run_id }}
+          EXPECTED_REVIEWER: ${{ inputs.target == 'qa' && vars.QA_APPROVER_ID || inputs.target == 'stg' && vars.CLIENT_APPROVER_ID || vars.DEVOPS_APPROVER_ID }}
         run: |
+          python scripts/verify-protection.py
           if [ "$TARGET" = dev ]; then
             python scripts/verify-build.py
             python scripts/promote.py "$COMPONENT" "$TARGET" --digest "$DIGEST"

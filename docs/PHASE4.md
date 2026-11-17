@@ -1,7 +1,6 @@
 # PDLC Phase 4 — Task, Sprint & Environment Setup
 
-Four agents in the agent-engine format (one folder each under `agents/`, each with its own validator), built on
-deepagents. Each one combines the model's judgement with tools for everything that must be exact:
+Four code-driven agents in the agent-engine format (one folder each under `agents/`, each with its own validator). Each one combines the model's judgement with tools for everything that must be exact:
 
 | Agent | Folder | The model decides | Tools compute (`src/agent_engine/phase4/`) |
 |---|---|---|---|
@@ -10,9 +9,7 @@ deepagents. Each one combines the model's judgement with tools for everything th
 | 3 Work Allocation | `agents/work-allocation/` | which tasks are safe for an AI coding agent, one-line explanation per assignment | hard AI rules, capacity and review budget, Timefold task-assigning service (local CP-SAT fallback), score breakdown, runner-up, post-checks |
 | 4 Infra & Pipeline | `agents/infra-pipeline/` | infra intent from architecture.md, repairing files that fail checks | golden-path catalog rendering (OpenTofu, Argo CD, Helm, ExternalSecrets, PrometheusRule, Atlantis, CI), 10 sandbox checks, secret scan, risk score, PR text |
 
-All four agents run as code-driven stages (**knowledge**: the infra catalog at `/knowledge/catalog/`; summarization; the engine's
-write guard and lock). Task Breakdown, Sprint Planning and Work Allocation run as structured model calls driven by code instead of a
-tool-using agent: see [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md) and [SPRINT_PLANNING.md](SPRINT_PLANNING.md).
+All four stages use checked structured calls for model judgement. Code owns assembly, solvers, rendering, validation and files. Models receive no write tools. See [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md), [SPRINT_PLANNING.md](SPRINT_PLANNING.md), [WORK_ALLOCATION.md](WORK_ALLOCATION.md) and [INFRA_PIPELINE.md](INFRA_PIPELINE.md).
 
 ## Inputs and outputs
 
@@ -67,28 +64,19 @@ version's own release date wins), `ai_min_recorded_outcomes`
 
 ## Flow and gates
 
-```
-Jira (approved stories) ──► phase4/stories.json ─┐
-prd.md, architecture.md [G3A + G3B approved] ────┼─► task-breakdown ──► backlog/ ──[P4-G1]──► sprint-planning ──► sprint/ ──[P4-G2]──►
-phase4/project.json ─────────────────────────────┘                                                                                    │
-                                    work-allocation (one sprint) ──► allocation/ ──[P4-G3]──► publish      ◄┘
-architecture.md ──► infra-pipeline ──► infra/ ──[P4-G4]──► publish infra ──► CI-ready repos for work-allocation
-```
+Task Breakdown → Sprint Planning → Work Allocation remains the planning sequence. Infra starts early so reviewed, operational CI can inform AI eligibility. This is the documented ordering deviation from the spreadsheet; no execution is dispatched in Phase 4.
 
-| Gate (`gates.toml`) | Approves | Typical approver | After approval |
-|---|---|---|---|
-| P4-G1 | `backlog/backlog.json` | Tech Lead | `agent-engine phase4 publish backlog`; sprint-planning may run |
-| P4-G2 | `sprint/sprint-plan.json` | Scrum Master / Engineering Manager | `phase4 publish sprint`; work-allocation may run |
-| P4-G3 | `allocation/assignments.json` | Engineering Manager | `phase4 publish assignments` (assignees + owner comments; no dispatch) |
-| P4-G4 | `infra/intent.json`, `infra/manifest.json` | DevOps Lead + Solution Architect | `phase4 publish infra` (infra PR + CI PRs; Atlantis applies after merge) |
+Keep P4-G1 (Tech Lead), P4-G2 (Scrum Master / Engineering Manager), P4-G3 (Engineering Manager) and P4-G4 (DevOps Lead + Solution Architect) as G4 parts 1–4. Final `G4` binds all seven output artifacts. Every publisher requires every checkpoint plus current final G4, including direct Python publisher calls. Humans still own each decision and maker-checker applies.
 
-An approval pins the sha256 of the approved files: if a file changes afterwards, the next agent and `publish`
-refuse until the gate is approved again. Feedback works the engine's way: `--decision changes_requested`, then run
-the same agent again with the feedback as the request (it reads its request history and changes only what is
-needed). Infra runs in parallel with the other three; Work Allocation only gives tasks to AI agents for
-repositories whose CI was approved at P4-G4.
+The orchestrator waits for final G4 after the four checkpoints. CLI approval of final G4 refuses before its parts are approved. A final changes request routes to P4-G1 for planning issues or P4-G4 for environment/pipeline issues; rejection invalidates both design approvals and returns to G3A/G3B.
+
+`--test-approve` records synthetic decisions, never human sign-off. Automated final G4 cannot authorize live publication. Phase 5 `phase4 dispatch` additionally requires current environment readiness, operational CI, completed predecessors and available worker concurrency.
+
+`phase4 check-environments` records readiness using read-only sources. The generated infra PR/runbook lists missing setup; approved PRs do not establish provisioned environments.
 
 ## Commands
+
+Record each checkpoint first and final G4 after all four outputs are reviewed. Publication commands wait for final approval; use `agent-engine gate G4 --project-name taskflow --decision approved --approver "<reviewer>" --submitted-by "<maker>"` with the real participants after review.
 
 ```bash
 uv sync                                               # Python 3.13 env with ortools, networkx, ...
@@ -98,7 +86,6 @@ uv run agent-engine gate G3A --project-name taskflow --decision approved --appro
 uv run agent-engine gate G3B --project-name taskflow --decision approved --approver "Architect" --submitted-by "Architecture agent"
 uv run agent-engine run "Break the approved stories down into tasks." --agent task-breakdown --project-name taskflow
 uv run agent-engine gate P4-G1 --project-name taskflow --decision approved --approver "Priya" --submitted-by "Rahul"
-uv run agent-engine phase4 publish backlog --project-name taskflow
 uv run agent-engine run "Plan the sprints." --agent sprint-planning --project-name taskflow
 uv run agent-engine gate P4-G2 --project-name taskflow --decision approved --approver "Dana" --submitted-by "Rahul"
 uv run agent-engine run "Assign sprint 1." --agent work-allocation --project-name taskflow
@@ -180,3 +167,7 @@ tracker write everything as files instead.
 Work Allocation now uses checked small-model eligibility, structured risk routing and deterministic explanations. See [WORK_ALLOCATION.md](WORK_ALLOCATION.md). Phase 5 execution is explicit through `phase4 dispatch` and requires all four current gate approvals.
 
 Infra now includes QA, immutable-digest promotion, branching/runbook documents, checked intent and bounded repair. See [INFRA_PIPELINE.md](INFRA_PIPELINE.md). Operational evidence is collected by `phase4 check-environments`; missing scanners or readiness sources never count as passed.
+
+## Execution budgets
+
+All structured stages share per-run call/token/time limits across generation, review and repair. Task Breakdown retains its existing BREAKDOWN settings. Other stages use `AGENT_ENGINE_SPRINT_PLANNING_*`, `AGENT_ENGINE_WORK_ALLOCATION_*` and `AGENT_ENGINE_INFRA_PIPELINE_*` with suffixes MAX_CALLS, MAX_INPUT_TOKENS, MAX_OUTPUT_TOKENS and TIMEOUT_SECONDS. Initial defaults are 16 calls, 1M reported input tokens, 64k reported output tokens and 1800 seconds. These are provisional safeguards, not production usage estimates. Budget stops remain partial and never approval. Calibrate from a separately authorized live run; fake-model timings do not justify live token tuning.
