@@ -20,7 +20,7 @@ agent-engine/
       validator/
         agent.toml            # Requirements Validator (judges the PRD)
         system_prompt.md
-    task-breakdown/           # PDLC Phase 4, agent 1 (spec-kit skills + subagents)
+    task-breakdown/           # PDLC Phase 4, agent 1 (approved Jira stories -> tasks)
     sprint-planning/          # PDLC Phase 4, agent 2
     work-allocation/          # PDLC Phase 4, agent 3
     infra-pipeline/           # PDLC Phase 4, agent 4 (golden-path catalog in knowledge/)

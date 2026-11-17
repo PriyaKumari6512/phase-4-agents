@@ -23,7 +23,8 @@ from agent_engine.phase4.contracts import Backlog, CheckResult, SprintPlan
 from agent_engine.phase4.sandbox import CmdResult
 from agent_engine.phase4.sprint_model import SolveResult
 from test_model_escalation import _pack, engine  # noqa: F401  (fixture)
-from test_phase4_pipeline import AS_OF, P, _enrich, _features, _intent, approve, proj  # noqa: F401  (fixture)
+from test_phase4_pipeline import AS_OF, P, _intent, approve, proj  # noqa: F401  (fixture)
+from phase4_helpers import build_story_backlog
 
 
 # ============================================================================ 6.1 stale child reports
@@ -139,9 +140,7 @@ def test_output_deleted_by_a_fix_pass_fails_the_run(engine, monkeypatch):  # noq
 
 # ============================================================================ 6.3 unsuccessful solver results
 def _planned(proj_root: Path) -> dict:  # noqa: F811
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    _enrich(P)
+    build_story_backlog(files.project_dir(P))
     b = files.read_json(P, files.BACKLOG, Backlog)
     return {s.item_id: 5 for s in b.stories()}
 
@@ -278,9 +277,7 @@ def _normalize(value):
 
 
 def _flow(root: Path) -> dict[str, object]:
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    _enrich(P)
+    build_story_backlog(files.project_dir(P))
     backlog.validate_report(P)
     approve(root, "P4-G1")
     sprint.capacity_report(P, AS_OF)
@@ -329,6 +326,8 @@ def test_artifacts_are_identical_with_diagnostics_on_and_off(proj, tmp_path, mon
     example = Path(__file__).resolve().parents[1] / "examples" / "phase4" / "taskflow" / "phase4"
     for name in ("project.json", "history.json"):
         shutil.copy(example / name, proj / "phase4" / name)
+    from phase4_helpers import make_design_ready
+    make_design_ready(proj)
     perf.reset_for_tests()
     monkeypatch.setenv(perf.ENV_SESSION, "equivalence")
     monkeypatch.setenv(perf.ENV_SAMPLE_SECONDS, "0")

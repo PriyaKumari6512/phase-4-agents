@@ -28,11 +28,11 @@ M = TypeVar("M", bound=BaseModel)
 # Fixed locations inside outputs/<project>/ (the agents' [input] / [output] files).
 PROJECT_SETTINGS = "phase4/project.json"
 HISTORY = "phase4/history.json"
+STORIES = "phase4/stories.json"      # approved stories imported from the tracker (story_import.py)
 SKILL_PROFILES = "phase4/skill-profiles.json"
 AGENT_OUTCOMES = "phase4/agent-outcomes.json"
 PRD = "prd.md"
 ARCHITECTURE = "architecture.md"
-FEATURES = "backlog/features.json"
 BACKLOG = "backlog/backlog.json"
 BACKLOG_MD = "backlog/backlog.md"
 CAPACITY = "sprint/capacity.json"

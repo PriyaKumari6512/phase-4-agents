@@ -17,13 +17,13 @@ from agent_engine.phase4.sprint_model import (
     StoryIn, SprintIn, DeadlineIn, Relaxation, solve, diagnostics, required_ids, verified_options,
 )
 from test_model_escalation import engine, _script, _passes
-from test_phase4_pipeline import proj, P, _features
+from test_phase4_pipeline import proj, P
+from phase4_helpers import build_story_backlog
 from test_phase4_orchestrator import root, FakeAgents
 
 
 def test_backlog_pages_are_lossless_and_reject_changed_snapshot(proj):
-    backlog.set_features(P, _features())
-    backlog.build(P)
+    build_story_backlog(files.project_dir(P))
     raw = files.read_text(P, files.BACKLOG)
     expected = json.loads(raw)["items"]
     rows, offset, digest = [], 0, ""
@@ -219,7 +219,7 @@ def test_parallel_orchestrator_preserves_human_gates(root, monkeypatch):
     monkeypatch.setattr(parallel_stages, "run_pair", pair)
     assert orch.orchestrate("demo", parallel_independent=True, out=lambda _: None) == orch.WAITING
     assert calls == ["task-breakdown", "infra-pipeline"]
-    assert not list((root / "gates").glob("*.approved.json"))
+    assert not list((root / "gates").glob("P4-*.approved.json"))
     assert not (root / "sprint").exists()
 
 

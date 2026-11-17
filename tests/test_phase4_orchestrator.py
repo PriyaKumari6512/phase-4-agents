@@ -9,6 +9,7 @@ import pytest
 
 from agent_engine import config, gates
 from agent_engine.phase4 import orchestrator as orch
+from phase4_helpers import make_design_ready
 
 P = "demo"
 PROJECT = {
@@ -46,6 +47,7 @@ def root(tmp_path, monkeypatch):
     (root / "phase4" / "project.json").write_text(json.dumps(PROJECT), encoding="utf-8")
     (root / "prd.md").write_text("prd", encoding="utf-8")
     (root / "architecture.md").write_text("arch", encoding="utf-8")
+    make_design_ready(root)
     return root
 
 

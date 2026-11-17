@@ -52,15 +52,19 @@ class Stage:
     optional: tuple[str, ...] = ()              # inputs read when present
     project_keys: tuple[str, ...] | None = None  # parts of phase4/project.json it depends on (None = all)
     needs: tuple[str, ...] = ()                 # gates that must be approved before it runs
+    upstream: tuple[str, ...] = ()              # earlier-phase gates (no Phase 4 owner) that must be approved first
     request: str = ""
 
 
 STAGES: tuple[Stage, ...] = (
     Stage(
-        "task-breakdown", "P4-G1", ("prd.md", "architecture.md"), ("phase4/history.json",),
+        "task-breakdown", "P4-G1",
+        ("phase4/stories.json", "prd.md", "architecture.md", f"gates/G3A{APPROVED_SUFFIX}", f"gates/G3B{APPROVED_SUFFIX}"),
+        ("phase4/history.json",),
         ("project_name", "code_repos", "infra_repo", "definition_of_done", "story_point_scale",
          "hours_per_story_point", "max_story_points_per_story", "deadlines"),
-        request="Break prd.md down into a backlog.",
+        upstream=("G3A", "G3B"),
+        request="Break the approved stories down into tasks.",
     ),
     Stage(
         "infra-pipeline", "P4-G4", ("architecture.md",), (),
@@ -120,9 +124,6 @@ def _input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
         for p in sorted(catalog.rglob("*")):
             if p.is_file():
                 digests["catalog:" + p.relative_to(catalog).as_posix()] = file_digest(p)
-    if stage.agent == "task-breakdown":
-        for p in sorted((root / "specs").rglob("*.md")):
-            digests[p.relative_to(root).as_posix()] = file_digest(p)
     if stage.agent in ("sprint-planning", "work-allocation"):
         digests["param:planning_date"] = datetime.now(timezone.utc).date().isoformat()
         for rel in ("phase4/ci-readiness.json", "phase4/committed-work.json"):
@@ -201,6 +202,19 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
     steps = []
     for stage in STAGES:
         gate = gates[stage.gate]
+        # PDLC: Phase 4 starts only when the design (G3A) and architecture (G3B) gates are approved by a human.
+        upstream = []
+        for name in stage.upstream:
+            if name not in gates:
+                upstream.append(f"gates.toml has no [{name}] gate")
+                continue
+            up_status, _ = gate_state(root, gates[name])
+            if up_status != "approved":
+                upstream.append(f"{name} is {up_status} ({gates[name].description}); a human approves it with "
+                                f"`agent-engine gate {name} --project-name {project} --decision approved ...`")
+        if upstream:
+            steps.append(Step(stage, "blocked_input", "earlier-phase gate not approved: " + "; ".join(upstream)))
+            continue
         missing = [f for f in stage.files if not (root / f).is_file() and not _produced_by_earlier_stage(f, stage)]
         if missing:
             steps.append(Step(stage, "blocked_input", "missing input: " + ", ".join(missing)))
@@ -279,7 +293,10 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
                         continue
             steps.append(Step(stage, "run", "; ".join(why), "\n\n".join(parts), status))
         elif status == "rejected":
-            steps.append(Step(stage, "escalate", f"{gate.name} was rejected; a human has to decide", gate_status=status))
+            back = (" Per the PDLC a rejected task breakdown goes back to design: revise and re-approve "
+                    + "/".join(stage.upstream) + ", then Task Breakdown runs again.") if stage.upstream else ""
+            steps.append(Step(stage, "escalate", f"{gate.name} was rejected; a human has to decide.{back}",
+                              gate_status=status))
         elif status == "approved":
             steps.append(Step(stage, "done", f"{gate.name} approved, output up to date", gate_status=status))
         else:
@@ -454,6 +471,20 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             return FAILED
         state = load_state(root)
         _observe_approvals(root, gates)
+        if not plan_only and os.environ.get("PHASE4_IMPORT_STORIES", "true").strip().lower() != "false":
+            # Approved stories live in the tracker; refresh the snapshot (read-only, rewritten only when changed).
+            from agent_engine.phase4.settings import project_overrides
+            try:
+                raw = json.loads((root / PROJECT_FILE).read_text(encoding="utf-8"))
+                if (project_overrides(raw).get("tracker") or {}).get("kind") == "jira":
+                    from agent_engine.phase4.story_import import import_stories
+                    summary = import_stories(project)
+                    out(f">>> approved stories: {summary['stories']} from Jira"
+                        f"{' (updated)' if summary['changed'] else ' (unchanged)'}"
+                        + (f"; excluded {len(summary['excluded'])}" if summary["excluded"] else ""))
+            except Exception as exc:  # noqa: BLE001  (network, auth, schema: stop before any generation)
+                out(f"ERROR: importing approved stories failed: {exc}")
+                return FAILED
         if not plan_only:
             from agent_engine.phase4.parallel_stages import replay_pending, acknowledge
             try:
@@ -520,9 +551,6 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             out(f"\n>>> running {step.stage.agent}: {step.why}\n")
             digests = input_digests(step.stage, root, sprint)
             result = runner(step.stage.agent, step.request, project)
-            if step.stage.agent == "task-breakdown":
-                digests = {k: v for k, v in digests.items() if not k.startswith("specs/")}
-                digests.update({k: v for k, v in input_digests(step.stage, root, sprint).items() if k.startswith("specs/")})
             ran.append(step.stage.agent)
             if result.get("rate_limited"):
                 out(f"\nSTOP: the subscription rate limit stopped {step.stage.agent}. Run the same command after the "

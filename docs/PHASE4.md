@@ -5,15 +5,14 @@ deepagents. Each one combines the model's judgement with tools for everything th
 
 | Agent | Folder | The model decides | Tools compute (`src/agent_engine/phase4/`) |
 |---|---|---|---|
-| 1 Task Breakdown | `agents/task-breakdown/` | feature split, specs and plans (github spec-kit 1.3.0 skills), estimates by analogy, task acceptance criteria, skills, AI proposals, cross-feature dependencies | spec-kit scripts without a shell, spec-kit parser, backlog build, TF-IDF reference tickets, story→task hour roll-up, DAG/coverage/size validation |
+| 1 Task Breakdown | `agents/task-breakdown/` | per approved story: FE/BE/DB/DevOps/QA tasks, task acceptance criteria, hours, skills, in-story dependencies; across stories: missing dependencies and work planned twice; a light review of flagged items | Jira story import, structured calls with a cached prefix, ids, Jira "blocks" links, story points (kept from Jira or derived from hours), DAG/coverage/size/effort checks, retained results, Jira sub-task publishing ([TASK_BREAKDOWN.md](TASK_BREAKDOWN.md)) |
 | 2 Sprint Planning | `agents/sprint-planning/` | business value per story, which option to recommend, sprint goals, explanations | calendar + PTO availability, Monte Carlo P50/P85 velocity, WSJF, OR-Tools CP-SAT packing, infeasibility cores and verified options |
 | 3 Work Allocation | `agents/work-allocation/` | which tasks are safe for an AI coding agent, one-line explanation per assignment | hard AI rules, capacity and review budget, Timefold task-assigning service (local CP-SAT fallback), score breakdown, runner-up, post-checks |
 | 4 Infra & Pipeline | `agents/infra-pipeline/` | infra intent from architecture.md, repairing files that fail checks | golden-path catalog rendering (OpenTofu, Argo CD, Helm, ExternalSecrets, PrometheusRule, Atlantis, CI), 10 sandbox checks, secret scan, risk score, PR text |
 
-Deepagents features used: **skills** (spec-kit's own `SKILL.md` files, loaded from `agents/task-breakdown/skills/`),
-**named subagents** (`speckit-feature` runs spec-kit for one feature, `backlog-enricher` enriches one epic; the agent
-starts them in parallel with the `task` tool), **knowledge** (the infra catalog at `/knowledge/catalog/`),
-summarization and the engine's write guard and lock on every subagent.
+Agents 2–4 run as deepagents (**knowledge**: the infra catalog at `/knowledge/catalog/`; summarization; the engine's
+write guard and lock). Task Breakdown runs as structured model calls driven by code instead of a tool-using agent:
+see [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md).
 
 ## Inputs and outputs
 
@@ -22,13 +21,38 @@ All paths are inside the project folder `outputs/<project>/`. "Gate" files are w
 
 | Agent | Reads (declared inputs; the run refuses if one is missing) | Also reads if present | Writes (declared outputs) | Also writes |
 |---|---|---|---|---|
-| 1 Task Breakdown | `prd.md` (from the `prd` agent), `architecture.md`, `phase4/project.json` | `phase4/history.json`, `requests/task-breakdown.md` | `backlog/backlog.json`, `backlog/backlog.md` | `specs/NNN-name/{spec,plan,tasks}.md` (+ research, data-model, contracts, clarifications), `.specify/`, `backlog/features.json`, `backlog/enrichments.json` |
+| 1 Task Breakdown | `phase4/stories.json` (approved stories, imported from Jira), `prd.md`, `architecture.md`, `phase4/project.json`, `gates/G3A.approved.json`, `gates/G3B.approved.json` | `phase4/history.json`, `requests/task-breakdown.md` | `backlog/backlog.json`, `backlog/backlog.md` | `.engine-task-breakdown/` (retained per-story results, engine-owned) |
 | 2 Sprint Planning | `backlog/backlog.json`, `gates/P4-G1.approved.json`, `phase4/project.json` | `phase4/history.json`, previous `sprint/sprint-plan.json` | `sprint/sprint-plan.json`, `sprint/sprint-plan.md` | `sprint/capacity.json` |
 | 3 Work Allocation | `sprint/sprint-plan.json`, `gates/P4-G2.approved.json`, `backlog/backlog.json`, `phase4/project.json` | `phase4/skill-profiles.json`, `phase4/agent-outcomes.json`, `infra/manifest.json` + `gates/P4-G4.approved.json` (CI-ready repos) | `allocation/assignments.json`, `allocation/assignments.md` | `allocation/problem.json` |
 | 4 Infra & Pipeline | `architecture.md`, `phase4/project.json` | — | `infra/intent.json`, `infra/manifest.json`, `infra/checks.json`, `infra/PR.md` | `infra/repo/**` (infra repository files), `infra/ci/<owner>__<repo>/**` (CI per code repo) |
 
 The file formats are Pydantic models in `src/agent_engine/phase4/contracts.py`; `agent-engine phase4 schemas`
 writes them as JSON Schema.
+
+### `phase4/stories.json` (approved stories)
+
+The PDLC has the stories written and approved (Gate 2) before Phase 4; Task Breakdown splits them into tasks and does
+not write its own. With `PHASE4_TRACKER=jira` the orchestrator (or `agent-engine phase4 import-stories`) reads them
+from Jira with read-only requests before anything runs, and rewrites the file only when Jira's content changed:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `JIRA_STORY_JQL` | `project = "<key>" AND issuetype = Story AND statusCategory = "To Do" ORDER BY key ASC` | Which stories to read. |
+| `PHASE4_STORY_APPROVAL_MARKER` | `Approved at gate G2` | Text the description must contain; others are listed under `excluded`. Empty = no check. |
+| `JIRA_ACCEPTANCE_FIELD_ID` | (none) | Read acceptance criteria from this custom field instead of the description's "Acceptance criteria" heading. |
+| `JIRA_STORY_POINTS_FIELD_ID` | auto | Story points field; by default the populated field named "Story point estimate" or "Story Points". |
+| `PHASE4_IMPORT_STORIES` | `true` | `false` keeps the existing snapshot without contacting Jira. |
+
+Each story keeps its key, statement, acceptance criteria with their own ids (`US-001.AC1`), notes, traceability,
+labels (US/FR/NFR ids, persona, `moscow-*`), fix versions, components, epic, existing story points and "blocks" links.
+With another tracker, provide `phase4/stories.json` yourself (`agent-engine phase4 schemas` writes its JSON Schema).
+
+### Design gates G3A and G3B
+
+"Phase 4 starts only when both G3A and G3B are approved." Task Breakdown refuses to run (and the orchestrator stops
+before it) until a human has approved `G3A` (`designs/designs.md`: screens, prototype links, design reports) and
+`G3B` (`architecture.md`), and neither file changed since. Infra & Pipeline is not blocked by them. A rejected P4-G1
+points back to design. These gates are never test-approved by the orchestrator.
 
 ### `phase4/project.json` (human input)
 
@@ -42,16 +66,16 @@ ceremonies), `definition_of_done`, `story_point_scale`, `hours_per_story_point`,
 ## Flow and gates
 
 ```
-prd agent ──► prd.md ─┐
-architecture.md ──────┼─► task-breakdown ──► backlog/ ──[P4-G1]──► sprint-planning ──► sprint/ ──[P4-G2]──►
-phase4/project.json ──┘                                                                                    │
+Jira (approved stories) ──► phase4/stories.json ─┐
+prd.md, architecture.md [G3A + G3B approved] ────┼─► task-breakdown ──► backlog/ ──[P4-G1]──► sprint-planning ──► sprint/ ──[P4-G2]──►
+phase4/project.json ─────────────────────────────┘                                                                                    │
                                     work-allocation (one sprint) ──► allocation/ ──[P4-G3]──► publish      ◄┘
 architecture.md ──► infra-pipeline ──► infra/ ──[P4-G4]──► publish infra ──► CI-ready repos for work-allocation
 ```
 
 | Gate (`gates.toml`) | Approves | Typical approver | After approval |
 |---|---|---|---|
-| P4-G1 | `backlog/backlog.json` | product owner / tech lead | `agent-engine phase4 publish backlog`; sprint-planning may run |
+| P4-G1 | `backlog/backlog.json` | Tech Lead | `agent-engine phase4 publish backlog`; sprint-planning may run |
 | P4-G2 | `sprint/sprint-plan.json` | delivery manager | `phase4 publish sprint`; work-allocation may run |
 | P4-G3 | `allocation/assignments.json` | engineering manager | `phase4 publish assignments` (assignees + AI dispatch) |
 | P4-G4 | `infra/intent.json`, `infra/manifest.json` | platform engineer | `phase4 publish infra` (infra PR + CI PRs; Atlantis applies after merge) |
@@ -67,7 +91,10 @@ repositories whose CI was approved at P4-G4.
 ```bash
 uv sync                                               # Python 3.13 env with ortools, networkx, ...
 uv run agent-engine phase4 init --project-name taskflow --example taskflow    # sample inputs into outputs/taskflow/
-uv run agent-engine run "Break prd.md down into a backlog." --agent task-breakdown --project-name taskflow
+uv run agent-engine phase4 import-stories --project-name taskflow      # approved stories from Jira (read-only)
+uv run agent-engine gate G3A --project-name taskflow --decision approved --approver "Design Lead" --submitted-by "UX agent"
+uv run agent-engine gate G3B --project-name taskflow --decision approved --approver "Architect" --submitted-by "Architecture agent"
+uv run agent-engine run "Break the approved stories down into tasks." --agent task-breakdown --project-name taskflow
 uv run agent-engine gate P4-G1 --project-name taskflow --decision approved --approver "Priya" --submitted-by "Rahul"
 uv run agent-engine phase4 publish backlog --project-name taskflow
 uv run agent-engine run "Plan the sprints." --agent sprint-planning --project-name taskflow
@@ -121,7 +148,9 @@ The model comes from the engine's settings (`SDLC_AGENT_ANTHROPIC_AUTH_MODE=subs
 Small and additive, so other teams' packs are unaffected:
 - `agent.toml` accepts `skills = "<folder>"` (Agent Skills, served read-only at `/skills/`) and
   `[subagents.<name>]` tables (`description`, `prompt` file, optional `model`). Named subagents get the same tools,
-  file tools, skills, write guard and lock as the built-in helper.
+  file tools, skills, write guard and lock as the built-in helper. (No Phase 4 pack uses them any more.)
+- A `frontier` model tier (`SDLC_AGENT_FRONTIER_MODEL`, default Opus for Anthropic) for escalation lists such as
+  Task Breakdown's `model = ["strong", "frontier"]`.
 - `TOOLS` registers the Phase 4 tool sets (`phase4-*`); the Phase 4 code lives in `src/agent_engine/phase4/`.
 - `agent-engine phase4 ...` CLI commands (init, publish, mine-profiles, schemas), which never call a model.
 - The tool `infra_validate` runs fixed check commands in the sandbox image. The agent itself still has no shell
@@ -132,14 +161,13 @@ Small and additive, so other teams' packs are unaffected:
 
 | Agent | Time | Input tokens | Validator | Result |
 |---|---|---|---|---|
-| Task Breakdown | 9.4 min | 3.5 M | partial → fixed → success | spec-kit for 3 features in parallel subagents; 3 epics, 13 stories, 48 tasks, 26 SP, all PRD ids covered |
+| Task Breakdown | 9.4 min | 3.5 M | partial → fixed → success | (retired spec-kit implementation; the story-based one is in [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md)) |
 | Sprint Planning | 1.3 min | ~0.2 M | success | CP-SAT OPTIMAL, 2 sprints, nothing deferred, deadline met |
 | Infra & Pipeline | 13.6 min | 0.3 M | success | 44 files, all 10 sandbox checks pass, risk 50, 1 infra PR + 2 CI PRs (local mode) |
 | Work Allocation | 4.0 min | 1.1 M | partial → fixed → success | Timefold service, 34 tasks assigned, 2 unassigned (skill gaps), capacity respected |
 
 Gates P4-G1..G4 were approved with `agent-engine gate` and every `phase4 publish` ran in local mode (tracker files,
-PR folders). Token use is driven by deepagents re-sending context on every tool call; Task Breakdown is the most
-expensive because of spec-kit's long skills.
+PR folders). Token use is driven by deepagents re-sending context on every tool call.
 
 ## Not verified here
 

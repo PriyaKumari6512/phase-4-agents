@@ -57,6 +57,7 @@ class TrackerAdapter:
     def create(self, payload: dict) -> ExtObj: raise NotImplementedError
     def update(self, external_id: str, fields: dict) -> None: raise NotImplementedError
     def get_fields(self, external_id: str) -> dict: raise NotImplementedError
+    def set_field_if_empty(self, external_id: str, field: str, value) -> bool: raise NotImplementedError
     def find_by_marker(self, marker: str, level: str | None = None) -> ExtObj | None: raise NotImplementedError
     def add_blocks(self, blocker_id: str, blocked_id: str) -> None: raise NotImplementedError
     def remove_blocks(self, blocker_id: str, blocked_id: str) -> None: raise NotImplementedError

@@ -35,10 +35,6 @@ class ProjectBackend(FilesystemBackend):
         resolved = self._resolve_path(path)
         parts = resolved.relative_to(self.cwd).parts
         rel = parts if self.bound else parts[1:]
-        from agent_engine.stage_controls import helper_write_allowed
-        project = active_project.get() if self.bound else (parts[0] if parts else "")
-        if not helper_write_allowed(project or "", "/".join(rel)):
-            return True
         return bool(rel and (rel[0] in READ_ONLY_PROJECT_DIRS or rel[0] == "report.json"
                              or rel[0].startswith(".engine-") or "/".join(rel) in self.inputs))
 

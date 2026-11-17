@@ -22,6 +22,12 @@ uv sync
 uv run agent-engine pipeline
 ```
 
+Approved stories are read from this Jira project before any generation (read-only; see "phase4/stories.json" in
+[PHASE4.md](PHASE4.md) for `JIRA_STORY_JQL` and the related settings). Task Breakdown also needs the human approvals
+of G3A and G3B (`agent-engine gate G3A|G3B ...`); `PHASE4_AUTO_APPROVE_FOR_TESTING` never approves those.
+
+`JIRA_EMAIL` must be the account that owns `JIRA_API_TOKEN` on `JIRA_BASE_URL`.
+
 `PHASE4_PROJECT_NAME` identifies an existing directory under `outputs/`. Its inputs must include
 `prd.md`, `architecture.md`, and `phase4/project.json`. The project display name can differ from its folder name.
 Existing project content (team, requirements, repositories, calendar and infrastructure choices) remains input data.
@@ -75,6 +81,7 @@ No per-stage command arguments are needed.
 | `JIRA_TIMEOUT_SECONDS` | `30` | HTTP timeout in seconds. |
 | `JIRA_MAX_RETRIES` | `5` | Maximum bounded retries for supported HTTP errors. |
 | `PHASE4_SPRINT_INDEX` | `1` | Sprint selected for allocation. |
+| `PHASE4_WRITE_STORY_POINTS` | `never` | `if_empty` writes the backlog's story points onto approved Jira stories that have none (never overwrites). |
 | `PHASE4_PUBLISH` | `true` | Publish after the stage/gate chain completes. |
 | `PHASE4_PARALLEL_STAGES` | `true` | Run the verified independent first stages in isolated workspaces. |
 | `PHASE4_IAC_CHECK_CONCURRENCY` | `2` on `pipeline` | Independent scanner workers; 1–4. |
@@ -103,6 +110,14 @@ It creates no test issues.
 It cannot prove every future request will succeed: permissions or user availability can change,
 and custom workflows or field contexts can add further constraints. Use an account permitted to create/edit/link
 issues, assign the configured users, and manage sprints in the target project/board.
+
+## Approved stories stay as they are
+
+When the backlog was built from approved stories imported from this Jira project, publishing creates only the
+tasks, as **sub-tasks of the existing stories** (labels `phase4` and `discipline-fe|be|db|devops|qa`, the estimate
+at the top of the description because sub-task screens often have no time-tracking field), plus "blocks" links
+between tasks. Epics and stories are never created, edited, linked or closed; their ids are recorded so sprint
+publication can move them. Publishing refuses when the stories were imported from a different project.
 
 ## What publishes concurrently
 

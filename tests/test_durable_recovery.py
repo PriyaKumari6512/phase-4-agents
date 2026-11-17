@@ -35,7 +35,7 @@ def stage(proj, tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "_deterministic_gaps", lambda *args: ([], False))
     # Mock the operation boundary; these tests exercise recovery with deliberately
     # synthetic artifacts, not planning or semantic review implementations.
-    from agent_engine.phase4 import breakdown_workflow as workflow
+    from agent_engine.phase4 import task_breakdown as workflow
     async def generate(project, request, callbacks):
         return await cli._stream(None, request, callbacks, "task-breakdown-write")
     async def review(project, callbacks):
@@ -46,7 +46,6 @@ def stage(proj, tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "generate", generate)
     monkeypatch.setattr(workflow, "review", review)
     monkeypatch.setattr(workflow, "repair", repair)
-    monkeypatch.setattr(workflow, "generation_supported", lambda project: True)
     return proj
 
 
@@ -87,7 +86,7 @@ def test_malformed_review_retries_only_review_then_resumes_after_model_change(st
     assert (stage / "requests/task-breakdown.md").read_bytes() == history
     assert (stage / "backlog/backlog.json").read_bytes() == before
     assert report(stage)["recovery_action"] == "verify"
-    assert not list((stage / "gates").glob("*.approved.json"))
+    assert not list((stage / "gates").glob("P4-*.approved.json"))
 
 
 def test_empty_state_is_bounded_format_failure(stage, monkeypatch):
@@ -189,15 +188,10 @@ def fake_runner(calls, *, feature_checkpoint=False):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps({"agent": agent_name}))
         if agent_name == "task-breakdown" and feature_checkpoint:
-            base = child / "specs/001-feature"
-            base.mkdir(parents=True)
-            for name in ("spec.md", "tasks.md", "plan.md"):
-                (base / name).write_text(name)
-            (child / "backlog/features.json").write_text(json.dumps({"features": [{"feature_dir": "specs/001-feature"}]}))
-            path = child / ".engine-feature-jobs/001-feature.json"
-            path.parent.mkdir()
-            path.write_text(json.dumps({"version": 1, "inputs": {}, "outputs": {
-                p.name: file_digest(p) for p in base.iterdir()}}))
+            state = child / ".engine-task-breakdown"
+            (state / "stories").mkdir(parents=True)
+            (state / "stories" / ("a" * 64 + ".json")).write_text(json.dumps({"base": "a" * 64, "result": {}}))
+            (state / "current.json").write_text(json.dumps({"BM-2": "a" * 64}))
         return {"status": "partial", "gaps": ["needs review"], "rate_limited": False}
     return run
 
@@ -208,12 +202,13 @@ def parallel_root(root, tmp_path, monkeypatch):
     return root
 
 
-def test_feature_checkpoint_merges_only_for_task_breakdown(parallel_root):
+def test_retained_story_results_merge_only_for_task_breakdown(parallel_root):
     calls = []
     result = parallel.run_pair(parallel_root, steps(), fake_runner(calls, feature_checkpoint=True))
     assert len(calls) == 2 and result["task-breakdown"]["status"] == "partial"
-    assert (parallel_root / ".engine-feature-jobs/001-feature.json").is_file()
-    assert not list((parallel_root / "gates").glob("*.approved.json"))
+    assert (parallel_root / ".engine-task-breakdown/current.json").is_file()
+    assert (parallel_root / ".engine-task-breakdown/stories" / ("a" * 64 + ".json")).is_file()
+    assert not list((parallel_root / "gates").glob("P4-*.approved.json"))
 
 
 def test_merge_error_replay_does_not_call_writers(parallel_root, monkeypatch):
@@ -284,8 +279,8 @@ def test_stale_original_blocks_replay_without_losing_child_work(parallel_root, m
     assert list((config.LOGS_DIR / "parallel").glob("*/task-breakdown/outputs/demo/backlog/backlog.json"))
 
 
-@pytest.mark.parametrize("bad", ["unknown-engine", "wrong-owner", "bad-hash"])
-def test_merge_rejects_unknown_engine_metadata_and_invalid_checkpoint(parallel_root, bad):
+@pytest.mark.parametrize("bad", ["unknown-engine", "wrong-owner", "bad-path"])
+def test_merge_rejects_unknown_engine_metadata_and_invalid_retained_state(parallel_root, bad):
     base = fake_runner([], feature_checkpoint=True)
     def run(agent_name, *args, **kwargs):
         result = base(agent_name, *args, **kwargs)
@@ -294,10 +289,10 @@ def test_merge_rejects_unknown_engine_metadata_and_invalid_checkpoint(parallel_r
             (child / ".engine-unknown").mkdir()
             (child / ".engine-unknown/data.json").write_text("{}")
         if bad == "wrong-owner" and agent_name == "infra-pipeline":
-            (child / ".engine-feature-jobs").mkdir()
-            (child / ".engine-feature-jobs/001-feature.json").write_text("{}")
-        if bad == "bad-hash" and agent_name == "task-breakdown":
-            (child / "specs/001-feature/spec.md").write_text("modified after checkpoint")
+            (child / ".engine-task-breakdown").mkdir()
+            (child / ".engine-task-breakdown/current.json").write_text("{}")
+        if bad == "bad-path" and agent_name == "task-breakdown":
+            (child / ".engine-task-breakdown/stories/not-a-digest.json").write_text("{}")
         return result
     with pytest.raises(ValueError):
         parallel.run_pair(parallel_root, steps(), run)
@@ -310,7 +305,7 @@ def test_orchestrator_selects_saved_review_and_preserves_gates(stage):
     recovery.save(stage, pack, "original request", "job", "review_pending")
     chosen = orch.assess(P)[0]
     assert chosen.action == "run" and chosen.request == "original request" and "resume retained verify" in chosen.why
-    assert not list((stage / "gates").glob("*.approved.json"))
+    assert not list((stage / "gates").glob("P4-*.approved.json"))
 
 
 def test_changed_reviewer_instructions_reuse_generation(stage, monkeypatch):
@@ -360,7 +355,7 @@ def test_orchestrator_automatically_resumes_review_once_then_waits_at_gate(stage
     assert orch.orchestrate(P, runner=runner, out=lambda _: None) == orch.WAITING
     assert calls == ["task-breakdown/validator-verify"]
     assert orch.orchestrate(P, runner=lambda *a: pytest.fail("completed stage restarted"), out=lambda _: None) == orch.WAITING
-    assert not list((stage / "gates").glob("*.approved.json"))
+    assert not list((stage / "gates").glob("P4-*.approved.json"))
 
 
 def test_orchestrator_recovers_committed_merge_before_state_save(parallel_root):
@@ -491,16 +486,15 @@ def test_completed_feedback_response_waits_for_gate_but_new_decision_is_respecte
     assert second.action == "run" and second.request != first.request
 
 
-def test_changed_approved_policy_prevents_interrupted_repair_restoration(stage):
+def test_changed_approved_input_prevents_interrupted_repair_restoration(stage):
     artifacts(stage)
-    policy = stage / ".specify/memory/constitution.md"
-    policy.parent.mkdir(parents=True)
+    policy = stage / "architecture.md"
     policy.write_text("Original approved policy")
     pack = agent.load_pack("task-breakdown")
     record = recovery.save(stage, pack, "request", "job", "repair_running")
     artifacts(stage, "unfinished edit")
     policy.write_text("New approved policy")
-    assert recovery.next_action(stage, pack)[0] == "conflict"
+    assert recovery.next_action(stage, pack)[0] == "generate"     # changed input: regenerate, never restore
     with pytest.raises(ValueError, match="inputs changed"):
         recovery.restore_repair(stage, pack, record)
     assert policy.read_text() == "New approved policy"

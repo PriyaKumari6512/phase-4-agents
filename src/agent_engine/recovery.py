@@ -16,7 +16,7 @@ from pathlib import Path
 from agent_engine.history import file_digest
 from agent_engine.runtime import atomic_json
 
-DIRECTORIES = {"task-breakdown": ("backlog", "specs", ".specify"), "infra-pipeline": ("infra",),
+DIRECTORIES = {"task-breakdown": ("backlog",), "infra-pipeline": ("infra",),
                "sprint-planning": ("sprint",), "work-allocation": ("allocation",)}
 OPTIONAL = {"task-breakdown": ("phase4/history.json",), "infra-pipeline": (),
             "sprint-planning": ("phase4/history.json", "phase4/ci-readiness.json", "phase4/committed-work.json"),
@@ -85,7 +85,7 @@ def evaluation(pack) -> dict[str, str]:
     common = ("agent.py", "cli.py", "config.py", "runtime.py", "backends.py", "guardrails.py", "locking.py",
               "stage_controls.py", "model_setup.py", "subscription_models.py", "recovery.py")
     domains = {
-        "task-breakdown": ("backlog", "contracts", "files", "speckit_parse", "textsim", "skills_taxonomy", "tools", "breakdown_workflow", "evidence", "planning_records", "paged_operation", "breakdown_state", "review_batches", "feature_documents"),
+        "task-breakdown": ("task_breakdown", "story_import", "backlog", "contracts", "files", "textsim", "skills_taxonomy"),
         "infra-pipeline": ("infra", "sandbox", "settings", "contracts", "files", "tools"),
         "sprint-planning": ("sprint", "sprint_model", "capacity", "calendars", "settings", "contracts", "files", "tools"),
         "work-allocation": ("allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),
@@ -203,8 +203,7 @@ def input_identity(root: Path, pack) -> dict:
 
 
 def _repair_inputs(values: dict, pack) -> dict:
-    return {**_inputs(values, pack), **{k: v for k, v in values.items()
-                                      if k.startswith((".specify/memory/", ".specify/templates/"))}}
+    return _inputs(values, pack)
 
 
 def _copy(source: Path, target: Path):

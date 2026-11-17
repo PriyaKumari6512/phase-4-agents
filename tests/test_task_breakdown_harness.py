@@ -1,4 +1,4 @@
-"""Task Breakdown capability/budget invariants without model service calls."""
+"""Task Breakdown's shared stage budget and recovery invariants, without model service calls."""
 import asyncio
 import json
 from types import SimpleNamespace
@@ -7,19 +7,16 @@ import pytest
 from langchain_core.messages import AIMessage
 from langchain.agents.middleware.types import ModelResponse
 
-from agent_engine import config, model_setup, backends
-from agent_engine.runtime import project_scope
+from agent_engine import config, model_setup
 from agent_engine.stage_controls import (
-    StageBudget, StageBudgetExceeded, StageBudgetMiddleware, StageBudgetCallback,
-    active_stage_budget, helper_scope, HelperScope, BreakdownHandoffMiddleware,
+    StageBudget, StageBudgetExceeded, StageBudgetMiddleware, StageBudgetCallback, active_stage_budget,
 )
 from test_model_escalation import engine, _script
 from test_phase4_pipeline import proj
 
 
 def budget(**overrides):
-    values = dict(max_calls=10, max_input_tokens=1000, max_output_tokens=1000,
-                  seconds=10, max_helpers=10, max_same_handoff=2)
+    values = dict(max_calls=10, max_input_tokens=1000, max_output_tokens=1000, seconds=10)
     return StageBudget(**(values | overrides))
 
 
@@ -110,146 +107,6 @@ def test_budget_does_not_affect_other_stages():
     asyncio.run(exercise())
 
 
-def test_breakdown_build_assigns_role_tools_and_fast_helper_summarizers(tmp_path, monkeypatch):
-    from agent_engine import agent
-    captured = {}
-    monkeypatch.setattr(backends, "OUTPUTS_DIR", tmp_path / "outputs")
-    monkeypatch.setattr(agent, "model_spec", lambda tier: "test:" + tier)
-    monkeypatch.setattr(agent, "resolve_model_with_retries", lambda spec: SimpleNamespace(spec=spec))
-    monkeypatch.setattr(agent, "summarization_middleware", lambda spec, model, backend: SimpleNamespace(model=model))
-    monkeypatch.setattr(agent.perf, "enabled", lambda: False)
-    def compile(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace()
-    monkeypatch.setattr(agent, "create_deep_agent", compile)
-    agent.build_agent(agent.load_pack("task-breakdown"))
-    helpers = {s["name"]: s for s in captured["subagents"]}
-    writer = helpers["speckit-feature"]
-    enricher = helpers["backlog-enricher"]
-    assert "speckit_script" in {t.name for t in writer["tools"]}
-    assert "backlog_build" not in {t.name for t in writer["tools"]}
-    assert {t.name for t in enricher["tools"]} <= {"source_context", "backlog_view", "backlog_find_similar", "backlog_update"}
-    for helper in (writer, enricher):
-        assert any(getattr(getattr(m, "model", None), "spec", None) == "test:fast" for m in helper["middleware"])
-
-
-def test_enricher_cannot_write_raw_files(tmp_path, monkeypatch):
-    monkeypatch.setattr(backends, "OUTPUTS_DIR", tmp_path)
-    with project_scope("p"):
-        token = helper_scope.set(HelperScope("backlog-enricher", "p", epic_id="E-001"))
-        try:
-            assert backends.build_backend().write("/outputs/p/specs/001-a/spec.md", "bad").error
-            assert backends.build_backend().write("/outputs/p/backlog/backlog.md", "bad").error
-        finally:
-            helper_scope.reset(token)
-
-
-def test_helper_scope_isolated_and_cross_feature_writes_denied(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
-    monkeypatch.setattr(backends, "OUTPUTS_DIR", tmp_path)
-    project = tmp_path / "p"
-    (project / "backlog").mkdir(parents=True)
-    (project / "backlog/features.json").write_text(json.dumps({"features": [
-        {"feature_dir": "specs/001-a"}, {"feature_dir": "specs/002-b"}]}))
-    async def exercise():
-        middleware = BreakdownHandoffMiddleware()
-        async def run(directory):
-            request = SimpleNamespace(tool=None, tool_call={"name": "task", "id": directory,
-                "args": {"subagent_type": "speckit-feature", "description": json.dumps({"project": "p", "feature_directory": directory})}})
-            async def handler(request):
-                backend = backends.build_backend()
-                await asyncio.sleep(.01)
-                assert helper_scope.get().feature_directory == directory
-                assert backend.write(f"/outputs/p/{directory}/spec.md", "own").error is None
-                other = "specs/002-b" if directory.endswith("a") else "specs/001-a"
-                assert backend.write(f"/outputs/p/{other}/bad.md", "bad").error
-                assert backend.write("/outputs/p/backlog/implementation-contract.md", "bad").error
-                return "ok"
-            return await middleware.awrap_tool_call(request, handler)
-        with project_scope("p"):
-            assert await asyncio.gather(run("specs/001-a"), run("specs/002-b")) == ["ok", "ok"]
-            assert helper_scope.get() is None
-    asyncio.run(exercise())
-
-
-def test_helper_barrier_released_on_failure_and_parent_writes_wait(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
-    monkeypatch.setattr(backends, "OUTPUTS_DIR", tmp_path)
-    (tmp_path / "p/backlog").mkdir(parents=True)
-    (tmp_path / "p/backlog/features.json").write_text('{"features":[{"feature_dir":"specs/001-a"}]}')
-    async def exercise():
-        shared = budget()
-        token = active_stage_budget.set(shared)
-        request = SimpleNamespace(tool=None, tool_call={"name": "task", "id": "t", "args": {
-            "subagent_type": "speckit-feature", "description": '{"project":"p","feature_directory":"specs/001-a"}'}})
-        async def helper(request):
-            assert shared.active_helpers == 1
-            with pytest.raises(ValueError, match="active"):
-                shared.check_parent_mutation()
-            scope_token = helper_scope.set(None)  # parent sees the same budget, no helper ownership
-            try:
-                assert backends.build_backend().write("/outputs/p/backlog/implementation-contract.md", "bad").error
-            finally:
-                helper_scope.reset(scope_token)
-            raise RuntimeError("helper failed")
-        try:
-            with project_scope("p"):
-                with pytest.raises(RuntimeError, match="helper failed"):
-                    await BreakdownHandoffMiddleware().awrap_tool_call(request, helper)
-                assert shared.active_helpers == 0 and helper_scope.get() is None
-                shared.check_parent_mutation()
-        finally:
-            active_stage_budget.reset(token)
-    asyncio.run(exercise())
-
-
-def test_closed_budget_blocks_backend_write_with_copied_context(tmp_path, monkeypatch):
-    monkeypatch.setattr(backends, "OUTPUTS_DIR", tmp_path)
-    shared = budget()
-    token = active_stage_budget.set(shared)
-    try:
-        with project_scope("p"):
-            backend = backends.build_backend()
-            shared.stop("execution closed")
-            with pytest.raises(StageBudgetExceeded, match="closed"):
-                backend.write("/outputs/p/late.md", "late")
-            assert not (tmp_path / "p/late.md").exists()
-    finally:
-        active_stage_budget.reset(token)
-
-
-@pytest.mark.parametrize("role,description", [
-    ("general-purpose", {}), ("speckit-feature", {"project": "other", "feature_directory": "specs/001-a"}),
-    ("speckit-feature", {"project": "p", "feature_directory": "specs/999-unknown"}),
-    ("speckit-feature", {"project": "p", "feature_directory": "specs/../outside"}),
-])
-def test_unscoped_and_unregistered_handoffs_refused(tmp_path, monkeypatch, role, description):
-    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
-    (tmp_path / "p/backlog").mkdir(parents=True)
-    (tmp_path / "p/backlog/features.json").write_text('{"features":[]}')
-    async def exercise():
-        request = SimpleNamespace(tool=None, tool_call={"name": "task", "id": "t",
-            "args": {"subagent_type": role, "description": json.dumps(description)}})
-        async def forbidden(request):
-            pytest.fail("invalid task was launched")
-        with project_scope("p"):
-            result = await BreakdownHandoffMiddleware().awrap_tool_call(request, forbidden)
-            assert "ERROR:" in result.content
-            assert helper_scope.get() is None
-    asyncio.run(exercise())
-
-
-def test_repeated_handoffs_and_total_helpers_are_bounded():
-    shared = budget(max_same_handoff=1)
-    shared.begin_helper('{"feature":"a"}')
-    with pytest.raises(StageBudgetExceeded, match="repeated"):
-        shared.begin_helper('{"feature":"a"}')
-    shared = budget(max_helpers=1)
-    shared.begin_helper("a")
-    with pytest.raises(StageBudgetExceeded):
-        shared.begin_helper("b")
-
-
 def test_verification_retry_preserves_business_request_history(engine, monkeypatch):
     from agent_engine import cli
     _script(monkeypatch, verdicts=[], fail_on={("judge", "strong")})
@@ -276,11 +133,10 @@ def test_cli_budget_exhaustion_is_partial_and_keeps_artifacts(proj, monkeypatch,
         (proj / "retained-partial.md").write_text("completed work")
         callback.on_chat_model_start({}, [])
     monkeypatch.setattr(cli, "_stream", stream)
-    from agent_engine.phase4 import breakdown_workflow as workflow
+    from agent_engine.phase4 import task_breakdown as workflow
     async def generate(project, request, callbacks):
         return await stream(None, request, callbacks, "task-breakdown-write")
     monkeypatch.setattr(workflow, "generate", generate)
-    monkeypatch.setattr(workflow, "generation_supported", lambda project: True)
     assert asyncio.run(cli._run("Build backlog", "task-breakdown", proj.name)) == 1
     report = json.loads((proj / "report.json").read_text())
     assert report["status"] == "partial"

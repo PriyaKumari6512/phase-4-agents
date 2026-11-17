@@ -1,6 +1,7 @@
 """`agent-engine phase4 ...` commands (no model calls):
 
   init           copy an example project's inputs (prd.md, architecture.md, phase4/*.json) into outputs/<project>/
+  import-stories read the approved stories from Jira (read-only) into phase4/stories.json
   publish        push a gate-approved file to the tracker / GitHub (backlog, sprint, assignments, infra)
   mine-profiles  skill and code-ownership evidence from a git clone -> phase4/skill-profiles.json
   schemas        write the JSON Schemas of every Phase 4 file contract
@@ -20,7 +21,8 @@ from agent_engine.phase4 import contracts, files
 EXAMPLES_DIR = config.ASSETS_ROOT / "examples" / "phase4"
 SCHEMAS = {
     "project.schema.json": contracts.ProjectSettings, "history.schema.json": contracts.History,
-    "features.schema.json": contracts.FeatureList, "backlog.schema.json": contracts.Backlog,
+    "stories.schema.json": contracts.StorySnapshot,
+    "backlog.schema.json": contracts.Backlog,
     "sprint-plan.schema.json": contracts.SprintPlan, "assignments.schema.json": contracts.AssignmentPlan,
     "infra-intent.schema.json": contracts.InfraIntent, "infra-manifest.schema.json": contracts.InfraManifest,
 }
@@ -33,6 +35,8 @@ def add_parser(sub) -> None:
     i.add_argument("--project-name", required=True)
     i.add_argument("--example", default="taskflow", help=f"Folder under {EXAMPLES_DIR}.")
     i.add_argument("--force", action="store_true", help="Overwrite files that already exist.")
+    st = s.add_parser("import-stories", help="Read approved stories from Jira (read-only) into phase4/stories.json.")
+    st.add_argument("--project-name", required=True)
     p = s.add_parser("publish", help="Publish a gate-approved file (refuses unless its gate is approved).")
     p.add_argument("what", choices=["backlog", "sprint", "assignments", "infra"])
     p.add_argument("--project-name", required=True)
@@ -83,6 +87,12 @@ def run(args: argparse.Namespace) -> int:
             return 0
         if args.phase4_command == "init":
             return _init(args.project_name, args.example, args.force)
+        if args.phase4_command == "import-stories":
+            from agent_engine.phase4.story_import import import_stories
+            from agent_engine.runtime import project_lock
+            with project_lock(files.project_dir(args.project_name)):
+                print(json.dumps(import_stories(args.project_name), indent=2))
+            return 0
         if args.phase4_command == "publish":
             from agent_engine import perf
             from agent_engine.phase4.publish import PUBLISHERS

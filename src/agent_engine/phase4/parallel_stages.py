@@ -14,7 +14,9 @@ from agent_engine import config, perf, recovery
 from agent_engine.history import file_digest
 from agent_engine.runtime import atomic_json, project_lock
 
-OWNED = {"task-breakdown": {"backlog", "specs", ".specify"}, "infra-pipeline": {"infra"}}
+OWNED = {"task-breakdown": {"backlog"}, "infra-pipeline": {"infra"}}
+RETAINED = ".engine-task-breakdown"   # Task Breakdown's retained per-story results (task_breakdown.py)
+_RETAINED_PATH = re.compile(r"(?:(?:stories|cross|reviews|repairs)/[0-9a-f]{64}|current)\.json")
 POINTER = ".engine-pending-merge.json"
 PLAN = "merge-plan.json"
 
@@ -62,30 +64,6 @@ def _session(root: Path, evidence: Path) -> Path:
     return evidence
 
 
-def _feature_checkpoint(source: Path, rel: str) -> None:
-    parts = Path(rel).parts
-    if len(parts) != 2 or not re.fullmatch(r"[0-9]{3}-[a-z0-9][a-z0-9-]*\.json", parts[1]):
-        raise ValueError(f"unexpected feature checkpoint path: {rel}")
-    directory = "specs/" + parts[1][:-5]
-    features = _read(source / "backlog/features.json").get("features", [])
-    if directory not in {f.get("feature_dir") for f in features}:
-        raise ValueError(f"unregistered feature checkpoint: {rel}")
-    data = _read(source / rel)
-    outputs = data.get("outputs", {})
-    if (data.get("version") != 1 or not isinstance(data.get("inputs"), dict) or not isinstance(outputs, dict)
-            or not {"spec.md", "tasks.md", "plan.md"} <= outputs.keys()):
-        raise ValueError(f"invalid feature checkpoint: {rel}")
-    base = source / directory
-    actual = {}
-    for p in base.rglob("*"):
-        if p.is_symlink():
-            raise ValueError("feature checkpoint contains symlinks")
-        if p.is_file() and not p.name.startswith(".engine-"):
-            actual[p.relative_to(base).as_posix()] = file_digest(p)
-    if actual != outputs:
-        raise ValueError(f"feature checkpoint output hashes do not match: {rel}")
-
-
 def _sources(evidence: Path, root: Path):
     result = {agent: evidence / agent / "outputs" / root.name for agent in OWNED}
     for source in result.values():
@@ -129,7 +107,7 @@ def _collect(root: Path, evidence: Path, plan: dict):
             parts = Path(rel).parts
             if plan.get("legacy"):
                 sibling = set().union(*OWNED.values()) - OWNED[agent]
-                if parts[0] in sibling or (agent == "infra-pipeline" and parts[0] in {".engine-feature-jobs", ".engine-breakdown"}):
+                if parts[0] in sibling or (agent == "infra-pipeline" and parts[0] == RETAINED):
                     continue  # never copy a sibling's artifacts from an older snapshot
                 if parts[0] in {"runs", "logs"} and rel in before:
                     continue  # legacy sessions cannot prove ownership of prior history
@@ -137,15 +115,9 @@ def _collect(root: Path, evidence: Path, plan: dict):
                     continue
             allowed = (parts[0] in OWNED[agent] or rel == f"requests/{agent}.md"
                        or (parts[0] == "runs" and rel not in before) or parts[0] == "logs")
-            if parts[0] == ".engine-breakdown" and agent == "task-breakdown":
-                if len(parts) != 3 or parts[1] not in {"plans", "generation", "reviews", "findings", "repairs", "operations", "dependencies"} or not re.fullmatch(r"(?:[0-9a-f]{64}|latest)\.json", parts[2]):
-                    raise ValueError(f"unexpected workflow receipt path: {rel}")
-                allowed = True
-            if parts[0] == ".engine-feature-jobs" and agent == "task-breakdown":
-                if len(parts) != 2 or not re.fullmatch(r"[0-9]{3}-[a-z0-9][a-z0-9-]*\.json", parts[1]):
-                    raise ValueError(f"unexpected feature checkpoint path: {rel}")
-                if rel in after:
-                    _feature_checkpoint(source, rel)
+            if parts[0] == RETAINED and agent == "task-breakdown":
+                if not _RETAINED_PATH.fullmatch("/".join(parts[1:])):
+                    raise ValueError(f"unexpected task-breakdown state path: {rel}")
                 allowed = True
             if rel == "report.json":
                 changes[rel] = (source / rel) if rel in after else None
@@ -315,7 +287,7 @@ def recover_session(root: Path, session: Path) -> dict:
                 requests[agent] = report["request_text"]
                 for rel in set(before) | set(after):
                     parts = Path(rel).parts
-                    generated = parts[0] in OWNED[agent] or (agent == "task-breakdown" and parts[0] in {".engine-feature-jobs", ".engine-breakdown"})
+                    generated = parts[0] in OWNED[agent] or (agent == "task-breakdown" and parts[0] == RETAINED)
                     bookkeeping = parts[0] in {"runs", "logs"} or rel == "report.json"
                     if generated:
                         if rel in before and before.get(rel) != after.get(rel):
@@ -325,7 +297,7 @@ def recover_session(root: Path, session: Path) -> dict:
                         new = (source / rel).read_text(encoding="utf-8") if rel in after else ""
                         if not new.startswith(old):
                             raise ValueError("request history changed since the retained run")
-                    elif (parts[0] in set().union(*OWNED.values()) or parts[0] in {".engine-feature-jobs", ".engine-breakdown"}
+                    elif (parts[0] in set().union(*OWNED.values()) or parts[0] == RETAINED
                           or (parts[0] == "requests" and rel != f"requests/{agent}.md")):
                         continue  # sibling outputs are not inputs to this independent stage
                     elif not bookkeeping and before.get(rel) != after.get(rel):

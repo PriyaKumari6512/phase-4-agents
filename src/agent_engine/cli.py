@@ -410,25 +410,24 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                     protected = set(pack.input_files)
                     if pack.name in ("task-breakdown", "sprint-planning", "work-allocation", "infra-pipeline"):
                         protected.update(("phase4/history.json", "phase4/skill-profiles.json", "phase4/agent-outcomes.json", "phase4/ci-readiness.json", "phase4/committed-work.json"))
-                        managed_outputs.set(frozenset(("backlog/backlog.json", "backlog/features.json", "backlog/enrichments.json",
+                        managed_outputs.set(frozenset(("backlog/backlog.json",
                             "sprint/sprint-plan.json", "sprint/solver-diagnostics.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json")))
                     active_inputs.set(frozenset(protected))
                     if pack.name == "task-breakdown":
-                        from agent_engine.phase4 import breakdown_workflow as workflow
+                        # Approved stories -> tasks, one structured call per story (phase4/task_breakdown.py).
+                        from agent_engine.phase4 import task_breakdown as workflow
                         if kind == "verify":
                             operation = workflow.review(project_name, pass_callbacks)
-                        elif kind == "fix" and workflow.generation_supported(project_name):
+                        elif kind == "fix":
                             operation = workflow.repair(project_name, (report.get("verdict", {}).get("gaps") or (recovery_record or {}).get("gaps", [])), pass_callbacks)
-                        elif kind == "write" and workflow.generation_supported(project_name):
-                            operation = workflow.generate(project_name, request, pass_callbacks)
                         else:
-                            operation = None  # legacy/custom-template writer retains its tools
+                            operation = workflow.generate(project_name, request, pass_callbacks)
                         state = None
                         if operation is not None:
                             budget = active_stage_budget.get()
                             timeout = float(os.environ.get("AGENT_ENGINE_PASS_TIMEOUT_SECONDS", "1800"))
                             try:
-                                with workflow.operation_model(p, level[p.name], request):
+                                with workflow.operation_model(p, level[p.name]):
                                     state = await asyncio.wait_for(operation, timeout=min(timeout, budget.remaining()) if budget else timeout)
                             except asyncio.TimeoutError as exc:
                                 from agent_engine.stage_controls import StageBudgetExceeded

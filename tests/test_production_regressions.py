@@ -21,14 +21,12 @@ from agent_engine.phase4 import allocation, backlog, files, infra, publish, sand
 from agent_engine.phase4 import alloc_solver as alloc
 from agent_engine.phase4.contracts import Backlog, ProjectSettings, SprintPlan, CheckResult
 from agent_engine.phase4.sprint_model import StoryIn, SprintIn, DeadlineIn, Relaxation, solve as packing
-from test_phase4_pipeline import proj, P, AS_OF, _features, _enrich, _intent, approve, mock_passed_checks, seed_ci_evidence
+from test_phase4_pipeline import proj, P, AS_OF, _intent, approve, mock_passed_checks, seed_ci_evidence
+from phase4_helpers import build_story_backlog
 
 
 def prepared():
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    _enrich(P)
-    backlog.validate(P)
+    build_story_backlog(files.project_dir(P))
     b = files.read_json(P, files.BACKLOG, Backlog)
     return b, {s.item_id: 5 for s in b.stories()}
 
@@ -68,34 +66,10 @@ def test_bad_settings_are_rejected_before_solver(proj, patch):
         ProjectSettings.model_validate(value)
 
 
-def test_invalid_backlog_patch_is_atomic_and_changed_specs_invalidate_enrichment(proj):
-    b, _ = prepared()
-    sid = b.stories()[0].item_id
-    before = files.read_json(P, files.BACKLOG)["items"]
-    result = json.loads(backlog.update(P, [{"item_id": sid, "description_md": "must not persist", "type": "invalid"}]))
-    assert result["errors"] and result["applied"] == 0
-    assert files.read_json(P, files.BACKLOG)["items"] == before
-    spec = proj / "specs/001-bookmark-management/spec.md"
-    spec.write_text(spec.read_text() + "\nChanged acceptance detail, titles unchanged.\n")
-    result = json.loads(backlog.build(P))
-    assert sid in result["enrichments_dropped_changed_items"]
-
-
-def test_split_child_acceptance_criteria_survive_rebuild(proj):
-    b, _ = prepared()
-    task = next(i for i in b.items if i.level == "task")
-    assert not json.loads(backlog.update(P, [{"item_id": task.item_id, "split_into": [
-        {"title": "first", "hours": 1}, {"title": "second", "hours": 1}]}]))["errors"]
-    child = task.item_id + "a"
-    assert not json.loads(backlog.update(P, [{"item_id": child, "acceptance_criteria": ["WHEN saved THE SYSTEM SHALL retain criteria"]}]))["errors"]
-    backlog.build(P)
-    assert files.read_json(P, files.BACKLOG, Backlog).by_id()[child].acceptance_criteria
-
-
 def test_scoped_backlog_view_is_paginated_and_read_only(proj):
     prepared()
     before = files.path(P, files.BACKLOG).read_bytes()
-    page = json.loads(tools.backlog_view.invoke({"project": P, "epic_id": "E-001", "limit": 2}))
+    page = json.loads(tools.backlog_view.invoke({"project": P, "epic_id": "BM-1", "limit": 2}))
     assert page["next_offset"] == 2 and len(page["items"]) == 2
     assert page["total"] > 2 and files.path(P, files.BACKLOG).read_bytes() == before
 
@@ -118,6 +92,16 @@ def test_recorded_clinic_capacity_option_passes_its_own_checker(tmp_path, monkey
         target = tmp_path / "clinic-test-2" / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(root / rel, target)
+    # The recording predates the story-based backlog: drop the retired spec-kit fields Sprint Planning never reads.
+    recorded = json.loads((tmp_path / "clinic-test-2" / files.BACKLOG).read_text(encoding="utf-8"))
+    for item in recorded["items"]:
+        item.pop("speckit_phase", None)
+        item.pop("speckit_ref", None)
+        for d in item["dependencies"]:
+            d["origin"] = "llm" if d["origin"] == "llm" else "human"
+        for r in item["source_refs"]:
+            r["source"] = "story" if r["source"] == "speckit" else r["source"]
+    (tmp_path / "clinic-test-2" / files.BACKLOG).write_text(json.dumps(recorded), encoding="utf-8")
     monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
     old = files.read_json("clinic-test-2", files.SPRINT_PLAN, SprintPlan)
     result = json.loads(sprint.solve("clinic-test-2", old.business_values, relax=["capacity:x1.3"], as_of="2026-11-16", time_limit_s=8))

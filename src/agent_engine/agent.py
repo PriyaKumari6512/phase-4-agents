@@ -74,12 +74,14 @@ _SUBAGENT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 REQUEST_HISTORIES = ("project", "agent")
 
 
-MODEL_TIERS = ("strong", "fast")
+MODEL_TIERS = ("strong", "fast", "frontier")
 
 
 def model_spec(tier: str) -> str:
     """The provider:model string a tier resolves to right now (.env)."""
     tiers = resolve_model_tiers()
+    if tier == "frontier":
+        return tiers.frontier or tiers.strong
     return tiers.strong if tier == "strong" else tiers.fast
 
 
@@ -149,7 +151,7 @@ def load_pack(name: str) -> AgentPack:
     model = data.get("model", "strong")
     models = [model] if isinstance(model, str) else model
     if not isinstance(models, list) or not models or any(m not in MODEL_TIERS for m in models):
-        problems.append(f"model must be 'strong', 'fast', or a list of them like [\"fast\", \"strong\"], got {model!r}")
+        problems.append(f"model must be 'strong', 'fast', 'frontier', or an escalation list like [\"strong\", \"frontier\"], got {model!r}")
     tools = data.get("tools", [])
     problems += [f"unknown tool {t!r} (registered: {', '.join(TOOLS) or 'none'})" for t in tools if t not in TOOLS]
     filesystem = data.get("filesystem")
@@ -279,10 +281,9 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
     with perf.span("model_setup", "summarization_middleware"):   # includes the model-profile lookups
         summarizer = summarization_middleware(spec, fast_model, backend)
     middleware = [*file_tools(), summarizer, *safety(), HelperLimitMiddleware()]
-    breakdown = pack.name in ("task-breakdown", "task-breakdown/validator")
-    if breakdown:
-        from agent_engine.stage_controls import StageBudgetMiddleware, BreakdownHandoffMiddleware
-        middleware += [StageBudgetMiddleware(), BreakdownHandoffMiddleware()]
+    if pack.name in ("task-breakdown", "task-breakdown/validator"):
+        from agent_engine.stage_controls import StageBudgetMiddleware
+        middleware.append(StageBudgetMiddleware())
     # deepagents' general-purpose helper (the `task` tool) only inherits middleware
     # that replaces one of its default slots, so it would get write tools without
     # the guard or the lock. Declaring it here hands it the same file tools and safety.
@@ -299,16 +300,6 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
                 entry["model"] = resolve_model_with_retries(model_spec(sub["model"]))
         if skill_sources:
             entry["skills"] = skill_sources
-        if breakdown:
-            # Explicit narrow capabilities and fast compaction for each role.
-            # Model/schema descriptions are repeated on every helper model turn.
-            allowed = ({"speckit_script", "speckit_check_feature", "source_context", "speckit_write_feature",
-                        "speckit_feature_status", "speckit_checkpoint_feature"}
-                       if sub_name == "speckit-feature" else
-                       {"backlog_view", "backlog_find_similar", "backlog_update", "source_context"})
-            entry["tools"] = [tool for tool in tools if tool.name in allowed]
-            entry["middleware"] += [summarization_middleware(model_spec(sub["model"]) if sub["model"] else spec,
-                                                            fast_model, backend), StageBudgetMiddleware()]
         named.append(entry)
 
     if perf.enabled():

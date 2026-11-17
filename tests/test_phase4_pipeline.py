@@ -1,7 +1,5 @@
-"""Phase 4 tools end to end, without a model: the test plays the agents' judgement (feature split, estimates,
-business values, AI verdicts, intent) and checks the deterministic parts, the gates and publishing.
-
-The spec-kit files in tests/fixtures/phase4/bookmarks/specs/ are real spec-kit 1.3.0 output (one feature).
+"""Phase 4 tools end to end, without a model: the test plays the agents' judgement (the task breakdown of the
+approved stories, business values, AI verdicts, intent) and checks the deterministic parts, the gates and publishing.
 """
 
 import json
@@ -11,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from agent_engine import config, gates
-from agent_engine.phase4 import allocation, backlog, files, infra, publish, speckit, sprint
+from agent_engine.phase4 import allocation, backlog, files, infra, publish, sprint
 from agent_engine.phase4.contracts import AssignmentPlan, Backlog, SprintPlan
 from agent_engine.phase4.contracts import CheckResult
 
@@ -52,6 +50,8 @@ def proj(tmp_path, monkeypatch):
     (root / "phase4").mkdir()
     for name in ("project.json", "history.json"):
         shutil.copy(EXAMPLE / "phase4" / name, root / "phase4" / name)
+    from phase4_helpers import make_design_ready
+    make_design_ready(root)
     return root
 
 
@@ -59,95 +59,34 @@ def approve(root: Path, gate: str) -> None:
     gates.record_decision(root, gates.load_gates()[gate], "approved", PO, DEV)
 
 
-def _features():
-    return [{"feature_key": "F01", "feature_dir": "specs/001-bookmark-management", "title": "Bookmark management",
-             "summary": "Save, list by tag and delete bookmarks.", "requirement_ids": ["FR-001", "FR-002", "FR-003",
-             "US-1", "US-2", "US-3"], "component_ids": ["ARCH-001", "ARCH-002"], "repo": "acme/taskflow-api"}]
+def built(project_root: Path) -> None:
+    """The approved stories and their task breakdown (what Task Breakdown produces), without a model."""
+    from phase4_helpers import build_story_backlog
+    build_story_backlog(project_root)
 
 
-def _enrich(project: str) -> None:
-    """What the backlog-enricher subagent does: estimates, task ACs, skills, AI proposals, PRD links."""
-    b = files.read_json(project, files.BACKLOG, Backlog)
-    links = {"S-001-US1": ["US-1"], "S-001-US2": ["US-2"], "S-001-US3": ["US-3"]}
-    updates = []
-    for s in b.stories():
-        sim = json.loads(backlog.find_similar(project, [s.item_id]))["stories"][s.item_id]
-        refs = [r["key"] for r in sim["references"][:2]]
-        updates.append({"item_id": s.item_id, "source_ids": links.get(s.item_id, []),
-                        "estimate": {"story_points": 3, "complexity": 4, "confidence": "medium",
-                                     "method": "analogy" if sim["analogy_valid"] else "llm",
-                                     "reference_ticket_ids": refs, "rationale": "similar scope to references"}})
-        if s.speckit_phase == "user_story":
-            updates[-1]["user_story"] = {"as_a": "signed-in reader", "i_want": f"to {s.title.lower()}",
-                                         "so_that": "I find saved pages again"}
-        for t in b.tasks_of(s.item_id):
-            updates.append({"item_id": t.item_id, "acceptance_criteria": [f"WHEN {t.item_id} is done THE SYSTEM SHALL pass its tests"],
-                            "skills_required": t.skills_required or ["backend-python"],
-                            "ai_eligible": False, "ai_eligibility_reason": "kept with humans in this test"})
-    res = json.loads(backlog.update(project, updates))
-    assert res["errors"] == [], res["errors"]
-
-
-# ============================================================================ spec-kit stand-in
-def test_speckit_scripts_match_speckit_json(proj):
-    root_info = json.loads(speckit.init(P))
-    assert root_info["REPO_ROOT"] == f"/outputs/{P}/" and "001-bookmark-management" in root_info["EXISTING_FEATURE_DIRS"]
-    assert "Definition of Done" in (proj / ".specify/memory/constitution.md").read_text(encoding="utf-8")
-    t = json.loads(speckit.run_script(P, "resolve-template", "spec-template --json"))
-    assert t["TEMPLATE_NAME"] == "spec-template" and "User Scenarios" in t["TEMPLATE_CONTENT"]
-    # a new feature: plan template copied once, then prerequisites resolve
-    (proj / "specs/002-tags").mkdir()
-    (proj / "specs/002-tags/spec.md").write_text("# Feature Specification: Tags\n", encoding="utf-8")
-    out = json.loads(speckit.run_script(P, ".specify/scripts/bash/setup-plan.sh", "--json", "specs/002-tags"))
-    assert out["IMPL_PLAN"] == f"/outputs/{P}/specs/002-tags/plan.md" and (proj / "specs/002-tags/plan.md").is_file()
-    pre = json.loads(speckit.run_script(P, "check-prerequisites", "--json --require-spec", "specs/002-tags"))
-    assert pre["FEATURE_DIR"].endswith("specs/002-tags") and pre["AVAILABLE_DOCS"] == []
-    with pytest.raises(files.ProjectError, match="tasks.md not found"):
-        speckit.run_script(P, "check-prerequisites", "--json --require-tasks", "specs/002-tags")
-    with pytest.raises(files.ProjectError, match="Feature directory not found"):
-        speckit.run_script(P, "setup-plan", "--json", "../etc")
-
-
-# ============================================================================ the four agents' tools + gates
-def test_backlog_is_built_validated_and_enrichments_survive_a_rebuild(proj):
-    res = json.loads(backlog.set_features(P, _features()))
-    assert res["not_yet_covered"] == []
-    built = json.loads(backlog.build(P))
-    assert built["epics"] == 1 and built["stories"] >= 4 and built["tasks"] == 39
-    _, issues = backlog.validate(P)
-    assert {i.rule for i in issues if i.severity == "blocking"} >= {"estimates", "coverage"}
-    _enrich(P)
+def test_story_backlog_is_validated_with_coverage_waves_and_critical_path(proj):
+    built(proj)
     report = json.loads(backlog.validate_report(P))
-    assert report["ready_for_review"], report["blocking"]
+    assert report["ready_for_review"] and report["stories"] == 3 and report["tasks"] == 12
     b = files.read_json(P, files.BACKLOG, Backlog)
-    story = b.by_id()["S-001-US1"]
-    hours = sum(t.estimate.hours for t in b.tasks_of(story.item_id))
-    assert abs(hours - 3 * 6.0) < 1.0                      # 3 SP x 6 h/SP rolled down to the tasks
-    assert b.coverage["FR-001"] and b.story_waves and b.critical_path
+    assert b.coverage["FR-001"] == ["BM-2"] and b.critical_path == ["BM-2", "BM-3"]
+    assert [d.on_id for d in b.by_id()["BM-3"].dependencies] == ["BM-2"]
     assert (proj / "backlog/backlog.md").read_text(encoding="utf-8").startswith("# Backlog v")
-    # a rebuild (spec unchanged) keeps every enrichment
-    rebuilt = json.loads(backlog.build(P))
-    assert rebuilt["enrichments_dropped_changed_items"] == [] and rebuilt["stories_without_estimate"] == []
-    assert json.loads(backlog.validate_report(P))["ready_for_review"]
 
 
-def test_backlog_update_rejects_bad_values_and_splits_tasks(proj):
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    res = json.loads(backlog.update(P, [
-        {"item_id": "S-001-US1", "estimate": {"story_points": 4, "complexity": 3, "confidence": "low", "method": "llm"}},
-        {"item_id": "001-T999", "type": "ui"},
-        {"item_id": "001-T010", "split_into": [{"title": "API part", "hours": 2}, {"title": "UI part", "hours": 2}]}]))
-    assert any("story_points must be one of" in e for e in res["errors"]) and any("no such item" in e for e in res["errors"])
-    ids = files.read_json(P, files.BACKLOG, Backlog).by_id()
-    assert "001-T010a" in ids and "001-T010b" in ids and "001-T010" not in ids
+def test_a_legacy_backlog_must_be_rebuilt(proj):
+    built(proj)
+    doc = json.loads((proj / files.BACKLOG).read_text(encoding="utf-8"))
+    doc["sources"] = {"prd.md": "x"}
+    (proj / files.BACKLOG).write_text(json.dumps(doc), encoding="utf-8")
+    _, issues = backlog.validate(P)
+    assert [i.rule for i in issues] == ["legacy_backlog"]
 
 
 def test_full_phase4_flow_through_gates_and_publishing(proj):
     # ---- Agent 1
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    _enrich(P)
+    built(proj)
     assert json.loads(backlog.validate_report(P))["ready_for_review"]
     with pytest.raises(publish.PublishError, match="P4-G1 is not approved"):
         publish.publish_backlog(P)
@@ -273,15 +212,11 @@ def test_infra_intent_render_validate_publish_and_ci_readiness(proj, monkeypatch
 
 
 def test_ai_agents_only_get_eligible_tasks_once_ci_is_operational(proj, monkeypatch):
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    _enrich(P)
+    built(proj)
     b = files.read_json(P, files.BACKLOG, Backlog)
     small = [t for t in b.items if t.level == "task" and t.file_paths and len(t.file_paths) <= 4
+             and t.estimate.hours <= 4
              and not any(w in f"{t.title} {' '.join(t.file_paths)}".lower() for w in allocation.RISKY)][:3]
-    backlog.update(P, [{"item_id": t.item_id, "estimate": {"hours": 2, "complexity": 2, "confidence": "medium",
-                                                           "method": "llm"}} for t in small])
-    backlog.validate(P)
     approve(proj, "P4-G1")
     vals = {s.item_id: 5 for s in b.stories()}
     sprint.solve(P, vals, as_of=AS_OF)

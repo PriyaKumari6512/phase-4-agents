@@ -114,7 +114,7 @@ def adapter_for(provider: str, local_root: Path):
     raise DispatchError(f"unknown provider {provider}")
 
 
-def brief_for(task, story, spec_dir: str | None, tracker_key: str | None) -> str:
+def brief_for(task, story, tracker_key: str | None) -> str:
     """Structured brief written from the task - never free-form."""
     lines = [f"# Task {task.item_id}: {task.title}", ""]
     if tracker_key:
@@ -126,8 +126,6 @@ def brief_for(task, story, spec_dir: str | None, tracker_key: str | None) -> str
     if story:
         lines += ["", f"## Story context ({story.item_id})", story.title]
         lines += [f"- {a.text}" for a in story.acceptance_criteria]
-    if spec_dir:
-        lines += ["", f"Specification: `{spec_dir}` (spec.md, plan.md, tasks.md) in this repository."]
     lines += ["", "## Rules",
               "- Add or update tests for this change.",
               "- Touch only the files and areas listed above.",
@@ -138,5 +136,5 @@ def brief_for(task, story, spec_dir: str | None, tracker_key: str | None) -> str
 
 
 def task_id_in(text: str) -> str | None:
-    m = re.search(r"\[(\d{3}-T\d{3,4}[a-z]?)\]", text or "")
+    m = re.search(r"\[([A-Z][A-Z0-9]*-\d+-T\d{2,})\]", text or "")   # e.g. [GR-9-T01]
     return m.group(1) if m else None

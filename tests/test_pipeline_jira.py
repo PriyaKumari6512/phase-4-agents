@@ -16,7 +16,8 @@ from agent_engine.phase4.contracts import Backlog, ProjectSettings, TrackerConfi
 from agent_engine.phase4.settings import get_pipeline_settings, get_jira_options
 from agent_engine.phase4.trackers.base import ExtObj, HttpClient, TrackerError
 from agent_engine.phase4.trackers.jira import JiraTracker
-from test_phase4_pipeline import proj, P, _features, _enrich, approve, AS_OF
+from test_phase4_pipeline import proj, P, approve, AS_OF
+from phase4_helpers import build_story_backlog
 from test_phase4_orchestrator import root, FakeAgents, OUTPUTS
 
 
@@ -40,9 +41,7 @@ def jira_env(monkeypatch):
 
 def built_backlog():
     from agent_engine.phase4 import backlog
-    backlog.set_features(P, _features())
-    backlog.build(P)
-    _enrich(P)
+    build_story_backlog(files.project_dir(P))
 
 
 def test_env_overrides_are_effective_without_changing_input_bytes(proj, monkeypatch):
@@ -307,7 +306,7 @@ def test_partial_publish_retains_completed_ids_and_rejected_create_can_resume(pr
     built_backlog()
     approve(proj, "P4-G1")
     tracker = ConcurrentTracker(P)
-    tracker.fail_id = "001-T"
+    tracker.fail_id = "BM-2-T"
     monkeypatch.setattr(publish, "_tracker_for", lambda *args: tracker)
     with pytest.raises(TrackerError, match="rejected"):
         publish.publish_backlog(P)

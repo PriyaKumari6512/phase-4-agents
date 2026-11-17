@@ -159,6 +159,14 @@ class JiraTracker(TrackerAdapter):
         if body:
             self.http.put(f"/rest/api/3/issue/{external_id}", json={"fields": body})
 
+    def set_field_if_empty(self, issue_id: str, field: str, value) -> bool:
+        """Write one field only while it is still empty in Jira (a human may have set it since the import)."""
+        current = self.http.get(f"/rest/api/3/issue/{issue_id}", params={"fields": field}).json()["fields"].get(field)
+        if current not in (None, "", []):
+            return False
+        self.http.put(f"/rest/api/3/issue/{issue_id}", json={"fields": {field: value}})
+        return True
+
     def get_fields(self, external_id: str) -> dict:
         names = ["summary", "description", "timetracking", "labels", "parent"] + ([self.estimation_field] if self.estimation_field else [])
         r = self.http.get(f"/rest/api/3/issue/{external_id}", params={"fields": ",".join(names)}).json()["fields"]

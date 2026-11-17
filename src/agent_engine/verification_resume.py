@@ -57,11 +57,12 @@ def _breakdown_snapshot(root: Path) -> dict[str, str]:
     even though feature-generation reuse can ignore unrelated scheduling fields.
     """
     result = {}
-    names = {"prd.md", "architecture.md", "phase4/project.json", "phase4/history.json",
-             "requests/task-breakdown.md", "gates/P4-G1.approved.json"}
+    names = {"phase4/stories.json", "prd.md", "architecture.md", "phase4/project.json", "phase4/history.json",
+             "requests/task-breakdown.md", "gates/G3A.approved.json", "gates/G3B.approved.json",
+             "gates/P4-G1.approved.json"}
     for p in sorted(root.rglob("*")):
         rel = p.relative_to(root)
-        if rel.as_posix() not in names and rel.parts[0] not in {"specs", "backlog", ".specify"}:
+        if rel.as_posix() not in names and rel.parts[0] != "backlog":
             continue
         if p.is_symlink():
             raise ValueError(f"cannot checkpoint symlink: {rel}")
@@ -70,13 +71,12 @@ def _breakdown_snapshot(root: Path) -> dict[str, str]:
     base = Path(__file__).parent
     common = ("agent.py", "cli.py", "config.py", "runtime.py", "backends.py", "guardrails.py", "locking.py",
               "stage_controls.py", "model_setup.py", "subscription_models.py", "verification_resume.py")
-    domain = ("backlog.py", "contracts.py", "files.py", "tools.py", "speckit.py", "speckit_parse.py",
-              "feature_documents.py", "feature_jobs.py", "textsim.py", "skills_taxonomy.py")
+    domain = ("task_breakdown.py", "story_import.py", "backlog.py", "contracts.py", "files.py", "textsim.py",
+              "skills_taxonomy.py")
     for rel in (*common, *("phase4/" + n for n in domain)):
         p = base / rel
         result["code:" + rel] = file_digest(p) if p.is_file() else "missing"
     for label, directory in (("pack", Path(config.AGENTS_DIR) / "task-breakdown"),
-                             ("assets", base / "phase4/speckit_assets"),
                              ("taxonomy", base / "phase4/data")):
         for p in sorted(directory.rglob("*")):
             if p.is_file():

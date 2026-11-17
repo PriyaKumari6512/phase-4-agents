@@ -16,8 +16,9 @@ Dependent stages still wait for their required gates; unresolved findings and hu
   awaiting-decision or verified boundary, with input/artifact identity, original request and gaps.
 - `.engine-recovery/artifacts/`: byte-checked output snapshots. Unchanged revisions reuse a snapshot.
 - `.engine-recovery/interrupted/`: edits retained from an interrupted repair before restoration/retry.
-- Existing `.engine-feature-jobs/` records: completed Task Breakdown feature work. Parallel merge validates
-  registered checkpoint filenames/output hashes and permits them only from Task Breakdown.
+- `.engine-task-breakdown/`: Task Breakdown's retained per-story results, cross-story pass, reviews and repair
+  attempts, keyed by the exact digest of what produced them. Parallel merge accepts only these paths, and only
+  from Task Breakdown.
 - `.engine-pending-merge.json`: points to a retained parallel session until orchestration records its outcomes.
 - `logs/parallel/<session>/merge-plan.json`: child requests, original file hashes, merge intent and commit state.
   Each child has its own durable result/inventory. Child roots and a before-merge copy remain available.

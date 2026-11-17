@@ -170,6 +170,83 @@ class History(Strict):
     sprints: list[HistorySprint] = []
 
 
+# ============================================================================ approved stories (input)
+class ImportedCriterion(Strict):
+    ac_id: str                 # as written in the tracker (US-001.AC1), or <KEY>.AC<n> when unnumbered
+    text: str
+
+
+class ImportedStory(Strict):
+    """One approved story exactly as the tracker holds it. Task Breakdown splits it; it never rewrites it."""
+
+    key: str                                   # tracker key, e.g. GR-9
+    issue_id: str
+    summary: str
+    statement: str = ""                        # "As ..., I want ... so that ..."
+    acceptance_criteria: list[ImportedCriterion] = []
+    notes: str = ""
+    traceability: str = ""
+    description_md: str = ""                   # the whole description as text, for anything not parsed above
+    labels: list[str] = []
+    requirement_ids: list[str] = []            # US-/FR-/NFR-/DS- ids from labels and traceability
+    persona_ids: list[str] = []
+    moscow: Literal["must", "should", "could", "wont"] | None = None
+    priority: str | None = None                # tracker priority name, kept as-is
+    fix_versions: list[str] = []
+    components: list[str] = []
+    epic_key: str | None = None
+    story_points: float | None = None          # set upstream (Phase 2); Task Breakdown does not overwrite it
+    blocks: list[str] = []                     # keys of stories this story blocks
+    status: str = ""
+    approval: str | None = None                # the approval line found in the description
+
+
+class ImportedEpic(Strict):
+    key: str
+    issue_id: str
+    summary: str
+    description_md: str = ""
+    labels: list[str] = []
+    requirement_ids: list[str] = []
+
+
+class StoryExclusion(Strict):
+    key: str
+    summary: str = ""
+    reason: str
+
+
+class StorySnapshot(Strict):
+    """phase4/stories.json: the approved stories Task Breakdown works from.
+
+    Content only (no timestamps), so an unchanged tracker produces identical bytes and does not re-run the agent.
+    """
+
+    schema_version: str = SCHEMA_VERSION
+    project: str
+    source: Literal["jira", "file"]
+    site: str = ""
+    project_key: str = ""
+    jql: str = ""
+    story_points_field: str | None = None
+    approval_marker: str = ""
+    epics: list[ImportedEpic] = []
+    stories: list[ImportedStory]
+    excluded: list[StoryExclusion] = []
+
+    @model_validator(mode="after")
+    def _unique(self):
+        keys = [s.key for s in self.stories]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate story keys")
+        if not self.stories:
+            raise ValueError("no approved stories")
+        epic_keys = [e.key for e in self.epics]
+        if len(epic_keys) != len(set(epic_keys)):
+            raise ValueError("duplicate epic keys")
+        return self
+
+
 # ============================================================================ Agent 1: backlog
 ItemLevel = Literal["epic", "story", "task"]
 ItemType = Literal["feature", "test", "infra", "ui", "chore", "spike", "docs"]
@@ -177,7 +254,7 @@ ItemType = Literal["feature", "test", "infra", "ui", "chore", "spike", "docs"]
 
 class SourceRef(Strict):
     req_id: str
-    source: Literal["prd", "story", "figma", "arch", "clarification", "speckit"]
+    source: Literal["prd", "story", "figma", "arch", "clarification"]
     anchor: str = ""
 
 
@@ -191,7 +268,7 @@ class Dependency(Strict):
     on_id: str
     reason: str
     confidence: float = Field(ge=0, le=1)
-    origin: Literal["speckit_phase", "speckit_inline", "llm", "human"]
+    origin: Literal["llm", "human"]      # human = set by a person or the tracker (e.g. a Jira "blocks" link)
 
 
 class Estimate(Strict):
@@ -217,7 +294,7 @@ class WorkItem(Strict):
     title: str
     description_md: str = ""
     type: ItemType = "feature"
-    speckit_phase: Literal["setup", "foundational", "user_story", "polish"] | None = None
+    discipline: Literal["FE", "BE", "DB", "DevOps", "QA"] | None = None   # tasks: which part of the stack
     priority: Literal["P1", "P2", "P3"] = "P2"
     moscow: Literal["must", "should", "could", "wont"] = "should"
     user_story: UserStory | None = None
@@ -234,11 +311,10 @@ class WorkItem(Strict):
     ai_eligibility_reason: str = ""
     source_refs: list[SourceRef] = []
     open_questions: list[str] = []
-    speckit_ref: str | None = None
 
 
 class Feature(Strict):
-    """One PRD feature, decided by Agent 1 before spec-kit runs (backlog/features.json)."""
+    """One epic of the approved stories (the tracker epic, or NO-EPIC for stories without one)."""
 
     feature_key: str                     # F01, F02, ...
     feature_dir: str                     # specs/001-short-name
