@@ -35,7 +35,7 @@ description = "Task breakdown: tasks, estimates and dependencies for the approve
 files = ["backlog/backlog.json"]
 
 [P4-G2]
-description = "Sprint plan from the Sprint Planning agent (delivery manager)"
+description = "Sprint plan and release plan from the Sprint Planning agent (Scrum Master / Engineering Manager)"
 files = ["sprint/sprint-plan.json"]
 
 [P4-G3]

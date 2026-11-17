@@ -563,6 +563,33 @@ def publish_backlog(project: str) -> dict:
 
 
 # ============================================================================ sprint
+def match_sprints(planned: list, existing: list[dict]) -> dict[int, dict]:
+    """Planned sprint index -> an existing tracker sprint to reuse instead of creating a duplicate.
+
+    In order: same start date; an active sprint whose dates cover the planned start; same name; then undated future
+    sprints (e.g. the one Jira creates with a new board), oldest first, for the remaining planned sprints in order."""
+    free = list(existing)
+    out = {}
+
+    def take(sp, sprint):
+        out[sp.sprint_index] = sprint
+        free.remove(sprint)
+    for sp in planned:
+        match = (next((s for s in free if s["start"] == sp.start), None)
+                 or next((s for s in free if s["state"] == "active" and s["start"] and s["end"]
+                          and s["start"] <= sp.start <= s["end"]), None)
+                 or next((s for s in free if s["name"] == sp.name), None))
+        if match:
+            take(sp, match)
+    undated = sorted((s for s in free if s["state"] == "future" and not s["start"]), key=lambda s: int(s["id"])
+                     if str(s["id"]).isdigit() else 0)
+    for sp in [p for p in planned if p.sprint_index not in out]:
+        if not undated:
+            break
+        take(sp, undated.pop(0))
+    return out
+
+
 @serialized
 def publish_sprint(project: str) -> dict:
     require_gate(project, "sprint")
@@ -581,6 +608,22 @@ def publish_sprint(project: str) -> dict:
             external[story_id] = row["id"]
 
     sprint_sys = f"{tracker.system}_sprint"
+    nonempty = [sp for sp in plan.sprints if sp.story_ids]
+    report["adopted"] = []
+    unmapped = [sp for sp in nonempty if ids.get(sprint_sys, f"sprint:{sp.start.isoformat()}") is None]
+    known = {row["id"] for row in ids.data.get(ids.namespace(sprint_sys), {}).values()}
+    by_index = {sp.sprint_index: sp for sp in unmapped}
+    for index, existing in match_sprints(unmapped, [s for s in tracker.board_sprints() if s["id"] not in known]).items():
+        sp = by_index[index]
+        fill = {k: v for k, v in (("start", sp.start if not existing["start"] else None),
+                                  ("end", sp.end if not existing["end"] else None),
+                                  ("goal", sp.goal if not existing["goal"] else None)) if v}
+        if fill:
+            tracker.update_sprint(existing["id"], fill)
+        ids.put(sprint_sys, f"sprint:{sp.start.isoformat()}", existing["id"], existing["name"], {"adopted": True})
+        report["adopted"].append({"sprint_index": sp.sprint_index, "tracker_sprint": existing["name"],
+                                  "filled": sorted(fill)})
+
     def publish_slot(sp):
         row = ids.get(sprint_sys, f"sprint:{sp.start.isoformat()}")
         if row is None or row.get("id") == "pending":
@@ -592,7 +635,6 @@ def publish_sprint(project: str) -> dict:
         if moved:
             tracker.move_to_sprint(sid, moved)
         return len(moved)
-    nonempty = [sp for sp in plan.sprints if sp.story_ids]
     # Defend the concurrency boundary even for manually edited plan artifacts.
     selected = [sid for sp in nonempty for sid in sp.story_ids] + [d.story_id for d in plan.deferred]
     if len(selected) != len(set(selected)):

@@ -33,7 +33,6 @@ class StoryIn:
     frozen_sprint: int | None = None   # active sprint content (hard, no switch)
     pinned_sprint: int | None = None   # human pin (switch)
     previous_sprint: int | None = None
-    skill_hours: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -49,7 +48,6 @@ class SprintIn:
     index: int
     cap_p50: float
     cap_p85: float
-    skill_caps: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -98,7 +96,6 @@ def diagnostics(stories, sprints, deadlines, result: SolveResult) -> dict:
     required = required_ids(stories, sprints, deadlines, Relaxation())
     demand = sum(round(s.points * SCALE) for s in stories if s.story_id in required)
     capacity = sum(int(s.cap_p50 * SCALE) for s in sprints)
-    skills = sorted({k for s in stories for k in s.skill_hours})
     return {"status": result.status, "wall_time_s": result.wall_time_s,
             "objective": result.objective, "best_bound": result.best_bound,
             "required_story_ids": sorted(required), "required_points_scaled": demand,
@@ -107,9 +104,6 @@ def diagnostics(stories, sprints, deadlines, result: SolveResult) -> dict:
             "aggregate_bound_proves_infeasible": demand > capacity,
             "conflicting_assumptions": result.conflicting,
             "conflict_note": "Solver assumption core is sufficient, not necessarily minimal or the only cause.",
-            "skills": [{"skill": k, "required_hours": sum(s.skill_hours.get(k, 0) for s in stories if s.story_id in required),
-                        "bounded_in_all_sprints": all(k in s.skill_caps for s in sprints),
-                        "explicit_capacity_hours": sum(s.skill_caps.get(k, 0) for s in sprints)} for k in skills],
             "dependency_edges": [[d, s.story_id] for s in stories for d in s.depends_on],
             "limitations": "Bounds are necessary, not sufficient. Dependencies allow the same sprint; no task-duration critical path is inferred. UNKNOWN is not infeasibility."}
 
@@ -177,9 +171,6 @@ def solve(stories: list[StoryIn], sprints: list[SprintIn], deadlines: list[Deadl
         m.add(load <= int(spr.cap_p50 * relax.capacity_factor * SCALE))
         over[spr.index] = m.new_int_var(0, 10_000_000, f"over[{spr.index}]")
         m.add(over[spr.index] >= load - int(spr.cap_p85 * relax.capacity_factor * SCALE))
-        for skill, cap in spr.skill_caps.items():
-            m.add(sum(int(round(by_id[i].skill_hours.get(skill, 0) * SCALE)) * x[i, spr.index] for i in ids)
-                  <= int(cap * relax.capacity_factor * SCALE))
 
     # dependencies: B planned => A planned and sprint(A) <= sprint(B)
     for s in stories:

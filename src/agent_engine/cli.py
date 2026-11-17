@@ -156,6 +156,9 @@ def _io_lines(pack: AgentPack, project: str) -> str:
     return ("\n\n" + "\n".join(lines)) if lines else ""
 
 
+STRUCTURED_STAGES = {"task-breakdown": "task_breakdown", "sprint-planning": "sprint_planning"}
+
+
 def _agent_message(pack: AgentPack, request: str, project_name: str, request_number: int) -> str:
     project = f"{OUTPUTS_VIRTUAL_PREFIX}{project_name}/"
     message = f"{request}\n\nWrite your output under {project}." + _io_lines(pack, project)
@@ -413,9 +416,11 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         managed_outputs.set(frozenset(("backlog/backlog.json",
                             "sprint/sprint-plan.json", "sprint/solver-diagnostics.json", "allocation/assignments.json", "infra/intent.json", "infra/manifest.json", "infra/checks.json")))
                     active_inputs.set(frozenset(protected))
-                    if pack.name == "task-breakdown":
-                        # Approved stories -> tasks, one structured call per story (phase4/task_breakdown.py).
-                        from agent_engine.phase4 import task_breakdown as workflow
+                    if pack.name in STRUCTURED_STAGES:
+                        # Stages the engine drives in code with structured calls instead of a tool-using agent:
+                        # Task Breakdown (phase4/task_breakdown.py) and Sprint Planning (phase4/sprint_planning.py).
+                        import importlib
+                        workflow = importlib.import_module("agent_engine.phase4." + STRUCTURED_STAGES[pack.name])
                         if kind == "verify":
                             operation = workflow.review(project_name, pass_callbacks)
                         elif kind == "fix":

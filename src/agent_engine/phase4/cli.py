@@ -1,7 +1,7 @@
 """`agent-engine phase4 ...` commands (no model calls):
 
   init           copy an example project's inputs (prd.md, architecture.md, phase4/*.json) into outputs/<project>/
-  import-stories read the approved stories from Jira (read-only) into phase4/stories.json
+  import-stories read the approved stories (phase4/stories.json) and closed sprints (phase4/history.json) from Jira, read-only
   publish        push a gate-approved file to the tracker / GitHub (backlog, sprint, assignments, infra)
   mine-profiles  skill and code-ownership evidence from a git clone -> phase4/skill-profiles.json
   schemas        write the JSON Schemas of every Phase 4 file contract
@@ -88,10 +88,11 @@ def run(args: argparse.Namespace) -> int:
         if args.phase4_command == "init":
             return _init(args.project_name, args.example, args.force)
         if args.phase4_command == "import-stories":
-            from agent_engine.phase4.story_import import import_stories
+            from agent_engine.phase4.story_import import import_history, import_stories
             from agent_engine.runtime import project_lock
             with project_lock(files.project_dir(args.project_name)):
-                print(json.dumps(import_stories(args.project_name), indent=2))
+                print(json.dumps({**import_stories(args.project_name),
+                                  "velocity": import_history(args.project_name)}, indent=2))
             return 0
         if args.phase4_command == "publish":
             from agent_engine import perf

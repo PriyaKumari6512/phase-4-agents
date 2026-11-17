@@ -85,9 +85,11 @@ def evaluation(pack) -> dict[str, str]:
     common = ("agent.py", "cli.py", "config.py", "runtime.py", "backends.py", "guardrails.py", "locking.py",
               "stage_controls.py", "model_setup.py", "subscription_models.py", "recovery.py")
     domains = {
-        "task-breakdown": ("task_breakdown", "story_import", "backlog", "contracts", "files", "textsim", "skills_taxonomy"),
+        "task-breakdown": ("task_breakdown", "structured", "story_import", "backlog", "contracts", "files", "textsim",
+                           "skills_taxonomy"),
         "infra-pipeline": ("infra", "sandbox", "settings", "contracts", "files", "tools"),
-        "sprint-planning": ("sprint", "sprint_model", "capacity", "calendars", "settings", "contracts", "files", "tools"),
+        "sprint-planning": ("sprint_planning", "structured", "sprint", "sprint_model", "capacity", "calendars", "settings",
+                            "contracts", "files"),
         "work-allocation": ("allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),
     }
     selected = [base / rel for rel in common] + [base / "phase4" / (name + ".py") for name in domains.get(pack.name, ())]

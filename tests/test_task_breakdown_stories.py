@@ -489,3 +489,25 @@ def test_cli_failed_review_escalates_one_fix_then_succeeds(proj, monkeypatch, tm
     assert report["status"] == "success" and len(fake.review_calls) == 2
     assert [(c["key"], c["spec"]) for c in fake.calls] == [
         ("GR-9", "test:strong"), ("GR-10", "test:strong"), ("GR-9", "test:frontier")]
+
+
+def test_backlog_carries_the_roadmap_without_regenerating_on_reorder(proj, monkeypatch):
+    stories = snapshot()
+    stories["releases"] = [{"name": "MVP", "order": 1, "release_date": "2027-01-29"}, {"name": "R2", "order": 2}]
+    stories["stories"][0].update(fix_versions=["MVP"], rank="0|i000hb:")
+    stories["stories"][1].update(fix_versions=["R2", "MVP"], rank="0|i000h2:")
+    (proj / "phase4/stories.json").write_text(json.dumps(stories))
+    fake = FakeModel()
+    monkeypatch.setattr(tb, "_invoke", fake)
+    run(tb.generate(P, "", []))
+    b = files.read_json(P, files.BACKLOG, Backlog)
+    by = b.by_id()
+    assert (by["GR-9"].release, by["GR-9"].rank) == ("MVP", "0|i000hb:")
+    assert by["GR-10"].release == "MVP"                   # earliest fix version on the roadmap
+    assert [r.name for r in b.releases] == ["MVP", "R2"]
+    assert "release MVP" in (proj / files.BACKLOG_MD).read_text() and "Roadmap: MVP (2027-01-29) → R2" in (proj / files.BACKLOG_MD).read_text()
+    calls = len(fake.calls)
+    stories["stories"][0]["rank"] = "0|i000zz:"            # reordered in Jira
+    (proj / "phase4/stories.json").write_text(json.dumps(stories))
+    run(tb.generate(P, "", []))
+    assert len(fake.calls) == calls and files.read_json(P, files.BACKLOG, Backlog).by_id()["GR-9"].rank == "0|i000zz:"

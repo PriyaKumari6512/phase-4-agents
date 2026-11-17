@@ -420,7 +420,7 @@ def test_jira_sprints_publish_concurrently_and_keep_their_own_issue_sets(proj, m
     built_backlog()
     approve(proj, "P4-G1")
     backlog = files.read_json(P, files.BACKLOG, Backlog)
-    sprint.solve(P, {s.item_id: 5 for s in backlog.stories()}, as_of=AS_OF)
+    sprint.solve(P, as_of=AS_OF)
     plan = files.read_json(P, files.SPRINT_PLAN)
     stories = [sid for slot in plan["sprints"] for sid in slot["story_ids"]]
     assert len(stories) >= 2 and len(plan["sprints"]) >= 2

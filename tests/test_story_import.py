@@ -43,21 +43,25 @@ def story_description(us, approved=True):
     ]}
 
 
-def issue(key, us, *, approved=True, kind="Story", points=3.0, blocks=(), parent="DEMO-1"):
+def issue(key, us, *, approved=True, kind="Story", points=3.0, blocks=(), parent="DEMO-1", rank=None, versions=("MVP",)):
     return {"id": key.split("-")[1], "key": key, "fields": {
         "summary": f"Story {key}", "description": story_description(us, approved),
         "labels": [us, "FR-002", "P-02", "moscow-must"], "priority": {"name": "Medium"},
-        "fixVersions": [{"name": "MVP"}], "components": [{"name": "MOD-01 Accounts"}],
+        "fixVersions": [{"name": v} for v in versions], "components": [{"name": "MOD-01 Accounts"}],
         "parent": {"key": parent, "fields": {"issuetype": {"name": "Epic"}}},
         "issuelinks": [{"type": {"name": "Blocks", "outward": "blocks"}, "outwardIssue": {"key": b}} for b in blocks],
         "status": {"name": "To Do"}, "issuetype": {"name": kind}, "project": {"key": "DEMO"},
-        "customfield_10016": points, "customfield_10036": None}}
+        "customfield_10016": points, "customfield_10036": None, "customfield_10019": rank}}
 
 
 EPIC = {"id": "1", "key": "DEMO-1", "fields": {
     "summary": "Access", "issuetype": {"name": "Epic"}, "labels": ["EPIC-01"],
     "description": {"type": "doc", "content": [para("Epic EPIC-01. Functional requirements: FR-001, FR-002.")]}}}
-NAMES = {"customfield_10016": "Story point estimate", "customfield_10036": "Story Points"}
+NAMES = {"customfield_10016": "Story point estimate", "customfield_10036": "Story Points", "customfield_10019": "Rank"}
+VERSIONS = [{"id": "1", "name": "MVP", "released": False, "releaseDate": "2027-01-29"},
+            {"id": "2", "name": "R2", "released": False},
+            {"id": "3", "name": "Old", "released": True, "archived": True},
+            {"id": "4", "name": "R3", "released": False}]
 
 
 class Response:
@@ -76,6 +80,8 @@ class FakeJira:
 
     def get(self, url, params=None):
         self.calls.append(("GET", url, dict(params or {})))
+        if url == "/rest/api/3/project/DEMO/versions":
+            return Response(VERSIONS)
         assert url == "/rest/api/3/search/jql"
         if params["jql"].startswith("key in"):
             return Response({"issues": [EPIC], "isLast": True})
@@ -100,7 +106,8 @@ def jira_project(tmp_path, monkeypatch):
     return root
 
 
-STORIES = [issue("DEMO-9", "US-001", blocks=["DEMO-10"]), issue("DEMO-10", "US-002", points=None),
+STORIES = [issue("DEMO-9", "US-001", blocks=["DEMO-10"], rank="0|i000hb:"),
+           issue("DEMO-10", "US-002", points=None, rank="0|i000h2:", versions=("R2", "MVP")),
            issue("DEMO-11", "US-003", approved=False), issue("DEMO-12", "US-004", kind="Bug")]
 
 
@@ -137,9 +144,10 @@ def test_import_reads_only_and_writes_a_content_only_snapshot(jira_project):
     fake = FakeJira(STORIES)
     result = story_import.import_stories(P, http=fake)
     assert all(method == "GET" for method, *_ in fake.calls)
-    first = fake.calls[0][2]
+    searches = [c for c in fake.calls if c[1].endswith("/search/jql")]
+    first = searches[0][2]
     assert first["jql"] == 'project = "DEMO" AND issuetype = Story AND statusCategory = "To Do" ORDER BY key ASC'
-    assert len([c for c in fake.calls if not c[2]["jql"].startswith("key in")]) == 2   # followed the page token
+    assert len([c for c in searches if not c[2]["jql"].startswith("key in")]) == 2   # followed the page token
     snap = files.read_json(P, files.STORIES, StorySnapshot)
     assert [s.key for s in snap.stories] == ["DEMO-9", "DEMO-10"]
     assert {e.key: e.reason[:20] for e in snap.excluded} == {"DEMO-11": "description has no a",
@@ -233,10 +241,13 @@ def test_orchestrator_refreshes_stories_from_jira_before_running(bare, monkeypat
     calls = []
     monkeypatch.setattr(story_import, "import_stories",
                         lambda project: calls.append(project) or {"stories": 1, "changed": False, "excluded": []})
+    monkeypatch.setattr(story_import, "import_history",
+                        lambda project: {"history": "updated", "closed_sprints": 3})
     fake = FakeAgents(bare)
     lines = []
     orch.orchestrate(P, runner=fake, out=lines.append)
     assert calls == [P] and "approved stories: 1 from Jira (unchanged)" in lines[0]
+    assert "velocity history: 3 closed sprints from Jira" in lines[1]
     assert orch.orchestrate(P, runner=fake, out=lines.append, plan_only=True) == orch.WAITING and calls == [P]
 
     def broken(project):
@@ -245,3 +256,67 @@ def test_orchestrator_refreshes_stories_from_jira_before_running(bare, monkeypat
     lines.clear()
     assert orch.orchestrate(P, runner=fake, out=lines.append) == orch.FAILED
     assert "importing approved stories failed: 401 from Jira" in lines[-1]
+
+
+def test_roadmap_and_rank_are_imported(jira_project):
+    story_import.import_stories(P, http=FakeJira(STORIES))
+    snap = files.read_json(P, files.STORIES, StorySnapshot)
+    assert [(r.name, r.order, str(r.release_date) if r.release_date else None) for r in snap.releases] == [
+        ("MVP", 1, "2027-01-29"), ("R2", 2, None), ("R3", 3, None)]         # archived versions are skipped
+    by = {s.key: s for s in snap.stories}
+    assert by["DEMO-9"].rank == "0|i000hb:" and by["DEMO-10"].rank == "0|i000h2:"
+    assert by["DEMO-10"].fix_versions == ["R2", "MVP"]
+
+
+# ---------------------------------------------------------------------------------------------- velocity history
+class FakeTracker:
+    def __init__(self, rows):
+        self.rows, self.calls = rows, []
+
+    def closed_sprints(self, limit=12, points_field=None):
+        self.calls.append(points_field)
+        return self.rows
+
+
+SPRINTS = [{"name": "GR Sprint 1", "start_date": "2026-10-12", "end_date": "2026-10-25", "completed_points": 18.0,
+            "available_person_days": None},
+           {"name": "GR Sprint 2", "start_date": "2026-10-26", "end_date": "2026-11-08", "completed_points": 21.0,
+            "available_person_days": None}]
+
+
+def test_closed_sprints_become_velocity_history_using_the_stories_points_field(jira_project):
+    story_import.import_stories(P, http=FakeJira(STORIES))            # finds customfield_10016 as the points field
+    tracker = FakeTracker(SPRINTS)
+    result = story_import.import_history(P, tracker=tracker)
+    assert result["history"] == "updated" and result["closed_sprints"] == 2
+    assert tracker.calls == ["customfield_10016"]
+    from agent_engine.phase4.contracts import History
+    history = files.read_json(P, files.HISTORY, History)
+    assert history.source == "jira" and [s.completed_points for s in history.sprints] == [18.0, 21.0]
+    assert story_import.import_history(P, tracker=FakeTracker(SPRINTS))["history"] == "unchanged"
+
+
+def test_a_hand_made_history_is_never_overwritten(jira_project):
+    (jira_project / files.HISTORY).write_text(json.dumps({"tickets": [], "sprints": []}))
+    before = (jira_project / files.HISTORY).read_bytes()
+    tracker = FakeTracker(SPRINTS)
+    assert story_import.import_history(P, tracker=tracker)["history"] == "kept"
+    assert tracker.calls == [] and (jira_project / files.HISTORY).read_bytes() == before
+
+
+def test_a_new_closed_sprint_does_not_make_the_backlog_stale(tmp_path, monkeypatch):
+    from agent_engine.phase4 import task_breakdown as tb
+    base = {"source": "jira", "tickets": [], "sprints": SPRINTS[:1]}
+    more = {**base, "sprints": SPRINTS}
+    tickets = {**base, "tickets": [{"key": "GR-1", "title": "done", "story_points": 3}]}
+    assert tb.history_tickets_digest(json.dumps(base)) == tb.history_tickets_digest(json.dumps(more))
+    assert tb.history_tickets_digest(json.dumps(base)) != tb.history_tickets_digest(json.dumps(tickets))
+    root = tmp_path / "outputs" / "demo"
+    (root / "phase4").mkdir(parents=True)
+    (root / "phase4/history.json").write_text(json.dumps(base))
+    stage = orch.STAGE_BY_AGENT["task-breakdown"]
+    before = orch._input_digests(stage, root, 1)["phase4/history.json"]
+    (root / "phase4/history.json").write_text(json.dumps(more))
+    assert orch._input_digests(stage, root, 1)["phase4/history.json"] == before
+    sprint_stage = orch.STAGE_BY_AGENT["sprint-planning"]
+    assert "phase4/history.json" in orch._input_digests(sprint_stage, root, 1)

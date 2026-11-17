@@ -104,6 +104,10 @@ def input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
 
 def _input_digests(stage: Stage, root: Path, sprint: int) -> dict[str, str]:
     digests = {f: file_digest(root / f) for f in (*stage.files, *stage.optional) if (root / f).is_file()}
+    if stage.agent == "task-breakdown" and "phase4/history.json" in digests:
+        # Only resolved tickets matter to Task Breakdown; closed sprints are Sprint Planning's velocity.
+        from agent_engine.phase4.task_breakdown import history_tickets_digest
+        digests["phase4/history.json"] = history_tickets_digest((root / "phase4/history.json").read_text(encoding="utf-8"))
     project = root / PROJECT_FILE
     if project.is_file():
         data = json.loads(project.read_text(encoding="utf-8"))
@@ -477,11 +481,14 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             try:
                 raw = json.loads((root / PROJECT_FILE).read_text(encoding="utf-8"))
                 if (project_overrides(raw).get("tracker") or {}).get("kind") == "jira":
-                    from agent_engine.phase4.story_import import import_stories
+                    from agent_engine.phase4.story_import import import_history, import_stories
                     summary = import_stories(project)
                     out(f">>> approved stories: {summary['stories']} from Jira"
                         f"{' (updated)' if summary['changed'] else ' (unchanged)'}"
                         + (f"; excluded {len(summary['excluded'])}" if summary["excluded"] else ""))
+                    velocity = import_history(project)
+                    if velocity.get("history") == "updated":
+                        out(f">>> velocity history: {velocity['closed_sprints']} closed sprints from Jira")
             except Exception as exc:  # noqa: BLE001  (network, auth, schema: stop before any generation)
                 out(f"ERROR: importing approved stories failed: {exc}")
                 return FAILED

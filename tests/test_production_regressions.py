@@ -102,9 +102,14 @@ def test_recorded_clinic_capacity_option_passes_its_own_checker(tmp_path, monkey
         for r in item["source_refs"]:
             r["source"] = "story" if r["source"] == "speckit" else r["source"]
     (tmp_path / "clinic-test-2" / files.BACKLOG).write_text(json.dumps(recorded), encoding="utf-8")
+    plan_file = tmp_path / "clinic-test-2" / files.SPRINT_PLAN       # model-scored values are retired too
+    recorded_plan = json.loads(plan_file.read_text(encoding="utf-8"))
+    recorded_plan.pop("business_values", None)
+    recorded_plan.pop("wsjf", None)
+    plan_file.write_text(json.dumps(recorded_plan), encoding="utf-8")
     monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
     old = files.read_json("clinic-test-2", files.SPRINT_PLAN, SprintPlan)
-    result = json.loads(sprint.solve("clinic-test-2", old.business_values, relax=["capacity:x1.3"], as_of="2026-11-16", time_limit_s=8))
+    result = json.loads(sprint.solve("clinic-test-2", relax=["capacity:x1.3"], as_of="2026-11-16", time_limit_s=8))
     assert result["solver"] in ("FEASIBLE", "OPTIMAL")
     sprint.annotate("clinic-test-2", {str(s["sprint_index"]): "Test goal" for s in result["sprints"] if s["stories"]}, {}, "Test plan")
     checked = json.loads(sprint.check("clinic-test-2"))
@@ -126,7 +131,7 @@ def test_local_solver_checks_end_time_and_actual_cross_worker_precedence():
 
 def test_blocked_ai_pin_cannot_override_hard_rules(proj):
     b, values = prepared()
-    sprint.solve(P, values, as_of=AS_OF)
+    sprint.solve(P, as_of=AS_OF)
     plan = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
     slot = next(s for s in plan.sprints if s.story_ids)
     task = b.tasks_of(slot.story_ids[0])[0]

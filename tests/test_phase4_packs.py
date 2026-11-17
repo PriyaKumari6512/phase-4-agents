@@ -51,8 +51,8 @@ def test_wrong_argument_types_come_back_as_text(tmp_path, monkeypatch):
     from agent_engine.phase4 import tools
 
     monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
-    bad = tools.sprint_solve.invoke({"project": "p", "business_values": "not a dict"})
-    assert isinstance(bad, str) and "business_values" in bad
+    bad = tools.allocation_solve.invoke({"project": "p", "ai_verdicts": "not a dict"})
+    assert isinstance(bad, str) and "ai_verdicts" in bad
 
 
 @pytest.mark.parametrize("text, hit", [

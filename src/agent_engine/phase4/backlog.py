@@ -316,12 +316,16 @@ def render_md(b: Backlog) -> str:
     lines += ["## Requirements traced by the approved stories", ""]
     lines += [f"- {r}: {', '.join(ids)}" for r, ids in b.coverage.items()] or ["- (no requirement ids on the stories)"]
     lines += ["", f"Critical path: {' → '.join(b.critical_path) or '-'}", ""]
+    if b.releases:
+        lines += ["Roadmap: " + " → ".join(f"{r.name}" + (f" ({r.release_date})" if r.release_date else "")
+                                         for r in sorted(b.releases, key=lambda r: r.order)), ""]
     for e in [i for i in b.items if i.level == "epic"]:
         lines += [f"## {e.item_id} {e.title}", "", e.description_md, ""]
         for s in [i for i in b.items if i.level == "story" and i.parent_id == e.item_id]:
             est = f"{s.estimate.story_points} SP ({s.estimate.confidence}, {s.estimate.method})" if s.estimate else "unestimated"
             deps = ", ".join(d.on_id for d in s.dependencies) or "-"
-            lines += [f"### {s.item_id} {s.title} — {s.priority}/{s.moscow} · {est}", ""]
+            release = f" · release {s.release}" if s.release else ""
+            lines += [f"### {s.item_id} {s.title} — {s.priority}/{s.moscow}{release} · {est}", ""]
             if s.description_md:
                 lines += [s.description_md, ""]
             lines += [f"Depends on: {deps} · Sources: {', '.join(r.req_id for r in s.source_refs) or '-'}", ""]

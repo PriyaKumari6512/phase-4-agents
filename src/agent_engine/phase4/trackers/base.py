@@ -68,6 +68,8 @@ class TrackerAdapter:
     def close_item(self, issue_id: str, reason: str) -> None: raise NotImplementedError
     # sprints
     def create_sprint(self, name: str, start: date, end: date, goal: str) -> ExtObj: raise NotImplementedError
+    def board_sprints(self) -> list[dict]: return []          # existing future/active sprints, for reuse
+    def update_sprint(self, sprint_id: str, fields: dict) -> None: raise NotImplementedError
     def move_to_sprint(self, sprint_id: str, issue_ids: list[str]) -> None: raise NotImplementedError
     def move_to_backlog(self, issue_ids: list[str]) -> None: raise NotImplementedError
     # people

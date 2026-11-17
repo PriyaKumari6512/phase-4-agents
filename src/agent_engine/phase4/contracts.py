@@ -111,6 +111,14 @@ class Deadline(Strict):
     hard: bool = False
 
 
+class ReleaseDeadline(Strict):
+    """A roadmap release's deadline when the tracker version has no release date (the tracker date wins)."""
+
+    release: str                # tracker version name, e.g. MVP
+    due_date: date
+    hard: bool = False          # also applies when the date comes from the tracker
+
+
 class ProjectSettings(Strict):
     schema_version: str = SCHEMA_VERSION
     project_name: str
@@ -126,6 +134,7 @@ class ProjectSettings(Strict):
     maintenance_capacity_pct: int = Field(default=20, ge=0, le=60)
     max_story_points_per_story: int = Field(default=13, ge=1)
     deadlines: list[Deadline] = []
+    release_deadlines: list[ReleaseDeadline] = []   # fallback dates for roadmap releases without a tracker date
     # AI agents get work only after this many recorded outcomes (phase4/agent-outcomes.json); before that they
     # run in shadow mode. 0 trusts them from the start.
     ai_min_recorded_outcomes: int = Field(default=20, ge=0)
@@ -166,11 +175,21 @@ class HistorySprint(Strict):
 
 
 class History(Strict):
+    source: Literal["manual", "jira"] = "manual"   # jira = refreshed from the tracker; a manual file is never overwritten
     tickets: list[HistoryTicket] = []
     sprints: list[HistorySprint] = []
 
 
 # ============================================================================ approved stories (input)
+class Release(Strict):
+    """One roadmap release (a Jira version), in roadmap order."""
+
+    name: str
+    order: int                                 # 1 = first release on the roadmap
+    release_date: date | None = None           # from the tracker; project.json release_dates is the fallback
+    released: bool = False
+
+
 class ImportedCriterion(Strict):
     ac_id: str                 # as written in the tracker (US-001.AC1), or <KEY>.AC<n> when unnumbered
     text: str
@@ -196,6 +215,7 @@ class ImportedStory(Strict):
     components: list[str] = []
     epic_key: str | None = None
     story_points: float | None = None          # set upstream (Phase 2); Task Breakdown does not overwrite it
+    rank: str | None = None                    # tracker backlog order (Jira LexoRank: sorts as text)
     blocks: list[str] = []                     # keys of stories this story blocks
     status: str = ""
     approval: str | None = None                # the approval line found in the description
@@ -230,6 +250,7 @@ class StorySnapshot(Strict):
     jql: str = ""
     story_points_field: str | None = None
     approval_marker: str = ""
+    releases: list[Release] = []               # the roadmap: tracker versions in order
     epics: list[ImportedEpic] = []
     stories: list[ImportedStory]
     excluded: list[StoryExclusion] = []
@@ -295,6 +316,8 @@ class WorkItem(Strict):
     description_md: str = ""
     type: ItemType = "feature"
     discipline: Literal["FE", "BE", "DB", "DevOps", "QA"] | None = None   # tasks: which part of the stack
+    release: str | None = None           # stories: the roadmap release (fix version) it belongs to
+    rank: str | None = None              # stories: approved backlog order from the tracker (sorts as text)
     priority: Literal["P1", "P2", "P3"] = "P2"
     moscow: Literal["must", "should", "could", "wont"] = "should"
     user_story: UserStory | None = None
@@ -343,6 +366,7 @@ class Backlog(Strict):
     project: str
     sources: dict[str, str]              # input file -> sha256 it was built from
     features: list[Feature]
+    releases: list[Release] = []         # the roadmap, in order (from phase4/stories.json)
     items: list[WorkItem]
     coverage: dict[str, list[str]] = {}  # requirement id -> story ids
     story_waves: list[list[str]] = []
@@ -413,6 +437,24 @@ class PlanOption(Strict):
     impact: str
 
 
+class ReleasePlan(Strict):
+    """When one roadmap release lands, from the placement and the velocity forecast."""
+
+    release: str
+    order: int
+    due_date: date | None = None
+    date_source: Literal["tracker", "project", "none"] = "none"
+    hard: bool = False
+    story_ids: list[str] = []
+    points: float = 0
+    deferred_story_ids: list[str] = []
+    last_sprint_index: int | None = None     # last sprint of this plan holding one of its stories
+    planned_finish: date | None = None       # end of that sprint (None if a story is deferred)
+    p50_date: date | None = None             # velocity forecast of this release and all earlier ones
+    p85_date: date | None = None
+    status: Literal["on_track", "late", "incomplete", "no_deadline"] = "no_deadline"
+
+
 class SprintPlan(Strict):
     schema_version: str = SCHEMA_VERSION
     plan_id: str
@@ -424,11 +466,12 @@ class SprintPlan(Strict):
     sprints: list[SprintSlot]
     deferred: list[Deferral]
     forecast: Forecast | None = None
+    releases: list[ReleasePlan] = []         # the release plan, in roadmap order
     solver: SolverReport
     assumptions: list[str] = []
     options_if_infeasible: list[PlanOption] = []
-    business_values: dict[str, int] = {}     # story -> 1..10 (Agent 2's judgement)
-    wsjf: dict[str, float] = {}              # story -> 0..100
+    priority_order: list[str] = []           # stories in approved order: release -> MoSCoW -> tracker Rank
+    priority: dict[str, float] = {}          # story -> weight per point (100 = first, 1 = last)
     pins: dict[str, int] = {}
     relaxations: list[str] = []
     summary_md: str = ""

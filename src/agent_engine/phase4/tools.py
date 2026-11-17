@@ -15,7 +15,7 @@ from typing import Callable
 from langchain_core.tools import tool
 
 from agent_engine import perf
-from agent_engine.phase4 import allocation, files, infra, sprint
+from agent_engine.phase4 import allocation, files, infra
 
 logger = logging.getLogger(__name__)
 
@@ -90,44 +90,6 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
     return _run("backlog_view", view)
 
 
-@tool
-def sprint_capacity(project: str, as_of: str = "") -> str:
-    """Sprint windows for the planning horizon from phase4/project.json (calendar, holidays, PTO, allocation,
-    ceremonies, maintenance reserve) and Monte Carlo capacity from phase4/history.json: P50 and P85 story points
-    per sprint. Also lists stories that cannot be planned (unestimated, too large). as_of: YYYY-MM-DD, default
-    today. Writes sprint/capacity.json."""
-    return _run("sprint_capacity", lambda: sprint.capacity_report(project, as_of or None))
-
-
-@tool
-def sprint_solve(project: str, business_values: dict[str, int], pins: dict[str, int] | None = None,
-                 relax: list[str] | None = None, as_of: str = "") -> str:
-    """Plan sprints with the CP-SAT solver. business_values: {story_id: 1..10} (value to users/business; missing
-    stories keep their previous value or 5). pins: {story_id: sprint_index, 0 = out of horizon} from the approver.
-    relax: 'changes' strings of an infeasibility option the approver chose. The solver maximizes WSJF under
-    capacity (P50 hard, above P85 penalized), dependencies, hard deadlines, must-haves and plan stability; when
-    infeasible it returns the conflicting constraints and options it verified to be feasible. Writes
-    sprint/sprint-plan.json and sprint-plan.md."""
-    return _run("sprint_solve", lambda: sprint.solve(project, business_values, pins, relax, as_of or None))
-
-
-@tool
-def sprint_annotate(project: str, goals: dict[str, str], deferral_explanations: dict[str, str] | None = None,
-                    summary_md: str = "") -> str:
-    """Write a goal for every sprint with stories ({sprint_index: goal}), optional plain-language explanations for
-    deferred stories ({story_id: text}), and a short summary for the approver. Updates sprint-plan.json and
-    sprint-plan.md."""
-    return _run("sprint_annotate", lambda: sprint.annotate(project, goals, deferral_explanations, summary_md))
-
-
-@tool
-def sprint_check(project: str) -> str:
-    """Read-only: checks sprint/sprint-plan.json against the backlog (capacity, dependency order, every story
-    planned or deferred, goals written, built from the current backlog)."""
-    return _run("sprint_check", lambda: sprint.check(project))
-
-
-# ============================================================================ allocation (Agent 3)
 @tool
 def allocation_prepare(project: str, sprint_index: int = 1) -> str:
     """Load one sprint of sprint/sprint-plan.json: its tasks, the hard rules for AI agents (acceptance criteria,
@@ -210,7 +172,7 @@ def infra_check(project: str) -> str:
     return _run("infra_check", lambda: infra.check(project))
 
 
-_ALL = [backlog_view, sprint_capacity, sprint_solve, sprint_annotate, sprint_check,
+_ALL = [backlog_view,
         allocation_prepare, allocation_solve, allocation_annotate, allocation_check, infra_set_intent, infra_render,
         infra_validate, infra_registry_versions, infra_check]
 def _invalid_arguments(error: Exception) -> str:
@@ -223,8 +185,6 @@ for _t in _ALL:
     _t.handle_tool_error = True
 
 TOOL_FACTORIES: dict[str, Callable[[], list]] = {
-    "phase4-sprint": lambda: [backlog_view, sprint_capacity, sprint_solve, sprint_annotate],
-    "phase4-sprint-check": lambda: [sprint_check],
     "phase4-allocation": lambda: [backlog_view, allocation_prepare, allocation_solve, allocation_annotate],
     "phase4-allocation-check": lambda: [allocation_check],
     "phase4-infra": lambda: [infra_set_intent, infra_render, infra_validate, infra_registry_versions],

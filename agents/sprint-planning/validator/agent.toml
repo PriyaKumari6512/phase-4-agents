@@ -1,10 +1,9 @@
-# Sprint Plan Validator: read-only judge of the Sprint Planning agent's plan.
-description = "Sprint Plan Validator: checks sprint-plan.json against the backlog, capacity, deadlines and every request."
-model = "strong"
-filesystem = ["ls", "read_file", "glob", "grep"]
-tools = ["phase4-sprint-check"]
+# Sprint Plan Reviewer: deterministic checks of the plan (capacity, dependencies, releases, goals present).
+description = "Sprint Plan Reviewer: deterministic checks of sprint-plan.json against the backlog, capacity and release deadlines."
+model = "fast"
+filesystem = ["ls", "read_file"]
 returns = "verdict"
 
 [input]
-description = "The sprint plan, the approved backlog, capacity, project settings and the agent's request history."
+description = "The sprint plan, the approved backlog and project settings."
 files = ["sprint/sprint-plan.json", "sprint/sprint-plan.md", "backlog/backlog.json", "phase4/project.json"]

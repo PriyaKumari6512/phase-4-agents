@@ -147,29 +147,29 @@ def _planned(proj_root: Path) -> dict:  # noqa: F811
 
 @pytest.mark.parametrize("status", ["UNKNOWN", "MODEL_INVALID"])
 def test_unsuccessful_solve_keeps_the_previous_valid_plan(proj, monkeypatch, status):  # noqa: F811
-    values = _planned(proj)
-    assert json.loads(sprint.solve(P, values, as_of=AS_OF))["solver"] in ("OPTIMAL", "FEASIBLE")
+    _planned(proj)
+    assert json.loads(sprint.solve(P, as_of=AS_OF))["solver"] in ("OPTIMAL", "FEASIBLE")
     before = (proj / files.SPRINT_PLAN).read_bytes()
     before_md = (proj / files.SPRINT_PLAN_MD).read_bytes()
     monkeypatch.setattr(sprint, "cpsat_solve", lambda *a, **k: SolveResult(
         status=status, placement={}, objective=None, best_bound=None, wall_time_s=10.0, conflicting=[], sprint_load={}))
-    out = phase4_tools._run("sprint_solve", lambda: sprint.solve(P, values, as_of=AS_OF))
+    out = phase4_tools._run("sprint_solve", lambda: sprint.solve(P, as_of=AS_OF))
     assert out.startswith("ERROR:") and status in out and "previous plan (v1) is kept" in out
     assert (proj / files.SPRINT_PLAN).read_bytes() == before and (proj / files.SPRINT_PLAN_MD).read_bytes() == before_md
 
 
 def test_unsuccessful_first_solve_writes_no_plan(proj, monkeypatch):  # noqa: F811
-    values = _planned(proj)
+    _planned(proj)
     monkeypatch.setattr(sprint, "cpsat_solve", lambda *a, **k: SolveResult(
         status="UNKNOWN", placement={}, objective=None, best_bound=None, wall_time_s=10.0, conflicting=[], sprint_load={}))
     with pytest.raises(files.ProjectError, match="no plan was written"):
-        sprint.solve(P, values, as_of=AS_OF)
+        sprint.solve(P, as_of=AS_OF)
     assert not (proj / files.SPRINT_PLAN).exists()
 
 
 def test_check_rejects_a_plan_written_from_an_unknown_solve(proj):  # noqa: F811
-    values = _planned(proj)
-    sprint.solve(P, values, as_of=AS_OF)
+    _planned(proj)
+    sprint.solve(P, as_of=AS_OF)
     plan = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
     plan.solver.status = "UNKNOWN"                       # what the old code could leave behind
     files.write_json(P, files.SPRINT_PLAN, plan)
@@ -282,7 +282,7 @@ def _flow(root: Path) -> dict[str, object]:
     approve(root, "P4-G1")
     sprint.capacity_report(P, AS_OF)
     b = files.read_json(P, files.BACKLOG, Backlog)
-    plan = json.loads(sprint.solve(P, {s.item_id: (8 if s.moscow == "must" else 5) for s in b.stories()}, as_of=AS_OF))
+    plan = json.loads(sprint.solve(P, as_of=AS_OF))
     sprint.annotate(P, {str(s["sprint_index"]): "goal" for s in plan["sprints"] if s["stories"]}, {}, "summary")
     approve(root, "P4-G2")
     first = next(s["sprint_index"] for s in plan["sprints"] if s["stories"])

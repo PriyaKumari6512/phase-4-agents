@@ -6,13 +6,13 @@ deepagents. Each one combines the model's judgement with tools for everything th
 | Agent | Folder | The model decides | Tools compute (`src/agent_engine/phase4/`) |
 |---|---|---|---|
 | 1 Task Breakdown | `agents/task-breakdown/` | per approved story: FE/BE/DB/DevOps/QA tasks, task acceptance criteria, hours, skills, in-story dependencies; across stories: missing dependencies and work planned twice; a light review of flagged items | Jira story import, structured calls with a cached prefix, ids, Jira "blocks" links, story points (kept from Jira or derived from hours), DAG/coverage/size/effort checks, retained results, Jira sub-task publishing ([TASK_BREAKDOWN.md](TASK_BREAKDOWN.md)) |
-| 2 Sprint Planning | `agents/sprint-planning/` | business value per story, which option to recommend, sprint goals, explanations | calendar + PTO availability, Monte Carlo P50/P85 velocity, WSJF, OR-Tools CP-SAT packing, infeasibility cores and verified options |
+| 2 Sprint Planning | `agents/sprint-planning/` | sprint goals, deferral explanations, the summary, which verified option to recommend; turning a reviewer's request into pins or an option (small model) | calendar + PTO availability, velocity from Jira closed sprints, Monte Carlo P50/P85, priority from the approved roadmap (release → MoSCoW → Rank), release deadlines, OR-Tools CP-SAT packing, release plan, infeasibility cores and verified options, Jira sprint reuse ([SPRINT_PLANNING.md](SPRINT_PLANNING.md)) |
 | 3 Work Allocation | `agents/work-allocation/` | which tasks are safe for an AI coding agent, one-line explanation per assignment | hard AI rules, capacity and review budget, Timefold task-assigning service (local CP-SAT fallback), score breakdown, runner-up, post-checks |
 | 4 Infra & Pipeline | `agents/infra-pipeline/` | infra intent from architecture.md, repairing files that fail checks | golden-path catalog rendering (OpenTofu, Argo CD, Helm, ExternalSecrets, PrometheusRule, Atlantis, CI), 10 sandbox checks, secret scan, risk score, PR text |
 
-Agents 2–4 run as deepagents (**knowledge**: the infra catalog at `/knowledge/catalog/`; summarization; the engine's
-write guard and lock). Task Breakdown runs as structured model calls driven by code instead of a tool-using agent:
-see [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md).
+Agents 3–4 run as deepagents (**knowledge**: the infra catalog at `/knowledge/catalog/`; summarization; the engine's
+write guard and lock). Task Breakdown and Sprint Planning run as structured model calls driven by code instead of a
+tool-using agent: see [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md) and [SPRINT_PLANNING.md](SPRINT_PLANNING.md).
 
 ## Inputs and outputs
 
@@ -22,7 +22,7 @@ All paths are inside the project folder `outputs/<project>/`. "Gate" files are w
 | Agent | Reads (declared inputs; the run refuses if one is missing) | Also reads if present | Writes (declared outputs) | Also writes |
 |---|---|---|---|---|
 | 1 Task Breakdown | `phase4/stories.json` (approved stories, imported from Jira), `prd.md`, `architecture.md`, `phase4/project.json`, `gates/G3A.approved.json`, `gates/G3B.approved.json` | `phase4/history.json`, `requests/task-breakdown.md` | `backlog/backlog.json`, `backlog/backlog.md` | `.engine-task-breakdown/` (retained per-story results, engine-owned) |
-| 2 Sprint Planning | `backlog/backlog.json`, `gates/P4-G1.approved.json`, `phase4/project.json` | `phase4/history.json`, previous `sprint/sprint-plan.json` | `sprint/sprint-plan.json`, `sprint/sprint-plan.md` | `sprint/capacity.json` |
+| 2 Sprint Planning | `backlog/backlog.json`, `gates/P4-G1.approved.json`, `phase4/project.json` | `phase4/history.json` (refreshed from Jira closed sprints), previous `sprint/sprint-plan.json` | `sprint/sprint-plan.json`, `sprint/sprint-plan.md` | `sprint/capacity.json`, `sprint/solver-diagnostics.json`, `.engine-sprint-planning/` |
 | 3 Work Allocation | `sprint/sprint-plan.json`, `gates/P4-G2.approved.json`, `backlog/backlog.json`, `phase4/project.json` | `phase4/skill-profiles.json`, `phase4/agent-outcomes.json`, `infra/manifest.json` + `gates/P4-G4.approved.json` (CI-ready repos) | `allocation/assignments.json`, `allocation/assignments.md` | `allocation/problem.json` |
 | 4 Infra & Pipeline | `architecture.md`, `phase4/project.json` | — | `infra/intent.json`, `infra/manifest.json`, `infra/checks.json`, `infra/PR.md` | `infra/repo/**` (infra repository files), `infra/ci/<owner>__<repo>/**` (CI per code repo) |
 
@@ -60,7 +60,9 @@ Project name, tracker (`local`, `jira`, `linear`, `github`), `code_repos`, `infr
 tracker account, GitHub login, role, allocation %, hours/day, declared skills, PTO days), `ai_agents` (Copilot coding
 agent / Claude Code Action, skills, limits), `calendar` (sprint length, first sprint start, horizon, holidays,
 ceremonies), `definition_of_done`, `story_point_scale`, `hours_per_story_point`, `maintenance_capacity_pct`,
-`max_story_points_per_story`, `deadlines` (prd.md requirement ids + date, hard or soft), `ai_min_recorded_outcomes`
+`max_story_points_per_story`, `deadlines` (prd.md requirement ids + date, hard or soft), `release_deadlines`
+(fallback date per roadmap release, e.g. `{"release": "MVP", "due_date": "2027-01-29", "hard": true}`; a tracker
+version's own release date wins), `ai_min_recorded_outcomes`
 (AI agents work in shadow mode until this many outcomes are recorded; default 20, the example uses 0).
 
 ## Flow and gates
@@ -76,7 +78,7 @@ architecture.md ──► infra-pipeline ──► infra/ ──[P4-G4]──►
 | Gate (`gates.toml`) | Approves | Typical approver | After approval |
 |---|---|---|---|
 | P4-G1 | `backlog/backlog.json` | Tech Lead | `agent-engine phase4 publish backlog`; sprint-planning may run |
-| P4-G2 | `sprint/sprint-plan.json` | delivery manager | `phase4 publish sprint`; work-allocation may run |
+| P4-G2 | `sprint/sprint-plan.json` | Scrum Master / Engineering Manager | `phase4 publish sprint`; work-allocation may run |
 | P4-G3 | `allocation/assignments.json` | engineering manager | `phase4 publish assignments` (assignees + AI dispatch) |
 | P4-G4 | `infra/intent.json`, `infra/manifest.json` | platform engineer | `phase4 publish infra` (infra PR + CI PRs; Atlantis applies after merge) |
 
@@ -162,7 +164,7 @@ Small and additive, so other teams' packs are unaffected:
 | Agent | Time | Input tokens | Validator | Result |
 |---|---|---|---|---|
 | Task Breakdown | 9.4 min | 3.5 M | partial → fixed → success | (retired spec-kit implementation; the story-based one is in [TASK_BREAKDOWN.md](TASK_BREAKDOWN.md)) |
-| Sprint Planning | 1.3 min | ~0.2 M | success | CP-SAT OPTIMAL, 2 sprints, nothing deferred, deadline met |
+| Sprint Planning | 1.3 min | ~0.2 M | success | (retired agent-loop implementation; the code-driven one is in [SPRINT_PLANNING.md](SPRINT_PLANNING.md)) |
 | Infra & Pipeline | 13.6 min | 0.3 M | success | 44 files, all 10 sandbox checks pass, risk 50, 1 infra PR + 2 CI PRs (local mode) |
 | Work Allocation | 4.0 min | 1.1 M | partial → fixed → success | Timefold service, 34 tasks assigned, 2 unassigned (skill gaps), capacity respected |
 

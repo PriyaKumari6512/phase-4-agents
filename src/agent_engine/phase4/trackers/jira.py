@@ -250,6 +250,34 @@ class JiraTracker(TrackerAdapter):
             "endDate": iso(end, time(17)), "goal": goal[:1000]}).json()
         return ExtObj(id=str(r["id"]), key=r.get("name"))
 
+    def board_sprints(self) -> list[dict]:
+        """Future and active sprints of the board (read-only), so publishing can reuse them."""
+        out, start = [], 0
+        while True:
+            r = self.http.get(f"/rest/agile/1.0/board/{self.cfg.jira_board_id}/sprint",
+                              params={"state": "future,active", "startAt": start, "maxResults": 50}).json()
+            for s in r.get("values", []):
+                out.append({"id": str(s["id"]), "name": s.get("name", ""), "state": s.get("state", ""),
+                            "start": date.fromisoformat(s["startDate"][:10]) if s.get("startDate") else None,
+                            "end": date.fromisoformat(s["endDate"][:10]) if s.get("endDate") else None,
+                            "goal": s.get("goal") or ""})
+            if r.get("isLast", True) or not r.get("values"):
+                return out
+            start += len(r["values"])
+
+    def update_sprint(self, sprint_id: str, fields: dict) -> None:
+        """Partial update of an adopted sprint: only empty dates or goal are ever filled."""
+        iso = lambda d, t: datetime.combine(d, t, tzinfo=timezone.utc).isoformat()  # noqa: E731
+        body = {}
+        if fields.get("start"):
+            body["startDate"] = iso(fields["start"], time(9))
+        if fields.get("end"):
+            body["endDate"] = iso(fields["end"], time(17))
+        if fields.get("goal"):
+            body["goal"] = fields["goal"][:1000]
+        if body:
+            self.http.post(f"/rest/agile/1.0/sprint/{sprint_id}", json=body)
+
     def move_to_sprint(self, sprint_id: str, issue_ids: list[str]) -> None:
         for i in range(0, len(issue_ids), 50):
             self.http.post(f"/rest/agile/1.0/sprint/{sprint_id}/issue", json={"issues": issue_ids[i:i + 50]})
@@ -262,7 +290,9 @@ class JiraTracker(TrackerAdapter):
         self.http.put(f"/rest/api/3/issue/{issue_id}/assignee", json={"accountId": account_id})
 
     # ---- history ----
-    def closed_sprints(self, limit: int = 12) -> list[dict]:
+    def closed_sprints(self, limit: int = 12, points_field: str | None = None) -> list[dict]:
+        """Closed sprints of the board, oldest first, with committed and completed story points. `points_field` is the
+        field the stories really use (team-managed projects often differ from the board's estimation field)."""
         sprints, start = [], 0
         while True:
             r = self.http.get(f"/rest/agile/1.0/board/{self.cfg.jira_board_id}/sprint",
@@ -273,7 +303,7 @@ class JiraTracker(TrackerAdapter):
             start += len(r.get("values", []))
         sprints = sorted(sprints, key=lambda s: s.get("completeDate") or s.get("endDate") or "")[-limit:]
         out = []
-        sp = self.estimation_field
+        sp = points_field or self.estimation_field
         for spr in sprints:
             issues, st = [], 0
             while True:

@@ -124,6 +124,9 @@ publication can move them. Publishing refuses when the stories were imported fro
 - Epics publish concurrently, then stories, then tasks. Each parent wave must finish before child publication.
 - Dependency links publish after issues exist; existing links are read back before creating missing ones.
 - Independent sprint publications run concurrently. Conflicting story destinations are rejected before sprint writes.
+- Sprints that already exist on the board are reused, not duplicated: same start date, an active sprint covering
+  the planned start, same name, then undated future sprints (such as the one Jira creates with a new board) in
+  order. Only an adopted sprint's empty dates and goal are filled; nothing is renamed or re-dated.
 - Human assignments/comments for different tasks run concurrently. Changed Jira account mappings trigger reassignment.
 - Local and other tracker adapters keep their serial execution. AI dispatch remains ordered because worker limits,
   predecessor checks and start-time constraints are shared.

@@ -25,7 +25,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage
 from pydantic import BaseModel, ConfigDict
 
 from agent_engine.phase4 import backlog, files, skills_taxonomy
@@ -149,11 +149,20 @@ def _digest(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
 
 
+def history_tickets_digest(text: str) -> str:
+    """Task Breakdown reads only the resolved tickets of history.json (estimation examples). Closed sprints are Sprint
+    Planning's velocity; a new closed sprint must not make an approved backlog stale."""
+    tickets = json.loads(text).get("tickets", [])
+    return "tickets:" + _digest(tickets)
+
+
 def source_manifest(project: str, settings: ProjectSettings | None = None) -> dict[str, str]:
     """What a story-based backlog was built from; validation reports it stale when any of these change."""
     settings = settings or _settings(project)
-    out = {rel: files.file_sha(project, rel) for rel in (files.STORIES, files.ARCHITECTURE, files.PRD, files.HISTORY)
+    out = {rel: files.file_sha(project, rel) for rel in (files.STORIES, files.ARCHITECTURE, files.PRD)
            if files.exists(project, rel)}
+    if files.exists(project, files.HISTORY):
+        out[files.HISTORY] = history_tickets_digest(files.read_text(project, files.HISTORY))
     out[files.PROJECT_SETTINGS] = "settings:" + _digest(backlog.source_settings(settings))
     return out
 
@@ -198,7 +207,17 @@ def _analogies(project: str, story: ImportedStory) -> dict:
 
 
 def _story_view(story: ImportedStory) -> dict:
-    return story.model_dump(mode="json", exclude={"description_md", "issue_id", "labels", "approval", "status"})
+    """What a story's tasks depend on. Backlog order (rank) and release do not change the tasks, so reordering the
+    roadmap in the tracker rebuilds the backlog from retained results without new model calls."""
+    return story.model_dump(mode="json", exclude={"description_md", "issue_id", "labels", "approval", "status",
+                                                  "rank", "fix_versions"})
+
+
+def story_release(story: ImportedStory, releases) -> str | None:
+    """The story's roadmap release: its earliest fix version in roadmap order (else its first fix version)."""
+    order = {r.name: r.order for r in releases}
+    known = sorted((v for v in story.fix_versions if v in order), key=order.get)
+    return known[0] if known else (story.fix_versions[0] if story.fix_versions else None)
 
 
 def _targets(request: str, keys: set[str]) -> set[str] | None:
@@ -259,29 +278,7 @@ def check_breakdown(story: ImportedStory, result: StoryBreakdown, settings: Proj
 
 
 # ---------------------------------------------------------------------------------------------- model call
-async def _invoke(schema, system: str, human: str, callbacks, spec: str):
-    """One structured call. The system text is sent as a cached block for Anthropic models (prompt caching)."""
-    from agent_engine.agent import close_agent
-    from agent_engine.model_setup import resolve_model_with_retries
-    from agent_engine.stage_controls import active_stage_budget
-    from types import SimpleNamespace
-    budget = active_stage_budget.get()
-    if budget:
-        budget.check()
-    model = resolve_model_with_retries(spec)
-    if hasattr(model, "max_tokens"):
-        model.max_tokens = min(getattr(model, "max_tokens", None) or 16000, 16000)
-    anthropic = spec.startswith("anthropic:")
-    system_message = SystemMessage(content=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
-                                   if anthropic else system)
-    try:
-        operation = model.with_structured_output(schema, **({"method": "json_schema"} if anthropic else {}))
-        timeout = min(budget.remaining(), 900) if budget else 900
-        result = await asyncio.wait_for(operation.ainvoke([system_message, HumanMessage(content=human)],
-                                                          config={"callbacks": callbacks}), timeout=timeout)
-        return schema.model_validate(result)
-    finally:
-        await close_agent(SimpleNamespace(_agent_engine_models=[model]))
+from agent_engine.phase4.structured import invoke as _invoke   # noqa: E402  (one structured call, cached prefix)
 
 
 # ---------------------------------------------------------------------------------------------- retained results
@@ -373,7 +370,8 @@ def _round_hours(hours: float) -> float:
     return max(0.5, round(hours * 2) / 2)
 
 
-def story_items(story: ImportedStory, epic_id: str, result: StoryBreakdown, settings: ProjectSettings) -> list[WorkItem]:
+def story_items(story: ImportedStory, epic_id: str, result: StoryBreakdown, settings: ProjectSettings,
+                releases=()) -> list[WorkItem]:
     moscow = story.moscow or "should"
     task_ids = {t.local_id: f"{story.key}-T{n:02d}" for n, t in enumerate(result.tasks, 1)}
     method = "analogy" if result.reference_ticket_ids else "llm"
@@ -405,6 +403,7 @@ def story_items(story: ImportedStory, epic_id: str, result: StoryBreakdown, sett
         item_id=story.key, level="story", parent_id=epic_id, title=story.summary,
         description_md="\n\n".join(p for p in (story.statement, story.notes) if p), type="feature",
         priority=MOSCOW_PRIORITY[moscow], moscow=moscow, user_story=_user_story(story.statement),
+        release=story_release(story, releases), rank=story.rank,
         acceptance_criteria=[AcceptanceCriterion(ac_id=c.ac_id, text=c.text,
                                                  format="gherkin" if c.text.lower().startswith("given") else "ears")
                              for c in story.acceptance_criteria],
@@ -439,7 +438,7 @@ def build_backlog(project: str, snap: StorySnapshot, settings: ProjectSettings,
                               moscow=moscow, components=components,
                               source_refs=[SourceRef(req_id=r, source="prd", anchor=epic_id) for r in requirement_ids]))
         for s in stories:
-            items += story_items(s, epic_id, results[s.key], settings)
+            items += story_items(s, epic_id, results[s.key], settings, snap.releases)
     by = {i.item_id: i for i in items}
     for s in snap.stories:                       # Jira "A blocks B": B cannot start before A
         for blocked in s.blocks:
@@ -450,7 +449,8 @@ def build_backlog(project: str, snap: StorySnapshot, settings: ProjectSettings,
         items = apply_cross(items, snap, settings, results, cross)
     previous = files.read_json(project, files.BACKLOG) if files.exists(project, files.BACKLOG) else {}
     return Backlog(backlog_id=previous.get("backlog_id") or files.new_id(), version=int(previous.get("version", 0)) + 1,
-                   project=project, sources=source_manifest(project, settings), features=features, items=items,
+                   project=project, sources=source_manifest(project, settings), features=features,
+                   releases=list(snap.releases), items=items,
                    generated_at=files.utcnow())
 
 

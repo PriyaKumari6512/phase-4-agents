@@ -95,8 +95,7 @@ def test_full_phase4_flow_through_gates_and_publishing(proj):
     cap = json.loads(sprint.capacity_report(P, AS_OF))
     assert cap["sprints"][0]["capacity_p50"] > 0 and cap["unestimated_stories"] == []
     b = files.read_json(P, files.BACKLOG, Backlog)
-    values = {s.item_id: (8 if s.moscow == "must" else 5) for s in b.stories()}
-    plan = json.loads(sprint.solve(P, values, as_of=AS_OF))
+    plan = json.loads(sprint.solve(P, as_of=AS_OF))
     assert plan["solver"] in ("OPTIMAL", "FEASIBLE")
     assert not json.loads(sprint.check(P))["ok"]           # goals not written yet
     goals = {str(s["sprint_index"]): f"Users can do {s['sprint_index']}" for s in plan["sprints"] if s["stories"]}
@@ -218,8 +217,7 @@ def test_ai_agents_only_get_eligible_tasks_once_ci_is_operational(proj, monkeypa
              and t.estimate.hours <= 4
              and not any(w in f"{t.title} {' '.join(t.file_paths)}".lower() for w in allocation.RISKY)][:3]
     approve(proj, "P4-G1")
-    vals = {s.item_id: 5 for s in b.stories()}
-    sprint.solve(P, vals, as_of=AS_OF)
+    sprint.solve(P, as_of=AS_OF)
     infra.set_intent(P, _intent())
     infra.render(P)
     mock_passed_checks(monkeypatch)
