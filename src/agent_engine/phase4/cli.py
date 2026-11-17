@@ -60,6 +60,8 @@ def add_parser(sub) -> None:
     recover.add_argument("--sprint", type=int, default=1)
     sc = s.add_parser("schemas", help="Write JSON Schemas of the Phase 4 files.")
     sc.add_argument("--out", default="schemas")
+    d = s.add_parser("dispatch", help="Phase 5: dispatch AI work only after all G4 parts and CI are approved.")
+    d.add_argument("--project-name", required=True)
     for name in ("check-ci", "reconcile"):
         command = s.add_parser(name, help="Refresh read-only operational CI / coding-agent outcome evidence.")
         command.add_argument("--project-name", required=True)
@@ -67,6 +69,10 @@ def add_parser(sub) -> None:
 
 def run(args: argparse.Namespace) -> int:
     try:
+        if args.phase4_command == "dispatch":
+            from agent_engine.phase4.publish import dispatch_assignments
+            print(json.dumps(dispatch_assignments(args.project_name), indent=2))
+            return 0
         if args.phase4_command == "recover-parallel":
             from agent_engine.phase4.parallel_stages import recover_session, acknowledge
             from agent_engine.phase4.orchestrator import record_parallel_results

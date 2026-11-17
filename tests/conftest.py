@@ -20,6 +20,13 @@ def _no_live_integrations(monkeypatch):
     for name in list(os.environ):
         if name.startswith(_LIVE_INTEGRATION_PREFIXES):
             monkeypatch.delenv(name, raising=False)
+    # Model-name resolution must also work on a clean machine without credentials.
+    # Calls remain fake; these are names, never authentication material.
+    from agent_engine import config
+    for name, default in (("SDLC_AGENT_STRONG_MODEL", config.ANTHROPIC_STRONG_MODEL),
+                          ("SDLC_AGENT_FAST_MODEL", config.ANTHROPIC_FAST_MODEL)):
+        if not os.environ.get(name):
+            monkeypatch.setenv(name, default)
     # Real HTTP never leaves a test: trackers are exercised with fake clients / httpx.MockTransport.
     import httpx
 

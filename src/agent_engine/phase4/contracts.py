@@ -137,6 +137,7 @@ class ProjectSettings(Strict):
     release_deadlines: list[ReleaseDeadline] = []   # fallback dates for roadmap releases without a tracker date
     # AI agents get work only after this many recorded outcomes (phase4/agent-outcomes.json); before that they
     # run in shadow mode. 0 trusts them from the start.
+    human_only_components: list[str] = []
     ai_min_recorded_outcomes: int = Field(default=20, ge=0)
 
     @model_validator(mode="after")
@@ -529,6 +530,7 @@ class AssignmentPlan(Strict):
     solver_score: str = ""
     pins: dict[str, str] = {}
     vetoes: dict[str, list[str]] = {}
+    block_ai: list[str] = []
     annotated: bool = False
     generated_at: datetime
 

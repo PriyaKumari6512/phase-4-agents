@@ -15,7 +15,7 @@ from typing import Callable
 from langchain_core.tools import tool
 
 from agent_engine import perf
-from agent_engine.phase4 import allocation, files, infra
+from agent_engine.phase4 import files, infra
 
 logger = logging.getLogger(__name__)
 
@@ -90,42 +90,6 @@ def backlog_view(project: str, epic_id: str = "", level: str = "", item_ids: lis
     return _run("backlog_view", view)
 
 
-@tool
-def allocation_prepare(project: str, sprint_index: int = 1) -> str:
-    """Load one sprint of sprint/sprint-plan.json: its tasks, the hard rules for AI agents (acceptance criteria,
-    at most 4 files, estimate within the agent limit, no sensitive area, no open questions, repository CI approved
-    at gate P4-G4), team availability and skills, skill gaps and capacity shortfalls. ai_candidates are the tasks
-    that need your eligibility verdict. Writes allocation/problem.json."""
-    return _run("allocation_prepare", lambda: allocation.prepare(project, sprint_index))
-
-
-@tool
-def allocation_solve(project: str, sprint_index: int = 1, ai_verdicts: dict[str, dict] | None = None,
-                     pins: dict[str, str] | None = None, vetoes: dict[str, list[str]] | None = None,
-                     block_ai: list[str] | None = None) -> str:
-    """Assign the sprint's tasks with the Timefold task-assigning solver (local CP-SAT when the service is down):
-    required skills hard, capacity hard, code ownership affinity, priorities, balanced load; non-AI-eligible tasks
-    only go to humans. ai_verdicts: {task_id: {"eligible": bool, "reason": str}} for the ai_candidates.
-    pins {task_id: worker_id}, vetoes {task_id: [worker_ids]}, block_ai [task_ids] come from the approver.
-    Writes allocation/assignments.json and assignments.md; returns each assignment with its score breakdown and
-    runner-up."""
-    return _run("allocation_solve", lambda: allocation.solve(project, sprint_index, ai_verdicts, pins, vetoes, block_ai))
-
-
-@tool
-def allocation_annotate(project: str, explanations: dict[str, str]) -> str:
-    """Write one plain sentence per assigned task explaining the choice ({task_id: text}), from its score
-    breakdown (skill fit, ownership, load, cost) and runner-up. Updates assignments.json and assignments.md."""
-    return _run("allocation_annotate", lambda: allocation.annotate(project, explanations))
-
-
-@tool
-def allocation_check(project: str) -> str:
-    """Read-only: checks allocation/assignments.json (built from the current sprint plan, every task assigned or
-    explained as unassigned, AI only on eligible tasks, explanations present, capacity)."""
-    return _run("allocation_check", lambda: allocation.check(project))
-
-
 # ============================================================================ infra (Agent 4)
 @tool
 def infra_set_intent(project: str, intent: dict) -> str:
@@ -173,7 +137,7 @@ def infra_check(project: str) -> str:
 
 
 _ALL = [backlog_view,
-        allocation_prepare, allocation_solve, allocation_annotate, allocation_check, infra_set_intent, infra_render,
+        infra_set_intent, infra_render,
         infra_validate, infra_registry_versions, infra_check]
 def _invalid_arguments(error: Exception) -> str:
     return f"ERROR: invalid arguments: {error}"
@@ -185,8 +149,6 @@ for _t in _ALL:
     _t.handle_tool_error = True
 
 TOOL_FACTORIES: dict[str, Callable[[], list]] = {
-    "phase4-allocation": lambda: [backlog_view, allocation_prepare, allocation_solve, allocation_annotate],
-    "phase4-allocation-check": lambda: [allocation_check],
     "phase4-infra": lambda: [infra_set_intent, infra_render, infra_validate, infra_registry_versions],
     "phase4-infra-check": lambda: [infra_check, infra_registry_versions],
 }

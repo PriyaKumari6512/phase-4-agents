@@ -153,20 +153,43 @@ def path_prefix(path: str, depth: int = 2) -> str:
     return "/".join(parts[:depth]) + "/" if len(parts) > 1 else parts[0]
 
 
+def risk_reasons(task: WorkItem, backlog: Backlog, settings: ProjectSettings) -> list[str]:
+    """Conservative human routing from approved metadata; never changes the backlog."""
+    reasons = []
+    if task.discipline in ("DB", "DevOps"):
+        reasons.append(f"{task.discipline} discipline")
+    sensitive = set(task.skills_required) & {"auth-security", "payments"}
+    reasons.extend(f"sensitive skill: {s}" for s in sorted(sensitive))
+    if any("Shared work:" in q for q in task.open_questions):
+        reasons.append("shared work across stories")
+    by = backlog.by_id()
+    if any(other.parent_id != task.parent_id and any(d.on_id == task.item_id for d in other.dependencies)
+           for other in backlog.items if other.level == "task") or any(
+               story.item_id != task.parent_id and any(d.on_id == task.parent_id for d in story.dependencies)
+               for story in backlog.stories()):
+        reasons.append("foundation depended on by another story")
+    components = set(task.components) | set(by[task.parent_id].components if task.parent_id in by else [])
+    reasons.extend(f"human-only component: {c}" for c in sorted(components & set(settings.human_only_components)))
+    text = f"{task.title} {task.description_md} {' '.join(task.file_paths)}".lower()
+    if any(r in text for r in RISKY) or "core architecture" in text:
+        reasons.append("sensitive security, payments, infrastructure or architecture area")
+    return reasons
+
+
 def hard_checks(task: WorkItem, max_hours: float, repo: str | None, ready: set[str]) -> str | None:
     text = f"{task.title} {task.description_md} {' '.join(task.file_paths)}".lower()
     if not task.acceptance_criteria:
         return "no acceptance criteria"
     if not task.file_paths or len(task.file_paths) > MAX_AI_FILES:
         return f"file scope missing or more than {MAX_AI_FILES} files"
-    if task.estimate is None or (task.estimate.hours or 0) > max_hours:
+    if task.estimate is None or not task.estimate.hours or not 0 < task.estimate.hours <= max_hours:
         return f"estimate above the agent limit of {max_hours} h"
     if any(r in text for r in RISKY):
         return "touches a sensitive area (auth, payments, migrations, infrastructure or secrets)"
     if task.open_questions:
         return "has open questions"
     if not repo:
-        return "task has no code repository (Agent 1 sets `repo` per feature or task)"
+        return "task has no code repository; provide an approved repository mapping"
     if repo not in ready:
         return f"CI for {repo} is not set up by the Infra agent and approved (gate P4-G4)"
     return None
@@ -208,11 +231,11 @@ def prepare(project: str, sprint_index: int) -> str:
     rows = []
     for t in tasks:
         repo = t.repo or (settings.code_repos[0] if len(settings.code_repos) == 1 else None)
-        reason = "no AI agents enabled" if not agents else hard_checks(t, max_hours, repo, ready)
+        reason = "; ".join(risk_reasons(t, backlog, settings)) or ("no AI agents enabled" if not agents else hard_checks(t, max_hours, repo, ready))
         rows.append({"task_id": t.item_id, "story_id": t.parent_id, "title": t.title, "type": t.type,
+                     "description": t.description_md, "repo": repo, "discipline": t.discipline,
                      "hours": t.estimate.hours if t.estimate else None, "skills": t.skills_required,
                      "files": t.file_paths, "acceptance_criteria": [a.text for a in t.acceptance_criteria],
-                     "agent1_ai_proposal": {"eligible": t.ai_eligible, "reason": t.ai_eligibility_reason},
                      "ai_candidate": reason is None, "hard_rule_failed": reason})
     w = _window(settings, slot, plan.as_of)
     levels, _ = _profiles(project, settings)
@@ -271,7 +294,7 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
             allowed, shadow = [], False
             failures = []
             for agent in agents:
-                reason = hard_checks(t, agent.max_task_hours, repo, ready)
+                reason = "; ".join(risk_reasons(t, backlog, settings)) or hard_checks(t, agent.max_task_hours, repo, ready)
                 merged, n = stats.get((agent.provider, t.type), (0, 0))
                 in_shadow = n < settings.ai_min_recorded_outcomes
                 shadow |= bool(verdict.get("eligible")) and not reason and in_shadow
@@ -282,7 +305,7 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
             permitted = bool(verdict.get("eligible")) and t.item_id not in blocked
             allowed_ai[t.item_id] = set(allowed) if permitted else set()
             reason = ("AI blocked by the approver" if t.item_id in blocked else
-                      str(verdict.get("reason") or (failures[0] if failures else "no qualified AI provider or no eligibility verdict")))
+                      str(failures[0] if failures else verdict.get("reason") or "no qualified AI provider or no eligibility verdict"))
             eligibility[t.item_id] = EligibilityVerdict(eligible=bool(allowed_ai[t.item_id]), reason=reason, shadow=shadow and permitted)
         elig_span.set(eligible=sum(v.eligible for v in eligibility.values()), outcome_history_reads=1 if outcomes else 0)
 
@@ -409,7 +432,7 @@ def solve(project: str, sprint_index: int, ai_verdicts: dict[str, dict] | None =
         sprint_plan_sha256=files.file_sha(project, files.SPRINT_PLAN), settings_sha256=files.file_sha(project, files.PROJECT_SETTINGS), sprint_index=sprint_index,
         assignments=sorted(assignments, key=lambda a: (a.worker_id, a.planned_start_minute)), unassigned=unassigned,
         eligibility=eligibility, solver_engine="timefold" if res.engine == "timefold" else "local_cpsat",
-        solver_status=res.status, solver_score=res.score, pins=pins, vetoes=vetoes,
+        solver_status=res.status, solver_score=res.score, pins=pins, vetoes=vetoes, block_ai=sorted(blocked),
         workers=[{"worker_id": w.worker_id, "name": w.name, "kind": w.kind,
                   "capacity_hours": round(w.capacity_minutes / 60, 1), "planned_hours": round(planned[w.worker_id], 1)}
                  for w in workers],
@@ -502,6 +525,33 @@ def check(project: str) -> str:
         except files.ProjectError as exc:
             problems.append(str(exc))
     worker_rows = {w["worker_id"]: w for w in ap.workers}
+    if slot is None:
+        problems.append("assignment sprint is missing from the sprint plan")
+    else:
+        window = _window(settings, slot, plan.as_of)
+        enabled = [a for a in settings.ai_agents if a.enabled]
+        review_hours = sum(window.hours_by_member.get(m.member_id, 0) * REVIEW_SHARE
+                           for m in settings.team if enabled and m.can_review)
+        expected = {m.member_id: ("human", max(0, int(window.hours_by_member.get(m.member_id, 0)
+                    * (1 - REVIEW_SHARE if enabled and m.can_review else 1) * 60)) / 60)
+                    for m in settings.team}
+        for agent in enabled:
+            limit = agent.max_concurrent_tasks * agent.max_task_hours * 3
+            expected[agent.agent_id] = ("ai_agent", max(0, int(min(limit, review_hours /
+                max(0.01, get_settings().phase4_ai_review_ratio) / len(enabled)) * 60)) / 60)
+        if len(worker_rows) != len(ap.workers) or set(worker_rows) != set(expected):
+            problems.append("worker roster differs from configured workers")
+        for wid, row in worker_rows.items():
+            actual = sum(a.planned_hours for a in ap.assignments if a.worker_id == wid)
+            kind, capacity = expected.get(wid, (None, 0))
+            if row.get("kind") != kind or abs(row.get("capacity_hours", 0) - round(capacity, 1)) > 0.051:
+                problems.append(f"{wid}: worker capacity or kind does not match authoritative inputs")
+            if abs(row.get("planned_hours", 0) - round(actual, 1)) > 0.051 or actual > capacity + 0.01:
+                problems.append(f"{wid}: planned load exceeds capacity or differs from assignments")
+            if any(a.worker_kind != kind for a in ap.assignments if a.worker_id == wid):
+                problems.append(f"{wid}: assignment worker kind mismatch")
+    if len({u.task_id for u in ap.unassigned}) != len(ap.unassigned) or any(not u.explanation.strip() for u in ap.unassigned):
+        problems.append("unassigned tasks must be unique and explained")
     for wid, row in worker_rows.items():
         previous_end = 0
         for a in sorted((a for a in ap.assignments if a.worker_id == wid), key=lambda a: a.planned_start_minute):
@@ -523,7 +573,13 @@ def check(project: str) -> str:
             if a.worker_kind == "ai_agent":
                 agent = ai_by.get(a.worker_id)
                 repo = task.repo or (settings.code_repos[0] if len(settings.code_repos) == 1 else None)
-                reason = hard_checks(task, agent.max_task_hours, repo, ready) if agent else "AI agent disabled or unknown"
+                reason = ("; ".join(risk_reasons(task, backlog, settings)) or hard_checks(task, agent.max_task_hours, repo, ready)) if agent else "AI agent disabled or unknown"
+                if agent:
+                    success, count = _agent_success(project, agent.provider, task.type)
+                    if count < settings.ai_min_recorded_outcomes or (count and success < MIN_SUCCESS):
+                        problems.append(f"{a.task_id}: AI outcome history does not meet policy")
+                if a.task_id in ap.block_ai:
+                    problems.append(f"{a.task_id}: AI blocked by the approver")
                 if reason:
                     problems.append(f"{a.task_id}: {reason}")
         if a.worker_kind == "ai_agent" and not (ap.eligibility.get(a.task_id) and ap.eligibility[a.task_id].eligible):

@@ -654,9 +654,50 @@ def publish_sprint(project: str) -> dict:
     return report
 
 
-# ============================================================================ assignments + AI dispatch
+# ============================================================================ assignment publication (Phase 4)
 @serialized
 def publish_assignments(project: str) -> dict:
+    require_gate(project, "assignments")
+    from agent_engine.phase4.allocation import check
+    problems = json.loads(check(project))["problems"]
+    if problems:
+        raise PublishError("assignment checks failed: " + "; ".join(problems))
+    settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
+    ap = files.read_json(project, files.ASSIGNMENTS, AssignmentPlan)
+    tracker, ids = tracker_for(project, settings), ExternalIds(project)
+    accounts = {m.member_id: m.tracker_account_id for m in settings.team}
+    report = {"tracker": tracker.system, "assigned": 0, "ai_owners_recorded": 0, "missing_in_tracker": []}
+    def publish_one(a):
+        row = ids.get(tracker.system, a.task_id)
+        if row is None:
+            return a.task_id, 0, 0
+        system = tracker.system + "_assign"
+        with ids.operation(system, a.task_id):
+            payload = {"account_id": accounts.get(a.worker_id), "worker_kind": a.worker_kind, "explanation": a.explanation}
+            prev = ids.get(system, a.task_id)
+            if prev and prev["id"] == a.worker_id and prev.get("last_payload") == payload:
+                return None, 0, 0
+            if a.worker_kind == "human":
+                if tracker.system == "jira" and not payload["account_id"]:
+                    raise PublishError(f"No Jira account ID for {a.worker_id}; set JIRA_ACCOUNT_MAP")
+                tracker.assign(row["id"], payload["account_id"])
+            _comment(tracker, ids, row["id"], f"Owner recommended by PDLC Phase 4 (P4-G3): {a.worker_id} ({a.worker_kind}). {a.explanation}")
+            ids.put(system, a.task_id, a.worker_id, None, payload)
+            return None, int(a.worker_kind == "human"), int(a.worker_kind == "ai_agent")
+    for missing, human, ai in _parallel_jira(tracker, ap.assignments, publish_one):
+        if missing:
+            report["missing_in_tracker"].append(missing)
+        report["assigned"] += human
+        report["ai_owners_recorded"] += ai
+    files.write_json(project, f"{files.PUBLISH_DIR}/assignments.json", report | {"at": files.utcnow().isoformat()})
+    return report
+
+
+# ============================================================================ assignments + AI dispatch
+@serialized
+def dispatch_assignments(project: str) -> dict:
+    for part in ("backlog", "sprint", "assignments", "infra"):
+        require_gate(project, part)
     from agent_engine.phase4 import dispatch
 
     require_gate(project, "assignments")

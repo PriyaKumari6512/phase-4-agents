@@ -90,7 +90,7 @@ def evaluation(pack) -> dict[str, str]:
         "infra-pipeline": ("infra", "sandbox", "settings", "contracts", "files", "tools"),
         "sprint-planning": ("sprint_planning", "structured", "sprint", "sprint_model", "capacity", "calendars", "settings",
                             "contracts", "files"),
-        "work-allocation": ("allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),
+        "work-allocation": ("work_allocation", "structured", "allocation", "alloc_solver", "capacity", "calendars", "readiness", "settings", "contracts", "files", "tools"),
     }
     selected = [base / rel for rel in common] + [base / "phase4" / (name + ".py") for name in domains.get(pack.name, ())]
     for p in selected:

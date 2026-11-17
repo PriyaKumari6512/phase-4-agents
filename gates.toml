@@ -39,7 +39,7 @@ description = "Sprint plan and release plan from the Sprint Planning agent (Scru
 files = ["sprint/sprint-plan.json"]
 
 [P4-G3]
-description = "Task assignments for one sprint from the Work Allocation agent (engineering manager)"
+description = "Task assignments for one sprint from the Work Allocation agent (Engineering Manager)"
 files = ["allocation/assignments.json"]
 
 [P4-G4]

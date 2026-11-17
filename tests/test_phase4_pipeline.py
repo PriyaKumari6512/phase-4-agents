@@ -11,7 +11,7 @@ import pytest
 from agent_engine import config, gates
 from agent_engine.phase4 import allocation, backlog, files, infra, publish, sprint
 from agent_engine.phase4.contracts import AssignmentPlan, Backlog, SprintPlan
-from agent_engine.phase4.contracts import CheckResult
+from agent_engine.phase4.contracts import CheckResult, ProjectSettings
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "phase4" / "bookmarks"
@@ -213,8 +213,10 @@ def test_infra_intent_render_validate_publish_and_ci_readiness(proj, monkeypatch
 def test_ai_agents_only_get_eligible_tasks_once_ci_is_operational(proj, monkeypatch):
     built(proj)
     b = files.read_json(P, files.BACKLOG, Backlog)
+    settings = files.read_json(P, files.PROJECT_SETTINGS, ProjectSettings)
     small = [t for t in b.items if t.level == "task" and t.file_paths and len(t.file_paths) <= 4
              and t.estimate.hours <= 4
+             and not allocation.risk_reasons(t, b, settings)
              and not any(w in f"{t.title} {' '.join(t.file_paths)}".lower() for w in allocation.RISKY)][:3]
     approve(proj, "P4-G1")
     sprint.solve(P, as_of=AS_OF)
