@@ -224,6 +224,21 @@ def _validate(backlog: Backlog, settings: ProjectSettings, stories: list) -> lis
     sec.end()
 
     sec = perf.start_span("compute", "backlog.validate.waves_and_critical_path")
+    for _ in range(50):     # loops through task links across stories: drop the weakest model-proposed link
+        try:
+            cycle = nx.find_cycle(story_graph(items))
+        except nx.NetworkXNoCycle:
+            break
+        pairs = set(cycle)
+        links = [(d.confidence, t.item_id, d.on_id) for t in items.values() if t.level == "task" for d in t.dependencies
+                 if d.origin == "llm" and d.on_id in items and items[d.on_id].level == "task"
+                 and (items[d.on_id].parent_id, t.parent_id) in pairs]
+        if not links:
+            break
+        _, task_id, on_id = min(links)
+        items[task_id].dependencies = [d for d in items[task_id].dependencies if d.on_id != on_id]
+        issue("dependency_cycle", f"removed low-confidence link {task_id} -> {on_id}: it made stories wait for each "
+              f"other ({' -> '.join(u for u, _ in cycle)})", [task_id], "warning")
     questions = [i.item_id for i in items.values() if i.open_questions]
     if questions:
         issue("open_questions", f"{len(questions)} items have open questions for the reviewer", questions, "warning")
@@ -241,7 +256,9 @@ def _validate(backlog: Backlog, settings: ProjectSettings, stories: list) -> lis
             paths[n] = (paths[pred] if pred is not None else []) + [n]
         backlog.critical_path = paths[max(lengths, key=lengths.get)] if lengths else []
     else:
-        issue("dependency_cycle", "story graph (with task-derived edges) has a cycle", [])
+        stuck = [u for u, _ in nx.find_cycle(sg)]
+        issue("dependency_cycle", "stories wait for each other through tracker or human links: " + " -> ".join(stuck)
+              + "; a human must fix the order", stuck)
     sec.end(critical_path=len(backlog.critical_path), waves=len(backlog.story_waves))
     return issues
 

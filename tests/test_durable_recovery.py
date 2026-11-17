@@ -527,3 +527,16 @@ def test_child_cannot_modify_orchestrator_bookkeeping(parallel_root):
     with pytest.raises(ValueError, match="bookkeeping"):
         parallel.run_pair(parallel_root, steps(), run)
     assert not (parallel_root / "backlog").exists()
+
+
+def test_infra_retained_state_merges_only_for_infra(parallel_root):
+    base = fake_runner([])
+    def run(agent_name, *args, **kwargs):
+        result = base(agent_name, *args, **kwargs)
+        if agent_name == "infra-pipeline":
+            state = kwargs["outputs_dir"] / "demo" / ".engine-infra-pipeline"
+            state.mkdir()
+            (state / ("b" * 64 + ".json")).write_text("{}")
+        return result
+    parallel.run_pair(parallel_root, steps(), run)
+    assert (parallel_root / ".engine-infra-pipeline" / ("b" * 64 + ".json")).is_file()

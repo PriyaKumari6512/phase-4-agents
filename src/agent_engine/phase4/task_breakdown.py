@@ -500,8 +500,11 @@ def screen_cross(review: CrossStoryReview, snap: StorySnapshot, results: dict[st
             task_owner[ids[t.local_id]] = s.key
             discipline[ids[t.local_id]] = t.discipline
     jira = {(b, s.key) for s in snap.stories for b in s.blocks} | {(s.key, b) for s in snap.stories for b in s.blocks}
+    import networkx as nx
+    order = nx.DiGraph()                       # story order so far: tracker links, then accepted proposals
+    order.add_edges_from((s.key, b) for s in snap.stories for b in s.blocks if b in stories)
     edges, merges, questions, seen = [], [], {}, set()
-    for d in review.dependencies:
+    for d in sorted(review.dependencies, key=lambda d: -d.confidence):
         a, b = _owner(d.item_id, stories, task_owner), _owner(d.on_id, stories, task_owner)
         same_level = (d.item_id in stories) == (d.on_id in stories)
         if not a or not b or a == b or not same_level or (d.item_id, d.on_id) in seen:
@@ -509,7 +512,13 @@ def screen_cross(review: CrossStoryReview, snap: StorySnapshot, results: dict[st
         if d.item_id in stories and (d.item_id, d.on_id) in jira:
             continue                                   # the tracker already says so
         seen.add((d.item_id, d.on_id))
+        if a in order and b in order and nx.has_path(order, a, b):
+            questions.setdefault(d.item_id, []).append(
+                f"Proposed dependency on {d.on_id} contradicts the existing story order ({b} already waits for {a}); "
+                f"not added: {d.reason}")
+            continue
         if d.confidence >= MIN_EDGE_CONFIDENCE:
+            order.add_edge(b, a)
             edges.append(d)
         else:
             questions.setdefault(d.item_id, []).append(
@@ -802,7 +811,9 @@ async def repair(project: str, gaps: list[str], callbacks):
     current = files.read_json(project, files.BACKLOG, Backlog)
     affected = _affected_stories(current, findings, keys)
     if not affected:
-        raise files.ProjectError("cannot map the findings to stories; partial backlog retained: " + "; ".join(gaps))
+        # Findings that name no story (e.g. a dependency loop reported by an older check): rebuild from retained
+        # results — no new story calls — and let validation repair what it can deterministically.
+        return await generate(project, "", callbacks)
     attempt = _digest({"affected": affected, "backlog": [i.model_dump(mode="json") for i in current.items]})
     if _load(project, "repairs", attempt + ".json"):
         raise files.ProjectError("the same findings remain after a repair; partial backlog retained for the Tech Lead")

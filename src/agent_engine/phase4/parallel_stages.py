@@ -15,8 +15,17 @@ from agent_engine.history import file_digest
 from agent_engine.runtime import atomic_json, project_lock
 
 OWNED = {"task-breakdown": {"backlog"}, "infra-pipeline": {"infra"}}
-RETAINED = ".engine-task-breakdown"   # Task Breakdown's retained per-story results (task_breakdown.py)
-_RETAINED_PATH = re.compile(r"(?:(?:stories|cross|reviews|repairs)/[0-9a-f]{64}|current)\.json")
+# Engine-owned retained results each parallel stage may bring back, and the exact paths allowed inside them.
+RETAINED_BY_AGENT = {
+    "task-breakdown": (".engine-task-breakdown",
+                       re.compile(r"(?:(?:stories|cross|reviews|repairs)/[0-9a-f]{64}|current)\.json")),
+    "infra-pipeline": (".engine-infra-pipeline", re.compile(r"[0-9a-f]{64}\.json")),
+}
+RETAINED_DIRS = {folder for folder, _ in RETAINED_BY_AGENT.values()}
+
+
+def _retained(agent: str, top: str) -> bool:
+    return agent in RETAINED_BY_AGENT and RETAINED_BY_AGENT[agent][0] == top
 POINTER = ".engine-pending-merge.json"
 PLAN = "merge-plan.json"
 
@@ -107,7 +116,7 @@ def _collect(root: Path, evidence: Path, plan: dict):
             parts = Path(rel).parts
             if plan.get("legacy"):
                 sibling = set().union(*OWNED.values()) - OWNED[agent]
-                if parts[0] in sibling or (agent == "infra-pipeline" and parts[0] == RETAINED):
+                if parts[0] in sibling or (parts[0] in RETAINED_DIRS and not _retained(agent, parts[0])):
                     continue  # never copy a sibling's artifacts from an older snapshot
                 if parts[0] in {"runs", "logs"} and rel in before:
                     continue  # legacy sessions cannot prove ownership of prior history
@@ -115,9 +124,9 @@ def _collect(root: Path, evidence: Path, plan: dict):
                     continue
             allowed = (parts[0] in OWNED[agent] or rel == f"requests/{agent}.md"
                        or (parts[0] == "runs" and rel not in before) or parts[0] == "logs")
-            if parts[0] == RETAINED and agent == "task-breakdown":
-                if not _RETAINED_PATH.fullmatch("/".join(parts[1:])):
-                    raise ValueError(f"unexpected task-breakdown state path: {rel}")
+            if _retained(agent, parts[0]):
+                if not RETAINED_BY_AGENT[agent][1].fullmatch("/".join(parts[1:])):
+                    raise ValueError(f"unexpected {agent} state path: {rel}")
                 allowed = True
             if rel == "report.json":
                 changes[rel] = (source / rel) if rel in after else None
@@ -287,7 +296,7 @@ def recover_session(root: Path, session: Path) -> dict:
                 requests[agent] = report["request_text"]
                 for rel in set(before) | set(after):
                     parts = Path(rel).parts
-                    generated = parts[0] in OWNED[agent] or (agent == "task-breakdown" and parts[0] == RETAINED)
+                    generated = parts[0] in OWNED[agent] or _retained(agent, parts[0])
                     bookkeeping = parts[0] in {"runs", "logs"} or rel == "report.json"
                     if generated:
                         if rel in before and before.get(rel) != after.get(rel):
@@ -297,7 +306,7 @@ def recover_session(root: Path, session: Path) -> dict:
                         new = (source / rel).read_text(encoding="utf-8") if rel in after else ""
                         if not new.startswith(old):
                             raise ValueError("request history changed since the retained run")
-                    elif (parts[0] in set().union(*OWNED.values()) or parts[0] == RETAINED
+                    elif (parts[0] in set().union(*OWNED.values()) or parts[0] in RETAINED_DIRS
                           or (parts[0] == "requests" and rel != f"requests/{agent}.md")):
                         continue  # sibling outputs are not inputs to this independent stage
                     elif not bookkeeping and before.get(rel) != after.get(rel):

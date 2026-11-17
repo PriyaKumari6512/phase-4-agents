@@ -511,3 +511,40 @@ def test_backlog_carries_the_roadmap_without_regenerating_on_reorder(proj, monke
     (proj / "phase4/stories.json").write_text(json.dumps(stories))
     run(tb.generate(P, "", []))
     assert len(fake.calls) == calls and files.read_json(P, files.BACKLOG, Backlog).by_id()["GR-9"].rank == "0|i000zz:"
+
+
+def test_a_proposed_link_against_the_tracker_order_becomes_a_question(proj, monkeypatch):
+    # Jira: GR-9 blocks GR-10. The model proposes the opposite (a GR-9 task waiting on a GR-10 task).
+    review = tb.CrossStoryReview(shared_work=[], dependencies=[edge("GR-9-T02", "GR-10-T01", 0.8, "needs the table")])
+    monkeypatch.setattr(tb, "_invoke", FakeModel(cross=review))
+    run(tb.generate(P, "", []))
+    by = files.read_json(P, files.BACKLOG, Backlog).by_id()
+    assert not any(d.on_id == "GR-10-T01" for d in by["GR-9-T02"].dependencies)
+    assert any("contradicts the existing story order (GR-10 already waits for GR-9)" in q
+               for q in by["GR-9-T02"].open_questions)
+    assert json.loads(backlog.validate_report(P, write=False))["ready_for_review"]
+
+
+def test_validation_breaks_a_loop_made_by_a_model_link(proj, monkeypatch):
+    monkeypatch.setattr(tb, "_invoke", FakeModel())
+    run(tb.generate(P, "", []))
+    doc = json.loads((proj / files.BACKLOG).read_text())
+    for item in doc["items"]:                    # bypass screening: a model link against Jira's GR-9 -> GR-10
+        if item["item_id"] == "GR-9-T02":
+            item["dependencies"].append({"on_id": "GR-10-T01", "reason": "x", "confidence": 0.7, "origin": "llm"})
+    (proj / files.BACKLOG).write_text(json.dumps(doc))
+    _, issues = backlog.validate(P)
+    loop = [i for i in issues if i.rule == "dependency_cycle"]
+    assert loop and loop[0].severity == "warning" and loop[0].item_ids == ["GR-9-T02"]
+    assert not any(i.severity == "blocking" for i in issues)
+
+
+def test_findings_without_story_ids_rebuild_from_retained_results(proj, monkeypatch):
+    fake = FakeModel()
+    monkeypatch.setattr(tb, "_invoke", fake)
+    run(tb.generate(P, "", []))
+    calls = len(fake.calls)
+    old = json.dumps({"rule": "dependency_cycle", "item_ids": [], "message": "story graph has a cycle"})
+    run(tb.repair(P, [old], []))
+    assert len(fake.calls) == calls                       # rebuilt from retained results, no new story calls
+    assert json.loads(backlog.validate_report(P, write=False))["ready_for_review"]
