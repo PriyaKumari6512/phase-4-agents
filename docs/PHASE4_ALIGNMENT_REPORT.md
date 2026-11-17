@@ -4,7 +4,7 @@ Local verification on 2026-11-17, branch feat/task-breakdown-from-approved-stori
 
 ## Decisions applied
 
-Keep missing paths/questions as AI blockers. Route structured security, payment and architecture signals to humans; allow configured human-only components. Record AI owners in tracker comments. Move dispatch behind an explicit Phase 5 command. Add qa and retain stg. Use trunk-based development, digest GitOps promotion and AWS-only catalog support. Retain checkpoint approvals and require final G4 before every publication path.
+Keep missing paths/questions as AI blockers. Route structured security, payment and architecture signals to humans (for a story other stories depend on, only its backend tasks; any task another story depends on); allow configured human-only components. Record AI owners in tracker comments. Move dispatch behind an explicit Phase 5 command. Add qa and retain stg. Use trunk-based development, digest GitOps promotion and AWS-only catalog support. Retain checkpoint approvals and require final G4 before every publication path.
 
 ## Offline end-to-end run
 

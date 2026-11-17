@@ -163,11 +163,15 @@ def risk_reasons(task: WorkItem, backlog: Backlog, settings: ProjectSettings) ->
     if any("Shared work:" in q for q in task.open_questions):
         reasons.append("shared work across stories")
     by = backlog.by_id()
+    # Foundation work: a task another story's task depends on, or the backend (the API other stories call) of a story
+    # other stories depend on. Screens and tests of such a story are not foundations; DB work is covered above.
     if any(other.parent_id != task.parent_id and any(d.on_id == task.item_id for d in other.dependencies)
-           for other in backlog.items if other.level == "task") or any(
-               story.item_id != task.parent_id and any(d.on_id == task.parent_id for d in story.dependencies)
-               for story in backlog.stories()):
+           for other in backlog.items if other.level == "task"):
         reasons.append("foundation depended on by another story")
+    elif task.discipline == "BE" and any(story.item_id != task.parent_id and any(d.on_id == task.parent_id
+                                                                                 for d in story.dependencies)
+                                         for story in backlog.stories()):
+        reasons.append("backend of a story other stories depend on")
     components = set(task.components) | set(by[task.parent_id].components if task.parent_id in by else [])
     reasons.extend(f"human-only component: {c}" for c in sorted(components & set(settings.human_only_components)))
     text = f"{task.title} {task.description_md} {' '.join(task.file_paths)}".lower()

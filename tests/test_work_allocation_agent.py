@@ -115,3 +115,19 @@ def _isolate_component_publication(monkeypatch):
     # These tests exercise one publisher/checkpoint; final G4 has dedicated integration tests.
     from agent_engine.phase4 import publish
     monkeypatch.setattr(publish, "require_final_gate", lambda project: {})
+
+
+def test_a_depended_on_story_keeps_only_its_backend_away_from_ai(proj):
+    """BM-3 depends on BM-2 (a tracker "blocks" link): BM-2's API is a foundation, its screen and tests are not."""
+    built(proj)
+    b = files.read_json(P, files.BACKLOG, Backlog)
+    settings = files.read_json(P, files.PROJECT_SETTINGS, ProjectSettings)
+    assert any(d.on_id == 'BM-2' for d in b.by_id()['BM-3'].dependencies)
+    by_discipline = {t.discipline: t for t in b.tasks_of('BM-2')}
+    assert "backend of a story other stories depend on" in allocation.risk_reasons(by_discipline['BE'], b, settings)
+    for discipline in ('FE', 'QA'):
+        reasons = allocation.risk_reasons(by_discipline[discipline], b, settings)
+        assert not any('depend' in r for r in reasons), (discipline, reasons)
+    # A story nobody depends on keeps its backend eligible on this signal.
+    be_of_leaf = next(t for t in b.tasks_of('BM-4') if t.discipline == 'BE')
+    assert not any('depend' in r for r in allocation.risk_reasons(be_of_leaf, b, settings))
