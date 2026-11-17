@@ -242,6 +242,23 @@ def test_model_clients_close_once_and_cleanup_failure_does_not_hide_outcome():
     assert calls == ["sync", "async"]
 
 
+def test_closing_writer_models_keeps_shared_transport_open_for_verifier():
+    # Regression: closing the writer's clients closed langchain_anthropic's cached httpx client, so every
+    # verifier pass failed with "Connection error" (client has been closed). No network call is made here.
+    from agent_engine.agent import close_agent
+    from agent_engine.subscription_models import build_anthropic_subscription_llm
+
+    async def exercise():
+        writer = build_anthropic_subscription_llm("claude-sonnet-5-5", "token")
+        verifier = build_anthropic_subscription_llm("claude-sonnet-5-5", "token")
+        shared = verifier._async_client._client
+        assert writer._async_client._client is shared
+        await close_agent(SimpleNamespace(_agent_engine_models=[writer]))
+        assert not shared.is_closed
+        assert not verifier._client._client.is_closed
+    asyncio.run(exercise())
+
+
 def test_provider_cache_changes_when_non_tf_file_changes_or_disappears(tmp_path, monkeypatch):
     monkeypatch.setenv("PHASE4_IAC_CACHE_DIR", str(tmp_path / "cache"))
     root = tmp_path / "source"

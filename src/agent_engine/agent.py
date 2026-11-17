@@ -332,15 +332,27 @@ def _build_agent(pack: AgentPack, level: int, sp) -> CompiledStateGraph:
         return graph
 
 
+def _uses_shared_transport(client) -> bool:
+    """True when an SDK client sends through a process-wide cached httpx client.
+
+    langchain_anthropic and langchain_openai hand every model instance the same lru_cache'd httpx client.
+    Closing it after one pass closes it for every later pass too (the verifier then fails with
+    "Cannot send a request, as the client has been closed", reported as "Connection error")."""
+    transport = getattr(client, "_client", None)
+    return transport is not None and type(transport).__module__.startswith(("langchain_anthropic", "langchain_openai"))
+
+
 async def close_agent(graph) -> None:
-    """Each build owns its SDK clients; release them after the pass, including failures."""
+    """Release the SDK clients a build owns after the pass, including failures.
+
+    Clients backed by a shared, cached transport are left open: the next build reuses that transport."""
     seen = set()
     with perf.span("diagnostics", "model_clients_close"):
         for model in getattr(graph, "_agent_engine_models", []):
             for name in ("_client", "_async_client", "root_client", "root_async_client"):
                 client = getattr(model, name, None)
                 close = getattr(client, "close", None)
-                if client is None or id(client) in seen or not callable(close):
+                if client is None or id(client) in seen or not callable(close) or _uses_shared_transport(client):
                     continue
                 seen.add(id(client))
                 try:
