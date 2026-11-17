@@ -44,7 +44,8 @@ def fingerprint(project_dir: Path) -> dict[str, str]:
             p.relative_to(project_dir).as_posix(): file_digest(p)
             for p in sorted(project_dir.rglob("*"))
             if p.is_file() and p.relative_to(project_dir).parts[0] not in _NOT_OUTPUT
-            and not p.name.startswith(".engine-") and not p.name.endswith(".tmp")
+            and not any(part.startswith(".engine-") for part in p.relative_to(project_dir).parts)
+            and not p.name.endswith(".tmp")
         }
         if perf.enabled():
             sp.set(files=len(digests), bytes=sum((project_dir / f).stat().st_size for f in digests))

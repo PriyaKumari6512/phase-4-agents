@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from agent_engine import config, perf
+from agent_engine import config, perf, recovery
 from agent_engine.gates import APPROVED_SUFFIX, Gate, load_gates, record_decision
 from agent_engine.history import file_digest
 from agent_engine.runtime import atomic_json, project_lock
@@ -138,11 +138,11 @@ def gate_state(root: Path, gate: Gate) -> tuple[str, dict]:
     """(approved | stale | changes_requested | rejected | pending, the latest decision record)."""
     history, last = root / "gates" / "history.jsonl", {}
     if history.is_file():
-        for line in history.read_text(encoding="utf-8").splitlines():
+        for event_index, line in enumerate(history.read_text(encoding="utf-8").splitlines()):
             if line.strip():
                 record = json.loads(line)
                 if record.get("gate") == gate.name:
-                    last = record
+                    last = {**record, "_event_index": event_index}
     approval = root / gate.approval_file
     if approval.is_file():
         record = json.loads(approval.read_text(encoding="utf-8"))
@@ -171,6 +171,16 @@ def save_state(root: Path, state: dict) -> None:
         atomic_json(path, state)
 
 
+def record_parallel_results(root: Path, results: dict, sprint: int = 1, state: dict | None = None) -> None:
+    state = load_state(root) if state is None else state
+    for agent, result in results.items():
+        if agent not in STAGE_BY_AGENT:
+            raise ValueError("unknown recovered stage")
+        state[agent] = {"inputs": input_digests(STAGE_BY_AGENT[agent], root, sprint),
+                        "status": result["status"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    save_state(root, state)
+
+
 @dataclass
 class Step:
     stage: Stage
@@ -178,6 +188,7 @@ class Step:
     why: str
     request: str = ""
     gate_status: str = ""
+    resume_action: str = ""
 
 
 def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None) -> list[Step]:
@@ -203,6 +214,25 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None) 
             continue
         status, record = gate_state(root, gate)
         request = stage.request.format(sprint=sprint)
+        if status not in ("changes_requested", "rejected", "approved"):
+            from agent_engine.agent import load_pack
+            pack = load_pack(stage.agent)
+            action, retained = recovery.next_action(root, pack)
+            # Allocation's selected sprint is part of its request contract.
+            same_parameter = stage.agent != "work-allocation" or not retained or retained["request"] == request
+            if retained and same_parameter:
+                if action == "complete":
+                    steps.append(Step(stage, "gate_pending", "retained review is complete; awaiting gate",
+                                      retained["request"], status, "complete"))
+                    continue
+                if action in ("verify", "repair", "restore_repair"):
+                    steps.append(Step(stage, "run", f"resume retained {action}; generation is saved",
+                                      retained["request"], status))
+                    continue
+                if action in ("wait", "conflict"):
+                    steps.append(Step(stage, "escalate", "retained output needs a decision: " +
+                                      "; ".join(retained.get("gaps", [])), gate_status=status))
+                    continue
         outputs_exist = all((root / f).is_file() for f in _outputs(stage))
         if not outputs_exist:
             steps.append(Step(stage, "run", "no output yet", request, status))
@@ -217,12 +247,29 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None) 
             if feedback:
                 comment = record.get("comment") or "(no comment given)"
                 parts.append(f"Gate {gate.name} was reviewed by {record.get('approver', {}).get('name', 'a reviewer')} "
+                             f"(decision event {record.get('_event_index', -1)}, {record.get('decided_at', '')}) "
                              f"and changes were requested: {comment}")
                 why.append(f"{gate.name} asked for changes")
             if changed:
                 parts.append("These inputs changed since your last run: " + ", ".join(changed)
                              + ". Update your output to match them and change only what needs changing.")
                 why.append("inputs changed: " + ", ".join(changed))
+            if feedback:
+                from agent_engine.agent import load_pack
+                action, retained = recovery.next_action(root, load_pack(stage.agent))
+                if retained and retained.get("request", "").startswith(parts[0]):
+                    if action == "complete":
+                        steps.append(Step(stage, "gate_pending", "reviewed response retained; renew the gate decision",
+                                          retained["request"], status, "complete"))
+                        continue
+                    if action in ("verify", "repair", "restore_repair"):
+                        steps.append(Step(stage, "run", f"resume retained {action}; generation is saved",
+                                          retained["request"], status))
+                        continue
+                    if action in ("wait", "conflict"):
+                        steps.append(Step(stage, "escalate", "retained response needs attention: " +
+                                          "; ".join(retained.get("gaps", [])), gate_status=status))
+                        continue
             steps.append(Step(stage, "run", "; ".join(why), "\n\n".join(parts), status))
         elif status == "rejected":
             steps.append(Step(stage, "escalate", f"{gate.name} was rejected; a human has to decide", gate_status=status))
@@ -288,6 +335,7 @@ def run_agent(agent: str, request: str, project: str, *, outputs_dir: Path | Non
     Returns {status, exit_code, rate_limited, gaps, invocation_id, report_problem}."""
     invocation_id = perf.new_id(24)
     cmd = [sys.executable, "-m", "agent_engine.cli", "run", request, "--agent", agent, "--project-name", project]
+    cmd.append("--resume")
     with perf.span("child", agent, agent=agent, invocation_id=invocation_id) as sp:
         env = {**os.environ, "PYTHONIOENCODING": "utf-8", perf.ENV_INVOCATION: invocation_id, **perf.child_env(sp.id)}
         if outputs_dir is not None:
@@ -393,27 +441,42 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             return FAILED
         state = load_state(root)
         _observe_approvals(root, gates)
+        if not plan_only:
+            from agent_engine.phase4.parallel_stages import replay_pending, acknowledge
+            try:
+                restored = replay_pending(root, runner=runner)
+            except Exception as exc:
+                out(f"STOP: retained parallel merge needs recovery: {exc}; child outputs remain saved.")
+                return FAILED
+            if restored:
+                record_parallel_results(root, restored, sprint, state)
+                acknowledge(root)
+                out(">>> recovered retained parallel results without rerunning stage writers")
     ran: list[str] = []
+    failed_attempts: set[str] = set()
     for _ in range(MAX_STEPS):
         with perf.span("orchestrator", "assess") as asp:
             steps = assess(project, sprint, gates)
             asp.set(actions={s.stage.agent: s.action for s in steps})
         # Existing outputs of a project run by hand: take them as up to date.
         for s in steps:
-            if s.action in ("done", "gate_pending") and s.stage.agent not in state:
+            if s.resume_action == "complete":
+                state[s.stage.agent] = {"inputs": input_digests(s.stage, root, sprint), "status": "success",
+                                       "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            elif s.action in ("done", "gate_pending") and s.stage.agent not in state:
                 state[s.stage.agent] = {"inputs": input_digests(s.stage, root, sprint), "status": "adopted",
                                         "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
         if not plan_only:
             save_state(root, state)
         out(format_table(steps))
         blocked = [s for s in steps if s.action in ("blocked_input", "escalate")]
-        runnable = [s for s in steps if s.action == "run"]
+        runnable = [s for s in steps if s.action == "run" and s.stage.agent not in failed_attempts]
         if plan_only:
             return DONE if all(s.action == "done" for s in steps) else WAITING
         if blocked and not runnable:
             for s in blocked:
                 out(f"\nSTOP {s.stage.agent}: {s.why}")
-            return WAITING
+            return FAILED if failed_attempts else WAITING
         if runnable:
             pair = [s for s in runnable if s.stage.agent in ("task-breakdown", "infra-pipeline")]
             # Only these two stages have verified independent inputs. Injected
@@ -433,10 +496,12 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
                                                "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
                     ran.append(item.stage.agent)
                 save_state(root, state)
+                from agent_engine.phase4.parallel_stages import acknowledge
+                acknowledge(root)
                 failed = {name: r for name, r in results.items() if r["status"] not in SUCCESS}
                 if failed:
                     out("STOP: parallel stages need review: " + json.dumps(failed))
-                    return FAILED
+                    failed_attempts.update(failed)
                 continue
             step = runnable[0]
             out(f"\n>>> running {step.stage.agent}: {step.why}\n")
@@ -460,7 +525,8 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
                     out(f"  report: {result['report_problem']}")
                 for gap in result.get("gaps", []):
                     out(f"  - {gap}")
-                return FAILED
+                failed_attempts.add(step.stage.agent)
+                continue
             state[step.stage.agent] = {"inputs": digests, "status": "success",
                                        "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
             save_state(root, state)
@@ -475,6 +541,8 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
                                decided_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
                     out(f">>> TEST-approved {s.stage.gate} (not a human sign-off)")
                 continue
+            if failed_attempts:
+                return FAILED
             # Diagnostics: human waiting starts now; it ends at the gate decision (gate command or approval record).
             perf.event("approval_wait_start", ",".join(s.stage.gate for s in pending),
                        gates=[s.stage.gate for s in pending], project=project)
@@ -486,7 +554,9 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             return WAITING
         waiting = [s for s in steps if s.action == "waiting_gate"]
         if waiting:  # nothing runnable, no gate to approve here: an upstream stage is blocked
-            return WAITING
+            return FAILED if failed_attempts else WAITING
+        if failed_attempts:
+            return FAILED
         break  # every stage is done
     else:
         out(f"STOP: no end after {MAX_STEPS} steps; check the project folder.")

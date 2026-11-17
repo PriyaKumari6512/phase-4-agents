@@ -67,6 +67,24 @@ transcript_logger = logging.getLogger(TRANSCRIPT_LOGGER_NAME)
 _PROJECT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
+class InvalidVerdictError(RuntimeError):
+    pass
+
+
+def _invalid_verdict_error(error: BaseException) -> bool:
+    """Only retry response-format failures, not arbitrary execution failures."""
+    seen = set()
+    for _ in range(8):
+        if error is None or id(error) in seen:
+            break
+        seen.add(id(error))
+        if isinstance(error, (InvalidVerdictError, json.JSONDecodeError)) or type(error).__name__ in {
+            "StructuredOutputValidationError", "MultipleStructuredOutputsError"}:
+            return True
+        error = error.__cause__ or error.__context__
+    return False
+
+
 def _text(content: object) -> str:
     """Some providers return message content as typed blocks; keep the text."""
     if isinstance(content, list):
@@ -181,16 +199,22 @@ def verdict_status(verdict: Verdict) -> tuple[str, str | None]:
     return verdict.status_so_far, None
 
 
-async def _run(request: str, agent_name: str, project_name: str, resume_verification: bool = False) -> int:
+async def _run(request: str, agent_name: str, project_name: str, resume_verification: bool = False,
+               resume: bool = False, review_existing: bool = False) -> int:
     if not _PROJECT_NAME_RE.fullmatch(project_name):
         raise ValueError("invalid project name")
     with project_scope(project_name), project_lock(OUTPUTS_DIR / project_name):
+        if review_existing:
+            return await _owned_run(request, agent_name, project_name, review_existing=True)
+        if resume:
+            return await _owned_run(request, agent_name, project_name, resume=True)
         if resume_verification:
             return await _owned_run(request, agent_name, project_name, resume_verification=True)
         return await _owned_run(request, agent_name, project_name)
 
 
-async def _owned_run(request: str, agent_name: str, project_name: str, resume_verification: bool = False) -> int:
+async def _owned_run(request: str, agent_name: str, project_name: str, resume_verification: bool = False,
+                     resume: bool = False, review_existing: bool = False) -> int:
     from agent_engine.stage_controls import StageBudget, active_stage_budget
     budget_token = None
     if agent_name in ("task-breakdown", "task-breakdown/validator"):
@@ -198,7 +222,11 @@ async def _owned_run(request: str, agent_name: str, project_name: str, resume_ve
     with perf.span("stage", agent_name, agent=agent_name, project=project_name,
                    invocation_id=os.environ.get(perf.ENV_INVOCATION)) as stage:
         try:
-            code = await _run_stage(request, agent_name, project_name, stage, resume_verification=resume_verification)
+            options = {"resume": True} if resume else {}
+            if review_existing:
+                options["review_existing"] = True
+            code = await _run_stage(request, agent_name, project_name, stage,
+                                    resume_verification=resume_verification, **options)
         finally:
             if budget_token is not None:
                 active_stage_budget.get().stop("Task Breakdown execution scope closed")
@@ -216,19 +244,47 @@ def _model_tiers() -> dict[str, str]:
         return {}
 
 
-async def _run_stage(request: str, agent_name: str, project_name: str, stage, resume_verification: bool = False) -> int:
-    from agent_engine import verification_resume
+async def _run_stage(request: str, agent_name: str, project_name: str, stage, resume_verification: bool = False,
+                     resume: bool = False, review_existing: bool = False) -> int:
+    from agent_engine import verification_resume, recovery
     resumed_from = None
+    recovery_action, recovery_record = "generate", None
+    if review_existing:
+        recovery_action, resumed_from = "verify", "explicit-current-artifact-review"
+    if resume or resume_verification:
+        pack = load_pack(agent_name)
+        recovery_action, recovery_record = recovery.next_action(OUTPUTS_DIR / project_name, pack, request)
+        if resume_verification and recovery_action == "conflict":
+            print("ERROR: saved artifacts or recovery metadata changed; inspect them and use --review-existing for a fresh review")
+            return 1
+        if recovery_record is not None:
+            resumed_from = recovery_record["job_id"]
+            if recovery_action == "restore_repair":
+                try:
+                    recovery.restore_repair(OUTPUTS_DIR / project_name, pack, recovery_record)
+                except (OSError, ValueError) as exc:
+                    print(f"ERROR: retained repair could not be restored: {exc}")
+                    return 1
+                recovery_action = "repair"
     if resume_verification:
         try:
-            resumed_from = verification_resume.validate(OUTPUTS_DIR / project_name, agent_name, request)
+            if resumed_from is None:
+                resumed_from = verification_resume.validate(OUTPUTS_DIR / project_name, agent_name, request)
+            recovery_action = "verify"
         except (ValueError, OSError) as exc:
             print(f"ERROR: {exc}")
             return 1
+    if recovery_action in ("wait", "conflict"):
+        print("WAITING: saved work needs a decision or changed inputs; generation was retained.")
+        for gap in recovery_record.get("gaps", []):
+            print(f"  - {gap}")
+        return 1
     with perf.span("phase", "preflight") as pre:
         try:  # fail on a bad pack (or its verifier) before any model call
             pack = load_pack(agent_name)
             verifier = load_pack(pack.verifier) if pack.verifier else None
+            if review_existing and verifier is None:
+                raise ValueError("--review-existing requires a pack with an independent verifier")
             if verifier is not None and verifier.returns != "verdict":
                 raise ValueError(f"verifier {pack.verifier!r} must declare returns = \"verdict\"")
         except ValueError as e:
@@ -286,7 +342,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
     notify_job_log_path(f"{OUTPUTS_VIRTUAL_PREFIX}{project_name}/")
     with perf.span("fs", "record_request"):
         if resumed_from:
-            text = (OUTPUTS_DIR / project_name / pack.requests_file).read_text(encoding="utf-8")
+            history = OUTPUTS_DIR / project_name / pack.requests_file
+            text = history.read_text(encoding="utf-8") if history.is_file() else ""
             request_number = sum(line.startswith("## Request ") for line in text.splitlines())
         else:
             request_number = _record_request(project_name, request, pack.requests_file)
@@ -308,6 +365,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
     }
     if resumed_from:
         report["verification_resumed_from"] = resumed_from
+        report["recovery_action"] = recovery_action
     # Stamped so the orchestrator can tell this run's report from an older one (orchestrator.run_agent).
     if os.environ.get(perf.ENV_INVOCATION):
         report["invocation_id"] = os.environ[perf.ENV_INVOCATION]
@@ -318,6 +376,15 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
     # Where each pack is in its `model` escalation order (agent.AgentPack.models).
     level = {pack.name: 0, **({verifier.name: 0} if verifier else {})}
     pass_counts: dict[str, int] = {}
+    generation_inputs = recovery.input_identity(OUTPUTS_DIR / project_name, pack) if pack.name in recovery.DIRECTORIES else None
+
+    def checkpoint(phase: str, **kwargs):
+        missing = _missing(project_name, pack.output_files)
+        if missing and pass_counts.get("fix", 0):
+            raise RuntimeError(f"{pack.name}'s declared output is missing after its fix passes: {', '.join(missing)}")
+        if generation_inputs is not None and recovery.input_identity(OUTPUTS_DIR / project_name, pack) != generation_inputs:
+            raise ValueError("source inputs changed during execution; artifacts retained but completion cannot be certified")
+        return recovery.save(OUTPUTS_DIR / project_name, pack, request, job_id, phase, **kwargs)
 
     async def run_pass(p: AgentPack, kind: str, message: str) -> dict | None:
         """One pass of pack `p` on its current model; a model error moves it
@@ -361,6 +428,12 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                                 raise StageBudgetExceeded(budget.stopped) from exc
                             raise
                         gs.set(messages=len(state.get("messages", [])) if isinstance(state, dict) else None)
+                    if kind == "verify" and not isinstance((state or {}).get("structured_response"), Verdict):
+                        last = state.get("messages", [])[-1] if state and state.get("messages") else None
+                        metadata = getattr(last, "response_metadata", {}) or {}
+                        entry["invalid_verdict"] = {"response_chars": len(_text(last.content)) if last is not None else 0,
+                                                     "finish_reason": metadata.get("stop_reason") or metadata.get("finish_reason")}
+                        raise InvalidVerdictError("verifier returned no valid structured Verdict")
                     entry["ok"] = True
                     return state
                 except Exception as e:
@@ -370,10 +443,10 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         raise
                     if handler is not None:
                         ps.set(open_model_or_tool_runs=handler.open_runs())
-                    if kind == "verify" and type(e).__name__ in ("StructuredOutputValidationError", "MultipleStructuredOutputsError") and schema_retries < 1:
+                    if kind == "verify" and _invalid_verdict_error(e) and schema_retries < 1:
                         schema_retries += 1
                         ps.set_status("error", str(e), "structured_output")
-                        message += "\nYour previous verdict was invalid or truncated. Return one concise Verdict; no repeated evidence or file contents. Keep the summary under 1000 characters."
+                        message += "\nThe previous review response was empty, malformed or schema-invalid. Recheck the retained artifacts; return exactly one valid, concise Verdict. Do not rewrite artifacts or echo file bodies. Report partial if review is incomplete."
                         continue
                     if level[p.name] + 1 >= len(p.models):
                         budget = active_stage_budget.get()
@@ -399,6 +472,13 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
         if missing:
             raise RuntimeError(f"{pack.name} did not create its declared output: {', '.join(missing)}")
 
+        if recovery_record is None:
+            checkpoint("generated")
+        if recovery_action == "repair":
+            checkpoint("repair_running", gaps=recovery_record.get("gaps"))
+            await run_pass(pack, "fix", _fix_message(pack, project_name, recovery_record.get("gaps", [])))
+            checkpoint("generated")
+
         if verifier is None:
             report.update(status="done", verified=False)
         else:
@@ -409,12 +489,21 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                     if deterministic:
                         verdict = Verdict(satisfied=False, status_so_far="partial", gaps=deterministic,
                                           summary="Deterministic checks found blocking issues before semantic review.")
+                    elif recovery_action == "complete" and attempt == 1:
+                        verdict = Verdict(satisfied=True, status_so_far="success", gaps=[],
+                                          summary="Reused completed review: source, artifacts and evaluation identity are unchanged.")
+                        report["review_reused"] = True
                     else:
-                        state = await run_pass(verifier, "verify", _verifier_message(pack, project_name))
+                        reviewed_snapshot = checkpoint("checked")["snapshot"]
+                        message = (_verifier_message(pack, project_name) +
+                                   f"\nOriginal request for this work: {request}\nIf an imported run has no history file, use this original request and the authoritative inputs.")
+                        state = await run_pass(verifier, "verify", message)
+                        if recovery.snapshot(OUTPUTS_DIR / project_name, pack) != reviewed_snapshot:
+                            raise ValueError("source or artifact changed during semantic review; verdict was not accepted")
                         verdict = state.get("structured_response") if state else None
                     if not isinstance(verdict, Verdict):
-                        raise RuntimeError("no structured verdict returned")
-                    if not deterministic:
+                        raise InvalidVerdictError("no valid structured verdict returned; response was empty or unparsable")
+                    if not deterministic and not report.get("review_reused"):
                         passes[-1]["satisfied"] = verdict.satisfied
                 except Exception as e:
                     logger.exception("verifier %s failed on attempt %d", verifier.name, attempt)
@@ -424,6 +513,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                     )
                     report.update(status="partial", verified=False, verdict=verdict.model_dump())
                     if not _missing(project_name, pack.output_files):
+                        checkpoint("review_pending",
+                                      gaps=verdict.gaps)
                         verification_resume.save(OUTPUTS_DIR / project_name, agent_name, request, job_id)
                     perf.event("verdict", verifier.name, attempt=attempt, verifier_failed=True,
                                error=perf.error_summary(e))
@@ -442,17 +533,25 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                 for gap in verdict.gaps:
                     print(f"  - {gap}")
                 if verdict.satisfied or attempt > pack.max_fix_loops or human_needed:
+                    checkpoint(
+                                  "verified" if verdict.satisfied and status in ("success", "done") else "awaiting_decision",
+                                  gaps=verdict.gaps, human=human_needed)
                     break
                 # A failed verdict moves the fix pass one step up the escalation order.
                 if level[pack.name] + 1 < len(pack.models):
                     level[pack.name] += 1
                     print(f"\n[{pack.name}: escalating fix pass to the {pack.models[level[pack.name]]} model]")
+                checkpoint("repair_pending", gaps=verdict.gaps)
+                checkpoint("repair_running", gaps=verdict.gaps)
                 await run_pass(pack, "fix", _fix_message(pack, project_name, verdict.gaps))
+                checkpoint("generated")
             # Fix passes can delete or move files: success also needs every declared output to still exist.
             missing = _missing(project_name, pack.output_files)
             if missing and report.get("status") in ("done", "success"):
                 raise RuntimeError(f"{pack.name}'s declared output is missing after its fix passes: {', '.join(missing)}")
         exit_code = 0 if report["status"] in ("done", "success") else 1
+        if verifier is None:
+            checkpoint("verified")
     except Exception as e:
         logger.exception("run failed job_id=%s", job_id)
         from agent_engine.stage_controls import StageBudgetExceeded
@@ -566,8 +665,13 @@ def main() -> None:
     run_parser.add_argument("request", help="The request: a requirement, or feedback on an earlier output.")
     run_parser.add_argument("--agent", required=True, help="Agent pack name (see `list`).")
     run_parser.add_argument("--project-name", required=True, help="Output folder under outputs/ (a-z, 0-9, -).")
-    run_parser.add_argument("--resume-verification", action="store_true",
+    recovery_flags = run_parser.add_mutually_exclusive_group()
+    recovery_flags.add_argument("--resume-verification", action="store_true",
                             help="Retry a failed verifier without regeneration; requires unchanged checkpoint and request.")
+    recovery_flags.add_argument("--resume", action="store_true",
+                            help="Resume retained generation/review/repair using its source and artifact hashes.")
+    recovery_flags.add_argument("--review-existing", action="store_true",
+                            help="Explicitly recheck current declared outputs, including manual edits, without initial generation.")
     inputs_parser = sub.add_parser("add-inputs", help="Add client files to a project's inputs/round-N/.")
     inputs_parser.add_argument("files", nargs="+", help="Files to add (PDF, images, Word, Excel, PowerPoint, email, text).")
     inputs_parser.add_argument("--project-name", required=True, help="Output folder under outputs/ (a-z, 0-9, -).")
@@ -633,6 +737,10 @@ def _dispatch(args: argparse.Namespace) -> int | None:
     if args.command == "gate":
         approver = {"name": args.approver, **({"role": args.approver_role} if args.approver_role else {})}
         raise SystemExit(_gate(args.gate, args.project_name, args.decision, approver, {"name": args.submitted_by}, args.comment))
+    if args.review_existing:
+        raise SystemExit(asyncio.run(_run(args.request, args.agent, args.project_name, review_existing=True)))
+    if args.resume:
+        raise SystemExit(asyncio.run(_run(args.request, args.agent, args.project_name, resume=True)))
     if args.resume_verification:
         raise SystemExit(asyncio.run(_run(args.request, args.agent, args.project_name, resume_verification=True)))
     raise SystemExit(asyncio.run(_run(args.request, args.agent, args.project_name)))

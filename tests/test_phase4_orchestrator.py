@@ -118,7 +118,7 @@ def test_requested_changes_go_back_to_the_owning_agent_with_the_comment(root):
 def test_a_partial_result_stops_the_run_and_is_not_test_approved(root):
     fake = FakeAgents(root, status="partial")
     assert go(fake, test_approve=True) == orch.FAILED
-    assert fake.calls == ["task-breakdown"]
+    assert fake.calls == ["task-breakdown", "infra-pipeline"]  # independent work is retained too
     assert not (root / "gates" / "P4-G1.approved.json").exists()
     assert go(FakeAgents(root, status="partial"), test_approve=True, plan_only=True) == orch.WAITING
 

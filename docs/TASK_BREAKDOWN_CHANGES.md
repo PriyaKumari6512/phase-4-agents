@@ -56,7 +56,9 @@ unchanged work is eligible for reuse. A scheduling-only change may require a che
 raw provenance while preserving feature work and valid enrichments.
 
 Use the existing `--resume-verification` command with the exact original request after a verifier failure.
-Changed relevant artifacts/settings reject that retry. Human gates still require their normal decisions.
+Changed source/artifact identity rejects strict reuse. Reviewer/runtime changes permit fresh validation of saved
+generation. Orchestration now selects retained review/repair automatically; human gates still require normal
+decisions. See [PIPELINE_RECOVERY.md](PIPELINE_RECOVERY.md) for interrupted repairs and retained merge recovery.
 
 ## Optional shared work budgets
 

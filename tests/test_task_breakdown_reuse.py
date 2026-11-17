@@ -148,7 +148,7 @@ def test_stopped_budget_blocks_domain_mutations(proj):
     assert files.path(P, files.FEATURES).read_bytes() == before
 
 
-def test_verification_reuse_is_scoped_and_guards_effective_model_settings(proj, monkeypatch):
+def test_verification_reuse_keeps_generation_when_reviewer_settings_change(proj, monkeypatch):
     setup_feature()
     verification_resume.save(proj, "task-breakdown", "request", "job")
     (proj / "infra").mkdir()
@@ -156,8 +156,7 @@ def test_verification_reuse_is_scoped_and_guards_effective_model_settings(proj, 
     monkeypatch.setenv("PHASE4_IAC_CHECK_CONCURRENCY", "3")
     assert verification_resume.validate(proj, "task-breakdown", "request") == "job"
     monkeypatch.setenv("SDLC_AGENT_EFFORT", "low")
-    with pytest.raises(ValueError, match="stale"):
-        verification_resume.validate(proj, "task-breakdown", "request")
+    assert verification_resume.validate(proj, "task-breakdown", "request") == "job"
 
 
 def test_verification_reuse_rejects_changed_backlog_sources(proj):

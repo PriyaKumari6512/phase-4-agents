@@ -50,6 +50,10 @@ def add_parser(sub) -> None:
     o.add_argument("--test-approve", action="store_true",
                    help="TEST ONLY: approve the gates itself (recorded as an automated test approval, not a human sign-off).")
     o.add_argument("--publish", action="store_true", help="When everything is approved, run phase4 publish for all four.")
+    recover = s.add_parser("recover-parallel", help="Merge retained child results without rerunning writers.")
+    recover.add_argument("--project-name", required=True)
+    recover.add_argument("--session", required=True, help="Retained directory under the configured logs/parallel.")
+    recover.add_argument("--sprint", type=int, default=1)
     sc = s.add_parser("schemas", help="Write JSON Schemas of the Phase 4 files.")
     sc.add_argument("--out", default="schemas")
     for name in ("check-ci", "reconcile"):
@@ -59,6 +63,17 @@ def add_parser(sub) -> None:
 
 def run(args: argparse.Namespace) -> int:
     try:
+        if args.phase4_command == "recover-parallel":
+            from agent_engine.phase4.parallel_stages import recover_session, acknowledge
+            from agent_engine.phase4.orchestrator import record_parallel_results
+            from agent_engine.runtime import project_lock
+            root = files.project_dir(args.project_name)
+            with project_lock(root, "orchestrator"), project_lock(root):
+                result = recover_session(root, Path(args.session))
+                record_parallel_results(root, result, args.sprint)
+                acknowledge(root)
+            print(json.dumps(result, indent=2))
+            return 0  # recovery succeeded; partial stage results still need review
         if args.phase4_command in ("check-ci", "reconcile"):
             from agent_engine.phase4 import readiness
             from agent_engine.runtime import project_lock

@@ -21,7 +21,7 @@ def snapshot(root: Path, agent: str | None = None) -> dict[str, str]:
     result = {}
     for p in sorted(root.rglob("*")):
         rel = p.relative_to(root)
-        if (rel.parts[0] in {"runs", "logs"} or p.name.startswith(".engine-")
+        if (rel.parts[0] in {"runs", "logs"} or any(part.startswith(".engine-") for part in rel.parts)
                 or rel.as_posix() in {"report.json", "phase4/orchestrator-state.json"}):
             continue
         if p.is_symlink():
@@ -102,6 +102,27 @@ def validate(root: Path, agent: str, request: str) -> str:
     if not path.is_file():
         raise ValueError("no failed-verifier checkpoint; run generation normally")
     data = json.loads(path.read_text(encoding="utf-8"))
+    from agent_engine import recovery
+    if agent in recovery.DIRECTORIES and data.get("version") == (2 if agent == "task-breakdown" else 1):
+        # Migration of retained review checkpoints: code/model changes require a
+        # fresh review, not regeneration of byte-identical source/artifacts.
+        from agent_engine.agent import load_pack
+        pack = load_pack(agent)
+        names = set(pack.input_files) | set(pack.output_files) | set(recovery.OPTIONAL.get(agent, ()))
+        names.update({pack.requests_file, "phase4/project.json"})
+        def generation_identity(values):
+            result = {}
+            for key, value in values.items():
+                if key in names or Path(key).parts[0] in recovery.DIRECTORIES[agent]:
+                    result[key] = value
+                elif agent == "task-breakdown" and key.startswith("pack:") and not key.startswith("pack:validator/"):
+                    result[key] = value
+                elif key.startswith("packs:" + agent + "/") and "/validator/" not in key:
+                    result[key] = value
+            return result
+        if (data.get("agent") == agent and data.get("request") == request
+                and generation_identity(data.get("snapshot", {})) == generation_identity(snapshot(root, agent))):
+            return data["job_id"]
     if (data.get("version") != (2 if agent == "task-breakdown" else 1)
             or data.get("agent") != agent or data.get("request") != request
             or data.get("snapshot") != snapshot(root, agent)):
