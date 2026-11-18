@@ -161,10 +161,14 @@ def set_intent(project: str, intent: dict) -> str:
     for r in it.regions:
         if r not in allowed:
             problems.append(f"region {r} is not on the org allow-list {sorted(allowed)}")
+    # Hosting the catalog does not cover is a gap report for the platform team, not a failure: the intent is kept,
+    # everything the catalog does cover is generated, and the rest is listed in manifest.json gaps.
     if it.cloud != "aws":
-        problems.append(f"cloud {it.cloud}: this catalog only implements AWS; no substitute topology will be generated")
+        warnings.append(f"cloud {it.cloud}: this catalog only implements AWS; no substitute topology is generated "
+                        "(reported as a gap)")
     if it.deploy_target not in WORKLOAD_NEED and any(c.kind in ("service", "worker") for c in it.components):
-        problems.append(f"deploy_target {it.deploy_target} has no workload template in this catalog")
+        warnings.append(f"deploy_target {it.deploy_target} has no workload template in this catalog; its services "
+                        "and workers are reported as gaps")
     workload = WORKLOAD_NEED.get(it.deploy_target)
     for c in it.components:
         if workload and c.kind in ("service", "worker") and workload not in c.needs:
@@ -385,6 +389,11 @@ def render(project: str) -> str:
             with perf.span("compute", "infra.render_env", env=env, components=len(it.components)):
                 _render_env(out, project, settings, it, env)
         kubernetes = it.deploy_target == "kubernetes"
+        if it.deploy_target not in WORKLOAD_NEED:
+            for c in it.components:
+                if c.kind in ("service", "worker"):
+                    out.gaps.append(f"{c.name}: hosting target '{it.deploy_target}' is not in the catalog; nothing "
+                                    "runs this workload. Provision it by hand or add a catalog template.")
         if kubernetes:
             chart_dir = catalog_dir() / "templates" / "gitops" / "chart"
             for p in sorted(chart_dir.rglob("*")):

@@ -79,7 +79,10 @@ class TaskDraft(_Record):
 
 class DeferredCriterion(_Record):
     ac_id: str                                        # a story acceptance criterion no task implements yet
-    reason: str                                       # the reviewer decision it follows
+    reason: str                                       # the reviewer decision, or "DECISION NEEDED: ..." for the Tech Lead
+
+
+DECISION_NEEDED = "DECISION NEEDED:"
 
 
 class StoryBreakdown(_Record):
@@ -88,7 +91,7 @@ class StoryBreakdown(_Record):
     estimate_rationale: str
     reference_ticket_ids: list[str]                   # history tickets actually used as analogies; else empty
     open_questions: list[str]
-    deferred_criteria: list[DeferredCriterion]        # only when reviewer_request says not to build them; else empty
+    deferred_criteria: list[DeferredCriterion]        # reviewer decisions, or "DECISION NEEDED:" conflicts; else empty
 
 
 class CrossDependency(_Record):
@@ -108,6 +111,7 @@ class SharedWork(_Record):
 class CrossStoryReview(_Record):
     dependencies: list[CrossDependency]
     shared_work: list[SharedWork]
+
 
 
 # ---------------------------------------------------------------------------------------------- model selection
@@ -276,8 +280,12 @@ def check_breakdown(story: ImportedStory, result: StoryBreakdown, settings: Proj
         if not [s for s in t.skills if s in taxonomy or skills_taxonomy.normalize(s)]:
             errors.append(f"{where}: needs 1-2 skills from the taxonomy")
     deferred = {d.ac_id for d in result.deferred_criteria}
-    if result.deferred_criteria and not deferrable:
-        errors.append("deferred_criteria is only for criteria a reviewer_request says not to build; cover every criterion")
+    # A missing product decision or a PRD conflict is recorded for the Tech Lead, never a failure. Without a reviewer
+    # request a deferral must say so explicitly, so it cannot be a silent way to skip work.
+    if not deferrable and (silent := [d.ac_id for d in result.deferred_criteria
+                                      if not d.reason.strip().upper().startswith(DECISION_NEEDED)]):
+        errors.append(f"deferred_criteria {silent} need a reason starting with '{DECISION_NEEDED}' naming the PRD "
+                      "conflict or the missing product decision (or cover them with tasks)")
     if bad := sorted(deferred - ac_ids):
         errors.append(f"deferred_criteria names acceptance criteria not in the story {bad}")
     if not all(d.reason.strip() for d in result.deferred_criteria):
@@ -307,6 +315,12 @@ def check_breakdown(story: ImportedStory, result: StoryBreakdown, settings: Proj
 
 # ---------------------------------------------------------------------------------------------- model call
 from agent_engine.phase4.structured import invoke as _invoke   # noqa: E402  (one structured call, cached prefix)
+from pydantic import ValidationError as _ValidationError     # noqa: E402
+from langchain_core.exceptions import OutputParserException   # noqa: E402
+
+# Per-story failures that stay with the story ("needs attention"). Provider errors, rate limits and budget stops are
+# not in this list: they stop the stage so the orchestrator can retry it cleanly.
+STORY_ERRORS = (files.ProjectError, _ValidationError, OutputParserException)
 
 
 # ---------------------------------------------------------------------------------------------- retained results
@@ -438,14 +452,31 @@ def story_items(story: ImportedStory, epic_id: str, result: StoryBreakdown, sett
         definition_of_done=list(settings.definition_of_done), components=list(story.components),
         source_refs=[SourceRef(req_id=r, source="story", anchor=story.key) for r in story.requirement_ids],
         open_questions=[*result.open_questions,
-                        *(f"{d.ac_id} is not planned (reviewer decision): {d.reason}" for d in result.deferred_criteria)],
+                        *(f"{d.ac_id} is not planned ("
+                          + ("decision needed by the Tech Lead" if d.reason.strip().upper().startswith(DECISION_NEEDED)
+                             else "reviewer decision") + f"): {d.reason}" for d in result.deferred_criteria)],
         deferred_criteria=[d.ac_id for d in result.deferred_criteria])
     story_item.estimate = _story_estimate(story, tasks, result, settings)
     return [story_item, *tasks]
 
 
+def _attention_story(story: ImportedStory, epic_id: str, reason: str, settings: ProjectSettings,
+                     releases=()) -> WorkItem:
+    """A story whose breakdown failed after its retry: kept in the backlog with no tasks, marked for the Tech Lead."""
+    empty = StoryBreakdown(story_key=story.key, tasks=[], estimate_rationale="", reference_ticket_ids=[],
+                           open_questions=[], deferred_criteria=[])
+    item = story_items(story, epic_id, empty, settings, releases)[0]
+    item.needs_attention = reason
+    item.open_questions = [f"NEEDS ATTENTION: no tasks were produced for this story ({reason}). Break it down by hand "
+                           "or fix the cause and run Task Breakdown again.", *item.open_questions]
+    if not (story.story_points is not None and int(story.story_points) in settings.story_point_scale):
+        item.estimate = None      # no tasks to roll up: Sprint Planning leaves it out until it is broken down
+    return item
+
+
 def build_backlog(project: str, snap: StorySnapshot, settings: ProjectSettings,
                   results: dict[str, StoryBreakdown], cross: "CrossStoryReview | None" = None) -> Backlog:
+    attention = needs_attention(project)
     epics = {e.key: e for e in snap.epics}
     by_epic: dict[str, list[ImportedStory]] = {}
     for s in snap.stories:
@@ -468,7 +499,11 @@ def build_backlog(project: str, snap: StorySnapshot, settings: ProjectSettings,
                               moscow=moscow, components=components,
                               source_refs=[SourceRef(req_id=r, source="prd", anchor=epic_id) for r in requirement_ids]))
         for s in stories:
-            items += story_items(s, epic_id, results[s.key], settings, snap.releases)
+            if s.key in results:
+                items += story_items(s, epic_id, results[s.key], settings, snap.releases)
+            else:
+                items.append(_attention_story(s, epic_id, attention.get(s.key, "no task breakdown was produced"),
+                                              settings, snap.releases))
     by = {i.item_id: i for i in items}
     for s in snap.stories:                       # Jira "A blocks B": B cannot start before A
         for blocked in s.blocks:
@@ -476,7 +511,7 @@ def build_backlog(project: str, snap: StorySnapshot, settings: ProjectSettings,
                 by[blocked].dependencies.append(Dependency(on_id=s.key, reason=f"tracker link: {s.key} blocks {blocked}",
                                                            confidence=1.0, origin="human"))
     if cross is not None:
-        items = apply_cross(items, snap, settings, results, cross)
+        items = apply_cross(items, _only(snap, results), settings, results, cross)
     previous = files.read_json(project, files.BACKLOG) if files.exists(project, files.BACKLOG) else {}
     return Backlog(backlog_id=previous.get("backlog_id") or files.new_id(), version=int(previous.get("version", 0)) + 1,
                    project=project, sources=source_manifest(project, settings), features=features,
@@ -682,8 +717,14 @@ async def _results(project: str, snap: StorySnapshot, settings: ProjectSettings,
 
     async def run(story, story_request, base, fix):
         async with semaphore:
-            result = await breakdown_story(project, story, settings, prefix, callbacks, request=story_request,
-                                           findings=fix or (), spec=spec)
+            try:
+                result = await breakdown_story(project, story, settings, prefix, callbacks, request=story_request,
+                                               findings=fix or (), spec=spec)
+            except STORY_ERRORS as exc:
+                # One story that still fails its checks (or returns an unusable answer) after its retry does not
+                # stop the others: it is marked "needs attention" and reported at the gate.
+                attention[story.key] = " ".join(str(exc).split())[:1500]
+                return story.key, None, None
             record_id = base if not fix else _digest({"base": base, "findings": fix})
             _save(project, {"base": base, "request": story_request, "findings": fix or [], "model": spec,
                             "result": result.model_dump(mode="json")},
@@ -700,18 +741,33 @@ async def _results(project: str, snap: StorySnapshot, settings: ProjectSettings,
             await asyncio.gather(*jobs, return_exceptions=True)
             raise
     done = []
+    attention: dict[str, str] = {}
     if todo:
         done += await gather(todo[:1])          # first call alone: it writes the prompt cache the others read
         done += await gather(todo[1:])
     for key, record_id, result in done:
+        if result is None:
+            current.pop(key, None)              # never reuse an older result for a story that now failed
+            continue
         results[key] = result
         current[key] = record_id
     _save(project, {k: v for k, v in current.items() if k in keys}, "current.json")
+    _save(project, attention, "attention.json")
     return results
 
 
+def needs_attention(project: str) -> dict[str, str]:
+    """{story key: reason} for stories the last generation could not break down."""
+    return _load(project, "attention.json") or {}
+
+
+def _only(snap: StorySnapshot, results) -> StorySnapshot:
+    """The snapshot restricted to stories that have a breakdown (cross-story work needs their tasks)."""
+    return snap.model_copy(update={"stories": [s for s in snap.stories if s.key in results]})
+
+
 async def _write(project: str, snap: StorySnapshot, settings: ProjectSettings, results, callbacks) -> dict:
-    cross = await cross_story(project, snap, settings, results, callbacks)
+    cross = await cross_story(project, _only(snap, results), settings, results, callbacks) if results else None
     files.write_json(project, files.BACKLOG, build_backlog(project, snap, settings, results, cross))
     return json.loads(backlog.validate_report(project))
 

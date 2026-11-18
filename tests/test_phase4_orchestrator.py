@@ -66,6 +66,45 @@ def test_missing_input_blocks_only_the_agent_that_needs_it(root):
     assert fake.calls == ["infra-pipeline"]  # infra reads architecture.md only; nothing after Task Breakdown can run
 
 
+@pytest.mark.real_preflight
+def test_every_input_problem_is_reported_up_front_before_any_agent_runs(root):
+    """Missing PRD, an unapproved design gate, a member without skills, an undated release: one stop, full list."""
+    (root / "prd.md").unlink()
+    (root / "gates" / "G3B.approved.json").unlink()
+    project = json.loads((root / "phase4" / "project.json").read_text())
+    (root / "phase4" / "project.json").write_text(json.dumps({**project, "team": [{"member_id": "a"}]}))
+    lines, fake = [], FakeAgents(root)
+    assert orch.orchestrate(P, runner=fake, out=lines.append) == orch.FAILED
+    assert fake.calls == []                                   # no model was called
+    text = "\n".join(lines)
+    assert "input problem(s)" in text and "prd.md is missing" in text and "G3B" in text
+    assert "project.json is invalid" in text
+
+
+@pytest.mark.real_preflight
+def test_preflight_lists_team_skills_and_undated_releases(tmp_path, monkeypatch):
+    from agent_engine.phase4 import files, preflight
+    from phase4_helpers import approve_design_gates
+    from test_phase4_pipeline import EXAMPLE
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path / "outputs")
+    root = tmp_path / "outputs" / "pf"
+    (root / "phase4").mkdir(parents=True)
+    settings = json.loads((EXAMPLE / "phase4" / "project.json").read_text())
+    settings["team"][0]["declared_skills"] = []
+    (root / "phase4" / "project.json").write_text(json.dumps(settings))
+    (root / "prd.md").write_text("prd")
+    (root / "architecture.md").write_text("arch")
+    approve_design_gates(root)
+    (root / "phase4" / "stories.json").write_text(json.dumps({
+        "project": "pf", "source": "file", "releases": [{"name": "MVP", "order": 1}],
+        "stories": [{"key": "PF-1", "issue_id": "1", "summary": "s", "fix_versions": ["MVP"]}]}))
+    errors, warnings = preflight.check_inputs("pf")
+    assert any("without declared_skills" in e and settings["team"][0]["member_id"] in e for e in errors)
+    assert any("releases without a date" in e and "MVP" in e for e in errors)
+    assert any("without acceptance criteria" in w and "PF-1" in w for w in warnings)
+    assert files.exists("pf", files.STORIES)
+
+
 def test_stops_at_the_first_gate_and_never_approves_by_itself(root):
     fake = FakeAgents(root)
     assert go(fake) == orch.WAITING
@@ -125,21 +164,51 @@ def test_a_partial_result_stops_the_run_and_is_not_test_approved(root):
     assert go(FakeAgents(root, status="partial"), test_approve=True, plan_only=True) == orch.WAITING
 
 
-def test_a_rate_limit_stops_the_run_so_it_can_resume(root):
-    calls = []
+def test_a_rate_limit_beyond_the_wait_limit_stops_with_the_reason(root, monkeypatch):
+    calls, waits = [], []
+    monkeypatch.setattr(orch, "_sleep", waits.append)
+    monkeypatch.setenv("AGENT_ENGINE_RATE_LIMIT_MAX_WAIT_SECONDS", "60")
 
     def limited(agent, request, project):
         calls.append(agent)
-        return {"status": "fail", "exit_code": 1, "gaps": [], "rate_limited": True}
+        return {"status": "fail", "exit_code": 1, "gaps": [], "rate_limited": True, "retry_after": 7000}
 
-    assert go(limited, test_approve=True) == orch.FAILED and calls == ["task-breakdown"]
+    assert go(limited, test_approve=True) == orch.FAILED and calls == ["task-breakdown"] and waits == []
 
 
-def test_a_project_run_by_hand_is_adopted_not_rerun(root):
+def test_a_rate_limit_is_waited_out_and_the_stage_runs_again(root, monkeypatch):
+    fake, waits, limited = FakeAgents(root), [], {"left": 1}
+    monkeypatch.setattr(orch, "_sleep", waits.append)
+
+    def runner(agent, request, project):
+        if agent == "task-breakdown" and limited["left"]:
+            limited["left"] -= 1
+            return {"status": "fail", "exit_code": 1, "gaps": [], "rate_limited": True, "retry_after": 30}
+        return fake(agent, request, project)
+
+    assert go(runner, test_approve=True) == orch.DONE
+    assert waits == [30] and fake.calls.count("task-breakdown") == 1
+
+
+def test_transient_provider_errors_back_off_then_give_up_cleanly(root, monkeypatch):
+    waits = []
+    monkeypatch.setattr(orch, "_sleep", waits.append)
+    monkeypatch.setenv("AGENT_ENGINE_PROVIDER_RETRIES", "2")
+    monkeypatch.setenv("AGENT_ENGINE_TRANSIENT_BACKOFF_SECONDS", "5")
+
+    def overloaded(agent, request, project):
+        return {"status": "fail", "exit_code": 1, "gaps": [], "rate_limited": False, "transient": True}
+
+    assert go(overloaded, test_approve=True) == orch.FAILED and waits == [5, 10]
+
+
+def test_a_project_run_by_hand_is_rerun_fresh_unless_resume_is_asked(root):
     fake = FakeAgents(root)
     for agent in OUTPUTS:
         fake(agent, "", P)
     fake.calls.clear()
     for name in ("P4-G1", "P4-G2", "P4-G3", "P4-G4", "G4"):
         approve(root, name)
-    assert go(fake) == orch.DONE and fake.calls == []
+    steps = orch.assess(P)
+    assert steps[0].action == "run" and "no recorded run" in steps[0].why     # fresh by default: nothing adopted
+    assert go(fake, resume=True) == orch.DONE and fake.calls == []             # explicit resume adopts it

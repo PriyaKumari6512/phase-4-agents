@@ -19,11 +19,54 @@ def test_qa_environment_rendered(proj, monkeypatch):
     assert json.loads(infra.validate(P))['checks_passed']
 
 
-def test_unsupported_cloud_is_rejected(proj):
+def test_unsupported_cloud_is_a_gap_report_not_a_failure(proj):
+    from agent_engine.phase4 import attention
     intent = _intent()
     intent['cloud'] = 'azure'
-    with pytest.raises(files.ProjectError, match='only implements AWS'):
-        infra.set_intent(P, intent)
+    result = json.loads(infra.set_intent(P, intent))
+    assert any('only implements AWS' in w for w in result.get('warnings', []))
+    infra.render(P)
+    assert any('only has AWS entries' in g for g in files.read_json(P, files.INFRA_MANIFEST)['gaps'])
+    assert any('only has AWS entries' in line for line in attention.open_items(P, 'infra-pipeline'))
+
+
+def test_hosting_target_outside_the_catalog_is_reported_as_gaps(proj):
+    intent = _intent()
+    intent['deploy_target'] = 'serverless'
+    for c in intent['components']:
+        c['needs'] = [n for n in c['needs'] if n not in ('k8s_workload', 'ecs_service')]
+    result = json.loads(infra.set_intent(P, intent))
+    assert any("no workload template" in w for w in result.get('warnings', []))
+    infra.render(P)
+    gaps = files.read_json(P, files.INFRA_MANIFEST)['gaps']
+    services = [c['name'] for c in intent['components'] if c['kind'] in ('service', 'worker')]
+    assert services and all(any(s in g and "'serverless' is not in the catalog" in g for g in gaps) for s in services)
+
+
+def test_checkov_policy_blocks_only_high_findings_in_generated_code():
+    from agent_engine.phase4 import sandbox
+    out = {"results": {"failed_checks": [
+        {"check_id": "CKV_TF_1", "check_name": "commit hash", "file_path": "/envs/dev/core/main.tf"},
+        {"check_id": "CKV_AWS_58", "check_name": "EKS secrets", "file_path": "/.external_modules/github.com/x/main.tf"},
+    ]}, "summary": {"parsing_errors": 0}}
+    ok = sandbox._checkov_result(sandbox.CmdResult(0, json.dumps(out), ""))
+    assert ok.passed and ok.outcome == "findings" and len(ok.findings) == 2   # medium + third-party: warnings only
+    out["results"]["failed_checks"].append(
+        {"check_id": "CKV_AWS_17", "check_name": "RDS public", "file_path": "/envs/dev/core/main.tf"})
+    bad = sandbox._checkov_result(sandbox.CmdResult(0, json.dumps(out), ""))
+    assert not bad.passed and "1 blocking" in bad.summary
+
+
+def test_infra_repair_applies_only_small_targeted_edits():
+    from agent_engine.phase4.infra_pipeline import Edit, apply_edits, MAX_EDIT_LINES
+    content = {"envs/dev/main.tf": 'resource "aws_s3_bucket" "logs" {\n  acl = "public-read"\n}\n'}
+    new, errors = apply_edits(content, [Edit(path="envs/dev/main.tf", find='acl = "public-read"', replace='acl = "private"')])
+    assert not errors and 'acl = "private"' in new["envs/dev/main.tf"] and 'resource "aws_s3_bucket"' in new["envs/dev/main.tf"]
+    _, errors = apply_edits(content, [Edit(path="envs/dev/main.tf", find="missing", replace="x")])
+    assert errors and "exactly once" in errors[0]
+    _, errors = apply_edits(content, [Edit(path="envs/dev/main.tf", find='acl = "public-read"',
+                                           replace="\n" * MAX_EDIT_LINES)])
+    assert errors and "at most" in errors[0]                    # whole-file rewrites are refused
 
 
 def test_promotion_copies_predecessor_digest_for_shared_images(proj):

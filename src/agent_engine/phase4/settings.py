@@ -42,6 +42,7 @@ class PipelineSettings:
     auto_approve_for_testing: bool
     diagnostics: bool
     scanner_concurrency: int
+    resume: bool = False      # PHASE4_RESUME: reuse saved recovery state; default runs fresh
 
 
 def get_pipeline_settings() -> PipelineSettings:
@@ -55,7 +56,7 @@ def get_pipeline_settings() -> PipelineSettings:
     return PipelineSettings(project, sprint, _bool("PHASE4_PUBLISH", True),
                             _bool("PHASE4_PARALLEL_STAGES", True),
                             _bool("PHASE4_AUTO_APPROVE_FOR_TESTING", False),
-                            _bool("AGENT_ENGINE_PERF", True), scans)
+                            _bool("AGENT_ENGINE_PERF", True), scans, _bool("PHASE4_RESUME", False))
 
 
 @dataclass(frozen=True)

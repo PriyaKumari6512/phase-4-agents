@@ -1,0 +1,18 @@
+{
+  "_comment": "Checkov policy for Phase 4 infrastructure. The free checkov reports no severity, so failing on every finding blocked almost every run. This policy decides instead: only fail_on severities block; checks listed under severity get that score; any other unscored check is unreported_severity (a warning shown to the DevOps Lead at P4-G4); findings under third_party_paths (downloaded modules) are reported, never blocking, because they cannot be fixed here. INITIAL POLICY: the DevOps Lead must review and extend the severity list.",
+  "fail_on": ["high", "critical"],
+  "unreported_severity": "medium",
+  "third_party_paths": [".external_modules/"],
+  "severity": {
+    "CKV_AWS_16": "high",
+    "CKV_AWS_17": "critical",
+    "CKV_AWS_19": "high",
+    "CKV_AWS_20": "critical",
+    "CKV_AWS_24": "high",
+    "CKV_AWS_25": "high",
+    "CKV_AWS_41": "critical",
+    "CKV_AWS_46": "critical",
+    "CKV_AWS_57": "critical",
+    "CKV_AWS_58": "high"
+  }
+}

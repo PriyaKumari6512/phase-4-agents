@@ -336,6 +336,7 @@ class WorkItem(Strict):
     source_refs: list[SourceRef] = []
     open_questions: list[str] = []
     deferred_criteria: list[str] = []    # stories: acceptance criteria a gate reviewer decided not to build now
+    needs_attention: str | None = None   # stories: why no tasks could be produced; the rest of the stage still finished
 
 
 class Feature(Strict):

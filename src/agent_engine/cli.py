@@ -534,6 +534,17 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         if recovery.snapshot(OUTPUTS_DIR / project_name, pack) != reviewed_snapshot:
                             raise ValueError("source or artifact changed during semantic review; verdict was not accepted")
                         verdict = state.get("structured_response") if state else None
+                        if isinstance(verdict, Verdict) and pack.name in ADVISORY_REVIEW_STAGES:
+                            # Phase 4 stages have deterministic checks, and only those block. A model reviewer's
+                            # findings are opinions that change from round to round: they become warnings and open
+                            # questions for the gate. Other packs, whose verifier is their only check, are unchanged.
+                            notes = _record_review_notes(pack, project_name, verdict)
+                            report["review_findings"] = notes
+                            if not verdict.satisfied:
+                                verdict = Verdict(
+                                    satisfied=True, status_so_far="success", gaps=[],
+                                    summary=(verdict.summary + f"\n[{len(notes)} reviewer finding(s) recorded as "
+                                             "warnings for the gate approver; they do not block the pipeline.]"))
                     if not isinstance(verdict, Verdict):
                         raise InvalidVerdictError("no valid structured verdict returned; response was empty or unparsable")
                     if not deterministic and not report.get("review_reused"):
@@ -627,6 +638,38 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
     if trace_host:
         print(f"Langfuse: {trace_host}")
     return exit_code
+
+
+REVIEW_NOTES = "review-notes.json"
+# Stages whose model review is advisory because deterministic checks (_deterministic_gaps) decide what blocks.
+ADVISORY_REVIEW_STAGES = frozenset(("task-breakdown", "sprint-planning", "work-allocation", "infra-pipeline"))
+
+
+def _record_review_notes(pack: AgentPack, project: str, verdict: Verdict) -> list[str]:
+    """Write the model reviewer's findings next to the stage's first output (a directory that stage owns), as
+    warnings and open questions for the gate approver. Returns the findings."""
+    findings = list(verdict.gaps)
+    if not pack.output_files:
+        return findings
+    rel = Path(pack.output_files[0]).parent / REVIEW_NOTES
+    atomic_json(OUTPUTS_DIR / project / rel, {
+        "agent": pack.name, "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "blocking": False, "reviewer_status": verdict.status_so_far, "summary": verdict.summary,
+        "findings": findings,
+        "note": "Model review findings are advisory: consider them at the gate. Deterministic checks are what block."})
+    return findings
+
+
+def review_notes(project: str, agent: str) -> dict | None:
+    """The advisory reviewer notes a stage recorded for its gate, if any."""
+    pack = load_pack(agent)
+    if not pack.output_files:
+        return None
+    path = OUTPUTS_DIR / project / Path(pack.output_files[0]).parent / REVIEW_NOTES
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def _deterministic_gaps(agent: str, project: str) -> tuple[list[str], bool]:

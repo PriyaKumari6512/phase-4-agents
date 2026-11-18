@@ -55,7 +55,7 @@ def run(out=print) -> int:
         return orchestrator.orchestrate(
             options.project, sprint=options.sprint, test_approve=options.auto_approve_for_testing,
             publish=options.publish, parallel_independent=options.parallel,
-            verified_test_approval=options.auto_approve_for_testing, out=out,
+            verified_test_approval=options.auto_approve_for_testing, out=out, resume=options.resume,
         )
     except (ValueError, OSError, TrackerError, RuntimeError) as exc:
         out(f"ERROR: {exc}")

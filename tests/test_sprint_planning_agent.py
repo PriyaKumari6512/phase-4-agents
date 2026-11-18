@@ -236,7 +236,8 @@ def test_a_later_release_planned_over_an_earlier_must_have_is_a_warning(planned,
     assert any("BM-2 (must-have, release MVP) is deferred for capacity while later-release stories" in w for w in warnings)
 
 
-def test_cli_failed_text_review_escalates_the_fix_to_the_bigger_model(planned, monkeypatch, tmp_path):
+def test_cli_text_review_findings_are_recorded_for_the_gate_not_fixed(planned, monkeypatch, tmp_path):
+    """Only deterministic checks block: the model reviewer's finding becomes an advisory note for P4-G2."""
     from agent_engine import agent, cli, gates, logging_setup
     gates.record_decision(planned, gates.load_gates()["P4-G1"], "approved", {"name": "Tech Lead"}, {"name": "Agent"})
     for module in (agent, cli):
@@ -250,10 +251,7 @@ def test_cli_failed_text_review_escalates_the_fix_to_the_bigger_model(planned, m
     monkeypatch.setattr(spa, "_invoke", fake)
     assert asyncio.run(cli._run("Plan the sprints.", "sprint-planning", P)) == 0
     report = json.loads((planned / "report.json").read_text())
-    assert [(p["kind"], p["model_tier"]) for p in report["passes"]] == [
-        ("write", "fast"), ("verify", "fast"), ("fix", "strong"), ("verify", "fast")]
-    assert report["status"] == "success"
-    fixes = [c for c in fake.calls if c["schema"] == "Annotation" and "findings_to_fix" in c["human"]]
-    assert len(fixes) == 1 and fixes[0]["spec"] == "test:strong"
-    plan = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
-    assert "BM-" not in plan.sprints[0].goal
+    assert [(p["kind"], p["model_tier"]) for p in report["passes"]] == [("write", "fast"), ("verify", "fast")]
+    assert report["status"] == "success" and report["review_findings"]
+    assert not [c for c in fake.calls if c["schema"] == "Annotation" and "findings_to_fix" in c["human"]]
+    assert cli.review_notes(P, "sprint-planning")["findings"] == report["review_findings"]

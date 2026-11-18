@@ -10,11 +10,13 @@ every output exists and every gate is approved, or it needs a human:
   * a gate asked for changes                  -> run the owning agent again with the gate comment as the request
   * an input an agent read has changed        -> run only that agent (and, through the changed outputs, the agents
                                                  after it); a team or calendar change never re-runs Task Breakdown
-  * an agent's validator ends partial / fails -> stop and show the open gaps (no endless retry)
-  * the subscription rate limit               -> stop; run the same command later and it resumes where it was
+  * an agent's deterministic checks fail      -> stop and show the open gaps (no endless retry)
+  * a rate limit or transient provider error  -> wait and retry (bounded); beyond the bound stop with the reason
 
-What each agent last read is kept in phase4/orchestrator-state.json. A project that was run by hand before has no
-state: its existing outputs are taken as up to date.
+Every run is fresh and depends only on its inputs. What each agent last read is kept in
+phase4/orchestrator-state.json: a stage is skipped only when its recorded inputs are byte-for-byte unchanged and its
+last run succeeded (a pure cache). Saved recovery state (interrupted repairs, reviews, parallel merges) is used only
+when `--resume` / PHASE4_RESUME=true asks for it. Outputs without a recorded run are regenerated, not adopted.
 """
 
 from __future__ import annotations
@@ -39,6 +41,23 @@ STATE_FILE = "phase4/orchestrator-state.json"
 PROJECT_FILE = "phase4/project.json"
 MAX_STEPS = 12
 RATE_LIMIT_MARKERS = ("SUBSCRIPTION_RATE_LIMITED", "rate_limit_error")
+# Provider hiccups that a later attempt usually survives (after the SDK's own retries were exhausted).
+TRANSIENT_MARKERS = ("overloaded_error", "Overloaded", "Error code: 529", "Error code: 503", "Error code: 502",
+                     "Error code: 500", "APIConnectionError", "Connection error", "APITimeoutError")
+_RESET_RE = __import__("re").compile(r"resets in (\d+)s")
+# `--resume` / PHASE4_RESUME: reuse saved recovery state. Off by default: runs start fresh.
+_RESUME = False
+_sleep = time.sleep   # injectable for tests
+
+
+def _retry_limits() -> tuple[int, float, float]:
+    """(attempts, longest single wait in seconds, backoff for transient errors) from the environment."""
+    attempts = int(os.environ.get("AGENT_ENGINE_PROVIDER_RETRIES", "3"))
+    max_wait = float(os.environ.get("AGENT_ENGINE_RATE_LIMIT_MAX_WAIT_SECONDS", "1800"))
+    backoff = float(os.environ.get("AGENT_ENGINE_TRANSIENT_BACKOFF_SECONDS", "60"))
+    if attempts < 0 or max_wait < 0 or backoff < 0:
+        raise ValueError("provider retry settings must be non-negative")
+    return attempts, max_wait, backoff
 
 # Exit codes of `phase4 orchestrate`.
 DONE, FAILED, WAITING = 0, 1, 2
@@ -199,8 +218,12 @@ class Step:
 
 
 def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
-           verified_test_approval: bool = False) -> list[Step]:
-    """The decision table: one Step per agent, from the current files and gate decisions (no side effects)."""
+           verified_test_approval: bool = False, resume: bool | None = None) -> list[Step]:
+    """The decision table: one Step per agent, from the current files and gate decisions (no side effects).
+
+    Without `resume` a stage is reused only as a pure cache: its last recorded run succeeded and every input it read
+    is byte-for-byte unchanged. Saved recovery state never decides what runs."""
+    resume = _RESUME if resume is None else resume
     root, gates = _root(project), gates if gates is not None else load_gates()
     state = load_state(root)
     steps = []
@@ -239,7 +262,7 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
             if automated(record) and not test_publication_allowed(project, stage.gate, record):
                 status = "pending"  # renew old test approvals only after current automated review
         request = stage.request.format(sprint=sprint)
-        if status not in ("changes_requested", "rejected", "approved"):
+        if resume and status not in ("changes_requested", "rejected", "approved"):
             from agent_engine.agent import load_pack
             pack = load_pack(stage.agent)
             action, retained = recovery.next_action(root, pack)
@@ -262,11 +285,21 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
         if not outputs_exist:
             steps.append(Step(stage, "run", "no output yet", request, status))
             continue
-        recorded = state.get(stage.agent, {}).get("inputs")
+        entry = state.get(stage.agent)
+        recorded = (entry or {}).get("inputs")
         now = input_digests(stage, root, sprint)
         changed = sorted(k for k in now if recorded is not None and recorded.get(k) != now[k])
         changed += sorted(k for k in (recorded or {}) if k not in now)
         feedback = status == "changes_requested"
+        if not resume and not feedback and status != "rejected":
+            # Fresh by default: outputs are reused only as a cache of a successful run on identical inputs.
+            if entry is None:
+                steps.append(Step(stage, "run", "no recorded run for the current inputs; running fresh", request, status))
+                continue
+            if entry.get("status") not in SUCCESS + ("adopted",) and not changed and status != "approved":
+                steps.append(Step(stage, "run", f"last run ended {entry.get('status')!r}; running fresh",
+                                  request, status))
+                continue
         if feedback or changed:
             parts, why = [], []
             if feedback:
@@ -279,7 +312,7 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
                 parts.append("These inputs changed since your last run: " + ", ".join(changed)
                              + ". Update your output to match them and change only what needs changing.")
                 why.append("inputs changed: " + ", ".join(changed))
-            if feedback:
+            if feedback and resume:
                 from agent_engine.agent import load_pack
                 action, retained = recovery.next_action(root, load_pack(stage.agent))
                 if retained and retained.get("request", "").startswith(parts[0]):
@@ -363,7 +396,8 @@ def run_agent(agent: str, request: str, project: str, *, outputs_dir: Path | Non
     Returns {status, exit_code, rate_limited, gaps, invocation_id, report_problem}."""
     invocation_id = perf.new_id(24)
     cmd = [sys.executable, "-m", "agent_engine.cli", "run", request, "--agent", agent, "--project-name", project]
-    cmd.append("--resume")
+    if _RESUME:   # saved recovery state is used only when explicitly requested
+        cmd.append("--resume")
     with perf.span("child", agent, agent=agent, invocation_id=invocation_id) as sp:
         env = {**os.environ, "PYTHONIOENCODING": "utf-8", perf.ENV_INVOCATION: invocation_id, **perf.child_env(sp.id)}
         if outputs_dir is not None:
@@ -389,14 +423,39 @@ def run_agent(agent: str, request: str, project: str, *, outputs_dir: Path | Non
             status, gaps, problem = read_child_report(child_root / "report.json", agent, invocation_id, code)
         text = "".join(tail)
         rate_limited = any(m in text for m in RATE_LIMIT_MARKERS)
+        reset = _RESET_RE.search(text)
+        transient = status not in SUCCESS and not rate_limited and any(m in text for m in TRANSIENT_MARKERS)
         sp.set(exit_code=code, report_status=status, report_problem=problem, first_output_s=first_output,
-               rate_limited=rate_limited)
+               rate_limited=rate_limited, transient=transient)
         if status not in SUCCESS:
             sp.set_status("failed", problem or f"stage ended {status}", "stage_outcome")
     return {
         "status": status, "exit_code": code, "gaps": gaps, "rate_limited": rate_limited,
+        "retry_after": int(reset.group(1)) if reset else None, "transient": transient,
         "invocation_id": invocation_id, "report_problem": problem,
     }
+
+
+def _provider_retry(result: dict, agent: str, attempts: dict[str, int], out: Callable[[str], None]) -> bool | None:
+    """None: not a provider problem. True: waited, run the stage again. False: retries exhausted (reason printed)."""
+    if not (result.get("rate_limited") or result.get("transient")):
+        return None
+    limit, max_wait, backoff = _retry_limits()
+    attempts[agent] = attempts.get(agent, 0) + 1
+    kind = "rate limit" if result.get("rate_limited") else "transient provider error"
+    wait = result.get("retry_after") if result.get("rate_limited") else backoff * 2 ** (attempts[agent] - 1)
+    if wait is None:
+        wait = backoff
+    if attempts[agent] > limit or wait > max_wait:
+        why = (f"{attempts[agent] - 1} retries used" if attempts[agent] > limit
+               else f"reset in {int(wait)}s exceeds AGENT_ENGINE_RATE_LIMIT_MAX_WAIT_SECONDS={int(max_wait)}")
+        out(f"\nSTOP: {agent} hit a {kind} ({why}). Nothing was merged from the failed attempt; run the same command "
+            "again later (it starts fresh), or raise the limits.")
+        return False
+    out(f"\n>>> {agent} hit a {kind}; waiting {int(wait)}s, then running it again (attempt {attempts[agent] + 1})")
+    perf.event("provider_retry", agent, problem=kind, wait_s=wait, attempt=attempts[agent])
+    _sleep(wait)
+    return True
 
 
 def _approve(root: Path, step: Step, gates: dict[str, Gate], status: str, verified_test_approval: bool = False) -> None:
@@ -409,6 +468,21 @@ def _approve(root: Path, step: Step, gates: dict[str, Gate], status: str, verifi
         {"name": f"{step.stage.agent} agent"},
         f"Automated test approval by the orchestrator ({source}), not a human review. Validator: {status}.",
     )
+
+
+def _show_gate_notes(project: str, step: Step, out: Callable[[str], None]) -> None:
+    """Advisory reviewer findings and open questions travel with the gate; they never block."""
+    from agent_engine.cli import review_notes
+    from agent_engine.phase4 import attention
+    notes = review_notes(project, step.stage.agent) or {}
+    items = attention.open_items(project, step.stage.agent)
+    if not notes.get("findings") and not items:
+        return
+    out(f"\n--- {step.stage.gate} notes for the approver ({step.stage.agent}); these do not block ---")
+    for f in (notes.get("findings") or [])[:20]:
+        out(f"  review: {f}")
+    for line in items[:30]:
+        out(f"  {line}")
 
 
 def format_table(steps: list[Step]) -> str:
@@ -439,8 +513,21 @@ def _observe_approvals(root: Path, gates: dict[str, Gate]) -> None:
 def orchestrate(
     project: str, sprint: int = 1, test_approve: bool = False, publish: bool = False, plan_only: bool = False,
     runner: Runner = run_agent, out: Callable[[str], None] = print, parallel_independent: bool = False,
-    verified_test_approval: bool = False,
+    verified_test_approval: bool = False, resume: bool = False,
 ) -> int:
+    global _RESUME
+    _RESUME = resume
+    try:
+        return _orchestrate_once(project, sprint, test_approve, publish, plan_only, runner, out, parallel_independent,
+                                 verified_test_approval)
+    finally:
+        _RESUME = False   # never leaks into a later assessment or run
+
+
+def _orchestrate_once(project: str, sprint: int, test_approve: bool, publish: bool, plan_only: bool, runner: Runner,
+                      out: Callable[[str], None], parallel_independent: bool, verified_test_approval: bool) -> int:
+    if _RESUME:
+        out(">>> --resume: saved recovery state (interrupted repairs, reviews, parallel merges) will be reused")
     pipeline_id = perf.new_id()
     perf.set_pipeline(pipeline_id)
     with perf.span("pipeline", project, project=project, sprint=sprint, test_approve=test_approve, publish=publish,
@@ -492,29 +579,48 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             except Exception as exc:  # noqa: BLE001  (network, auth, schema: stop before any generation)
                 out(f"ERROR: importing approved stories failed: {exc}")
                 return FAILED
-        if not plan_only:
-            from agent_engine.phase4.parallel_stages import replay_pending, acknowledge
-            try:
-                restored = replay_pending(root, runner=runner)
-            except Exception as exc:
-                out(f"STOP: retained parallel merge needs recovery: {exc}; child outputs remain saved.")
+        # Every input is checked before any model call; all problems are reported at once.
+        from agent_engine.phase4.preflight import check_inputs
+        problems, cautions = check_inputs(project)
+        for c in cautions:
+            out(f"WARNING (input): {c}")
+        if problems:
+            out(f"\nSTOP: {len(problems)} input problem(s) must be fixed before any agent runs (no model was called):")
+            for p in problems:
+                out(f"  - {p}")
+            if not plan_only:
                 return FAILED
-            if restored:
-                record_parallel_results(root, restored, sprint, state)
+        if not plan_only:
+            from agent_engine.phase4.parallel_stages import replay_pending, acknowledge, pending
+            if _RESUME:
+                try:
+                    restored = replay_pending(root, runner=runner)
+                except Exception as exc:
+                    out(f"STOP: retained parallel merge needs recovery: {exc}; child outputs remain saved.")
+                    return FAILED
+                if restored:
+                    record_parallel_results(root, restored, sprint, state)
+                    acknowledge(root)
+                    out(">>> recovered retained parallel results without rerunning stage writers")
+            elif pending(root):
+                # A fresh run never replays an unfinished merge; its evidence stays under logs/parallel.
                 acknowledge(root)
-                out(">>> recovered retained parallel results without rerunning stage writers")
+                out(">>> an unfinished parallel session was left by an earlier run; it is not replayed (fresh run). "
+                    "Use --resume to recover it instead.")
     ran: list[str] = []
     failed_attempts: set[str] = set()
+    provider_attempts: dict[str, int] = {}
+    parallel_ok = parallel_independent
     for _ in range(MAX_STEPS):
         with perf.span("orchestrator", "assess") as asp:
             steps = assess(project, sprint, gates, verified_test_approval=verified_test_approval)
             asp.set(actions={s.stage.agent: s.action for s in steps})
-        # Existing outputs of a project run by hand: take them as up to date.
+        # --resume only: existing outputs of a project run by hand are taken as up to date.
         for s in steps:
             if s.resume_action == "complete":
                 state[s.stage.agent] = {"inputs": input_digests(s.stage, root, sprint), "status": "success",
                                        "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-            elif s.action in ("done", "gate_pending") and s.stage.agent not in state:
+            elif _RESUME and s.action in ("done", "gate_pending") and s.stage.agent not in state:
                 state[s.stage.agent] = {"inputs": input_digests(s.stage, root, sprint), "status": "adopted",
                                         "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
         if not plan_only:
@@ -532,14 +638,27 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             pair = [s for s in runnable if s.stage.agent in ("task-breakdown", "infra-pipeline")]
             # Only these two stages have verified independent inputs. Injected
             # runners keep the existing sequential contract unless tested directly.
-            if parallel_independent and len(pair) == 2 and runner is run_agent:
-                from agent_engine.phase4.parallel_stages import run_pair
+            if parallel_ok and len(pair) == 2 and runner is run_agent:
+                from agent_engine.phase4.parallel_stages import run_pair, acknowledge
                 out("\n>>> running Task Breakdown and Infrastructure in isolated workspaces")
                 try:
                     results = run_pair(root, pair, runner)
                 except Exception as exc:
-                    out(f"STOP: parallel stage merge failed: {exc}; isolated evidence retained under logs/parallel")
-                    return FAILED
+                    # All or nothing: a refused or rolled-back merge changed nothing in the project. Parallelism is
+                    # only an optimisation, so the same two stages run again one after the other, fresh.
+                    acknowledge(root)
+                    parallel_ok = False
+                    out(f">>> parallel merge did not complete ({exc}); nothing was merged. Running Task Breakdown "
+                        "and Infrastructure one after the other instead (isolated evidence kept under logs/parallel).")
+                    continue
+                retry = [r for r in results.values() if r.get("rate_limited") or r.get("transient")]
+                if retry:
+                    agent = next(a for a, r in results.items() if r in retry)
+                    if not _provider_retry(retry[0], agent, provider_attempts, out):
+                        return FAILED
+                    from agent_engine.phase4.parallel_stages import acknowledge as _ack
+                    _ack(root)
+                    continue
                 for item in pair:
                     result = results[item.stage.agent]
                     state[item.stage.agent] = {"inputs": input_digests(item.stage, root, sprint),
@@ -559,9 +678,10 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
             digests = input_digests(step.stage, root, sprint)
             result = runner(step.stage.agent, step.request, project)
             ran.append(step.stage.agent)
-            if result.get("rate_limited"):
-                out(f"\nSTOP: the subscription rate limit stopped {step.stage.agent}. Run the same command after the "
-                    "limit resets; it resumes from here (an ANTHROPIC_API_KEY in .env avoids the wait).")
+            retried = _provider_retry(result, step.stage.agent, provider_attempts, out)
+            if retried is True:
+                continue        # the next assessment runs the stage again, fresh
+            if retried is False:
                 return FAILED
             if result["status"] not in ("success", "done"):
                 if all((root / f).is_file() for f in gates[step.stage.gate].files):
@@ -599,6 +719,8 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
                 approvable = verified
                 if prepared and not verified:
                     continue
+            for s in pending:
+                _show_gate_notes(project, s, out)
             if test_approve and approvable:
                 for s in approvable:
                     _approve(root, s, gates, state[s.stage.agent]["status"], verified_test_approval)

@@ -382,8 +382,11 @@ def test_legacy_existing_files_are_reviewed_before_env_auto_approval(root, monke
         calls.append(agent_name)
         recovery.save(root, agent.load_pack(agent_name), request, "reviewed", "verified")
         return {"status": "success"}
+    # Fresh by default: outputs without a recorded run are regenerated, never adopted...
+    assert all(s.action == "run" for s in orch.assess("demo", verified_test_approval=True)[:2])
+    # ...--resume reviews the retained files in place before any automated approval.
     assert orch.orchestrate("demo", test_approve=True, verified_test_approval=True, runner=review,
-                            out=lambda _: None) == orch.DONE
+                            out=lambda _: None, resume=True) == orch.DONE
     assert set(calls) == set(OUTPUTS)
 
 

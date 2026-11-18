@@ -137,14 +137,21 @@ def _validate(backlog: Backlog, settings: ProjectSettings, stories: list) -> lis
     missing = [s.key for s in stories if s.key not in items or items[s.key].level != "story"]
     if missing:
         issue("missing_story", f"approved stories missing from the backlog: {', '.join(missing)}", missing)
-    without = [s.item_id for s in items.values() if s.level == "story" and not backlog.tasks_of(s.item_id)]
+    # A story whose breakdown failed is reported, not fatal: the rest of the backlog stays usable.
+    attention = [s.item_id for s in items.values() if s.level == "story" and s.needs_attention]
+    if attention:
+        issue("needs_attention", f"{len(attention)} stories need attention (no tasks could be produced; see their open "
+              f"questions): {', '.join(attention[:20])}", attention, "warning")
+    skip = set(attention)
+    without = [s.item_id for s in items.values() if s.level == "story" and not backlog.tasks_of(s.item_id)
+               and s.item_id not in skip]
     if without:
         issue("story_tasks", f"stories without tasks: {', '.join(without)}", without)
     no_disc = [t.item_id for t in items.values() if t.level == "task" and not t.discipline]
     if no_disc:
         issue("discipline", f"{len(no_disc)} tasks have no discipline (FE/BE/DB/DevOps/QA)", no_disc)
     for s in stories:
-        if s.key not in items:
+        if s.key not in items or s.key in skip:
             continue
         covered = {r.req_id for t in items.values() if t.level == "task"
                    for r in t.source_refs if t.parent_id == s.key or r.anchor == s.key}   # shared work counts
@@ -168,7 +175,7 @@ def _validate(backlog: Backlog, settings: ProjectSettings, stories: list) -> lis
             if absent:
                 t.definition_of_done = absent + t.definition_of_done
     bad_hours = [t.item_id for t in items.values() if t.level == "task" and not (t.estimate and (t.estimate.hours or 0) > 0)]
-    bad_points = [s.item_id for s in items.values() if s.level == "story" and not (
+    bad_points = [s.item_id for s in items.values() if s.level == "story" and s.item_id not in skip and not (
         s.estimate and s.estimate.story_points in settings.story_point_scale)]
     if bad_hours or bad_points:
         issue("estimates", f"unestimated items: {', '.join((bad_points + bad_hours)[:20])}", bad_points + bad_hours)

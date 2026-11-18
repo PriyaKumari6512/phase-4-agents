@@ -121,6 +121,10 @@ def test_restart_during_review_retains_generation(stage, monkeypatch):
 
 
 def test_interrupted_repair_retains_edits_and_resumes_from_saved_artifacts(stage, monkeypatch):
+    # Phase 4 repairs are driven by deterministic gaps (model review is advisory): gaps remain until the repair lands.
+    monkeypatch.setattr(cli, "_deterministic_gaps", lambda *a: (
+        [] if "finished" in (stage / "backlog/backlog.md").read_text() else ["S-1: missing requirement"], False))
+
     async def crash(built, message, callbacks, run_name):
         if run_name.endswith("-write"):
             artifacts(stage, "original")
@@ -160,13 +164,18 @@ def test_unchanged_verified_result_needs_no_model_call(stage, monkeypatch):
     assert report(stage)["review_reused"]
 
 
-def test_changed_sources_invalidate_reuse_and_semantic_gaps_do_not_loop(stage, monkeypatch):
+def test_changed_sources_invalidate_reuse_and_unresolved_gaps_do_not_loop(stage, monkeypatch):
     async def stream(built, message, callbacks, run_name):
         if run_name.endswith(("-write", "-fix")):
             artifacts(stage)
             return {"messages": []}
         return verdict(False)
     monkeypatch.setattr(cli, "_stream", stream)
+    # A model reviewer's unsatisfied verdict alone does not block a Phase 4 stage...
+    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 0
+    assert report(stage)["review_findings"] == ["S-1: missing requirement"]
+    # ...a deterministic gap that the repair cannot resolve ends in a decision wait, not a loop.
+    monkeypatch.setattr(cli, "_deterministic_gaps", lambda *a: (["S-1: missing requirement"], False))
     assert asyncio.run(cli._run("request", "task-breakdown", P)) == 1
     assert recovery.next_action(stage, agent.load_pack("task-breakdown"))[0] == "wait"
     monkeypatch.setattr(cli, "build_agent", lambda *args: pytest.fail("decision wait called a model"))
@@ -303,7 +312,7 @@ def test_orchestrator_selects_saved_review_and_preserves_gates(stage):
     artifacts(stage)
     pack = agent.load_pack("task-breakdown")
     recovery.save(stage, pack, "original request", "job", "review_pending")
-    chosen = orch.assess(P)[0]
+    chosen = orch.assess(P, resume=True)[0]
     assert chosen.action == "run" and chosen.request == "original request" and "resume retained verify" in chosen.why
     assert not list((stage / "gates").glob("P4-*.approved.json"))
 
@@ -352,9 +361,9 @@ def test_orchestrator_automatically_resumes_review_once_then_waits_at_gate(stage
     def runner(agent_name, request, project):
         code = asyncio.run(cli._run(request, agent_name, project, resume=True))
         return {"status": report(stage)["status"], "exit_code": code}
-    assert orch.orchestrate(P, runner=runner, out=lambda _: None) == orch.WAITING
+    assert orch.orchestrate(P, runner=runner, out=lambda _: None, resume=True) == orch.WAITING
     assert calls == ["task-breakdown/validator-verify"]
-    assert orch.orchestrate(P, runner=lambda *a: pytest.fail("completed stage restarted"), out=lambda _: None) == orch.WAITING
+    assert orch.orchestrate(P, runner=lambda *a: pytest.fail("completed stage restarted"), out=lambda _: None, resume=True) == orch.WAITING
     assert not list((stage / "gates").glob("P4-*.approved.json"))
 
 
@@ -367,7 +376,7 @@ def test_orchestrator_recovers_committed_merge_before_state_save(parallel_root):
     parallel.run_pair(parallel_root, steps(), run)
     assert parallel.pending(parallel_root)
     assert orch.orchestrate("demo", runner=lambda *a, **kw: pytest.fail("merge replay reran a writer"),
-                            out=lambda _: None) == orch.WAITING
+                            out=lambda _: None, resume=True) == orch.WAITING
     assert not parallel.pending(parallel_root)
     assert orch.load_state(parallel_root)["task-breakdown"]["status"] == "success"
 
@@ -477,12 +486,12 @@ def test_completed_feedback_response_waits_for_gate_but_new_decision_is_respecte
     def feedback():
         gates.record_decision(stage, gate, "changes_requested", {"name": "Reviewer"}, {"name": "Author"}, "Explain the scope")
     feedback()
-    first = orch.assess(P)[0]
+    first = orch.assess(P, resume=True)[0]
     assert first.action == "run"
     recovery.save(stage, agent.load_pack("task-breakdown"), first.request, "job", "verified")
-    assert orch.orchestrate(P, runner=lambda *a: pytest.fail("completed feedback response restarted"), out=lambda _: None) == orch.WAITING
+    assert orch.orchestrate(P, runner=lambda *a: pytest.fail("completed feedback response restarted"), out=lambda _: None, resume=True) == orch.WAITING
     feedback()
-    second = orch.assess(P)[0]
+    second = orch.assess(P, resume=True)[0]
     assert second.action == "run" and second.request != first.request
 
 
@@ -510,10 +519,10 @@ def test_restart_after_state_save_before_merge_acknowledgment(parallel_root, mon
     actual = parallel.acknowledge
     monkeypatch.setattr(parallel, "acknowledge", lambda *a: (_ for _ in ()).throw(Crash("after state save")))
     with pytest.raises(Crash):
-        orch.orchestrate("demo", runner=lambda *a: pytest.fail("retained run restarted"), out=lambda _: None)
+        orch.orchestrate("demo", runner=lambda *a: pytest.fail("retained run restarted"), out=lambda _: None, resume=True)
     assert orch.load_state(parallel_root)["task-breakdown"]["status"] == "success"
     monkeypatch.setattr(parallel, "acknowledge", actual)
-    assert orch.orchestrate("demo", runner=lambda *a: pytest.fail("retained run restarted"), out=lambda _: None) == orch.WAITING
+    assert orch.orchestrate("demo", runner=lambda *a: pytest.fail("retained run restarted"), out=lambda _: None, resume=True) == orch.WAITING
     assert not parallel.pending(parallel_root)
 
 

@@ -68,7 +68,9 @@ def _windows(settings: ProjectSettings, history: History, as_of: date):
 
 def _prechecks(backlog: Backlog, settings: ProjectSettings, windows) -> tuple[list[str], list[str]]:
     max_cap = max((w.cap_p50 for w in windows), default=0)
-    unest = [s.item_id for s in backlog.stories() if not (s.estimate and s.estimate.story_points) and s.moscow != "wont"]
+    # Stories marked "needs attention" by Task Breakdown have no tasks yet: left out like unestimated stories.
+    unest = [s.item_id for s in backlog.stories() if (s.needs_attention or not (s.estimate and s.estimate.story_points))
+             and s.moscow != "wont"]
     too_big = [s.item_id for s in backlog.stories() if s.estimate and s.estimate.story_points and s.moscow != "wont"
                and (s.estimate.story_points > settings.max_story_points_per_story or s.estimate.story_points > max_cap)]
     return unest, too_big
@@ -273,7 +275,10 @@ def solve(project: str, pins: dict[str, int] | None = None, relax: list[str] | N
     for s in stories:
         if placement.get(s.story_id, 0) != 0:
             continue
-        if s.story_id in unest:
+        if s.story_id in unest and by[s.story_id].needs_attention:
+            code, why = "unestimated", ("Needs attention: Task Breakdown produced no tasks for it "
+                                        f"({by[s.story_id].needs_attention[:200]}). Plan it once it is broken down.")
+        elif s.story_id in unest:
             code, why = "unestimated", "No story points; Task Breakdown must estimate it."
         elif s.story_id in too_big:
             code, why = "too_large", (f"Larger than {settings.max_story_points_per_story} SP or one sprint's P50 capacity; "

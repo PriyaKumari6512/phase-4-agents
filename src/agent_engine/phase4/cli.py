@@ -54,6 +54,8 @@ def add_parser(sub) -> None:
     o.add_argument("--test-approve", action="store_true",
                    help="TEST ONLY: approve the gates itself (recorded as an automated test approval, not a human sign-off).")
     o.add_argument("--publish", action="store_true", help="When everything is approved, run phase4 publish for all four.")
+    o.add_argument("--resume", action="store_true",
+                   help="Reuse saved recovery state (interrupted repairs/reviews, parallel merges). Default: run fresh.")
     recover = s.add_parser("recover-parallel", help="Merge retained child results without rerunning writers.")
     recover.add_argument("--project-name", required=True)
     recover.add_argument("--session", required=True, help="Retained directory under the configured logs/parallel.")
@@ -119,7 +121,8 @@ def run(args: argparse.Namespace) -> int:
         if args.phase4_command == "orchestrate":
             from agent_engine.phase4.orchestrator import orchestrate
             return orchestrate(args.project_name, args.sprint, args.test_approve, args.publish, args.plan,
-                               parallel_independent=getattr(args, "parallel_independent", False))
+                               parallel_independent=getattr(args, "parallel_independent", False),
+                               resume=getattr(args, "resume", False))
         if args.phase4_command == "schemas":
             out = Path(args.out)
             out.mkdir(parents=True, exist_ok=True)

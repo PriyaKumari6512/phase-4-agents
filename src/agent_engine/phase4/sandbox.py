@@ -582,20 +582,50 @@ def _checkov_result(r: CmdResult) -> CheckResult:
     if not blocks or any(not isinstance(b, dict) or not isinstance(b.get("results"), dict)
                          or not isinstance(b["results"].get("failed_checks"), list) for b in blocks):
         return _parse_failure("checkov", r)
-    findings, unknown = [], 0
+    policy = checkov_policy()
+    findings, unknown, blocking, third_party = [], 0, 0, 0
     for b in blocks:
         for fc in b["results"]["failed_checks"]:
             if not isinstance(fc, dict):
                 return _parse_failure("checkov", r)
-            unknown += not bool(fc.get("severity"))
-            sev = SEVERITY.get(str(fc.get("severity", "")).upper(), "medium")
-            findings.append(Finding(rule_id=fc.get("check_id", "checkov"), severity=sev, file=fc.get("file_path"),
-                                    message=("[severity unreported; review required] " if not fc.get("severity") else "") + fc.get("check_name", "")))
+            check_id, path = fc.get("check_id", "checkov"), str(fc.get("file_path") or "")
+            reported = str(fc.get("severity") or "").upper()
+            # The free checkov reports no severity. Severity then comes from the reviewed policy map, else the
+            # policy default (medium): an unreported severity alone never fails the scan.
+            sev = SEVERITY.get(reported) or policy["severity"].get(check_id) or policy["unreported_severity"]
+            unknown += not reported and check_id not in policy["severity"]
+            vendor = any(path.lstrip("/").startswith(p) for p in policy["third_party_paths"])
+            third_party += vendor
+            fails = sev in policy["fail_on"] and not vendor
+            blocking += fails
+            tag = ("[third-party module; reported, not blocking] " if vendor else
+                   "" if fails else f"[{sev}; policy: warning] ")
+            findings.append(Finding(rule_id=check_id, severity=sev, file=fc.get("file_path"),
+                                    message=tag + fc.get("check_name", "")))
     incomplete_scan = any((b.get("summary") or {}).get("parsing_errors") for b in blocks) or "Failed to download module" in r.stderr
-    high = sum(f.severity in ("high", "critical") for f in findings)
     return _check("checkov", "execution_error" if incomplete_scan else "findings" if findings else "passed",
-                  passed=not high and not unknown and not incomplete_scan, findings=findings[:200],
-                  summary=f"{len(findings)} findings; {unknown} severity unreported; coverage {'incomplete' if incomplete_scan else 'reported'}")
+                  passed=not blocking and not incomplete_scan, findings=findings[:200],
+                  summary=(f"{len(findings)} findings: {blocking} blocking ({'/'.join(policy['fail_on'])}), "
+                           f"{third_party} in third-party modules, {unknown} without a reported or policy severity "
+                           f"(treated as {policy['unreported_severity']}); coverage "
+                           f"{'incomplete' if incomplete_scan else 'reported'}"))
+
+
+def checkov_policy() -> dict:
+    """The reviewed checkov policy (catalog `checkov-policy.json`): which severities fail, the severity of
+    checks the free checkov does not score, and vendor paths whose findings are reported but cannot be fixed here."""
+    from agent_engine.phase4.infra import catalog_dir
+    policy = {"fail_on": ["high", "critical"], "unreported_severity": "medium", "severity": {},
+              "third_party_paths": [".external_modules/"]}
+    path = catalog_dir() / "checkov-policy.json"
+    if path.is_file():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        policy.update({k: data[k] for k in policy if k in data})
+    allowed = {"info", "low", "medium", "high", "critical"}
+    if (not set(policy["fail_on"]) <= allowed or policy["unreported_severity"] not in allowed
+            or not set(policy["severity"].values()) <= allowed):
+        raise ValueError(f"{path}: severities must be one of {sorted(allowed)}")
+    return policy
 
 
 def _schema_result(tool: str, r: CmdResult) -> CheckResult:

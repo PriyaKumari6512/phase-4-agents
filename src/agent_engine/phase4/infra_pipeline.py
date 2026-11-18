@@ -24,9 +24,39 @@ def removed_blocks(before: str, after: str) -> list[str]:
     return sorted(blocks(before) - blocks(after))
 
 class Edit(BaseModel):
+    """One targeted fix: replace the exact text `find` (it must occur once in the file) with `replace`."""
     model_config = ConfigDict(extra='forbid')
     path: str
-    content: str
+    find: str
+    replace: str
+
+
+MAX_EDIT_LINES, MAX_EDITS = 40, 12
+
+
+def apply_edits(content: dict[str, str], edits: list[Edit]) -> tuple[dict[str, str], list[str]]:
+    """Apply targeted edits to copies of `content`. Returns (new contents, errors); nothing is written here."""
+    out, errors = dict(content), []
+    if not edits:
+        return out, ['Return at least one targeted edit']
+    if len(edits) > MAX_EDITS:
+        errors.append(f'At most {MAX_EDITS} edits per repair; report the rest instead of rewriting files')
+    for e in edits:
+        if e.path not in out:
+            errors.append(f'{e.path}: edit only the supplied failing files')
+            continue
+        if not e.find.strip():
+            errors.append(f'{e.path}: `find` must quote the exact text to change')
+            continue
+        if max(e.find.count('\n'), e.replace.count('\n')) + 1 > MAX_EDIT_LINES:
+            errors.append(f'{e.path}: each edit may change at most {MAX_EDIT_LINES} lines; make a smaller, targeted fix')
+            continue
+        found = out[e.path].count(e.find)
+        if found != 1:
+            errors.append(f'{e.path}: `find` must occur exactly once (found {found} times); quote more context')
+            continue
+        out[e.path] = out[e.path].replace(e.find, e.replace, 1)
+    return out, errors
 
 class Repairs(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -128,21 +158,28 @@ async def repair(project, gaps, callbacks=None):
     if any(p.search(text) for text in content.values() for p in infra.SECRET_PATTERNS):
         raise files.ProjectError('Secret-like generated content requires human removal before repair')
     def check(result):
-        paths = [e.path for e in result.edits]
-        if not paths or len(set(paths)) != len(paths) or set(paths) - set(content):
-            return ['Edit only the supplied failing files, once each']
-        if all(e.content == content[e.path] for e in result.edits):
+        new, errors = apply_edits(content, result.edits)
+        if errors:
+            return errors
+        if new == content:
             return ['Repair must change the failing content']
-        if any(p.search(e.content) for e in result.edits for p in infra.SECRET_PATTERNS):
+        if any(p.search(e.replace) for e in result.edits for p in infra.SECRET_PATTERNS):
             return ['Secrets must remain references only']
-        removed = {e.path: removed_blocks(content[e.path], e.content) for e in result.edits if e.path.endswith('.tf')}
+        removed = {path: removed_blocks(content[path], new[path]) for path in new if path.endswith('.tf')}
         removed = {path: gone for path, gone in removed.items() if gone}
         if removed:
-            return [f'Return each file complete; keep every block and fix findings in place. {path} drops: '
+            return [f'Fix findings in place; never delete infrastructure. {path} drops: '
                     + ', '.join(gone[:10]) for path, gone in removed.items()]
         return []
-    result = await _call(project, Repairs, 'Repair only the supplied generated files to resolve the scanner findings. Preserve the catalog topology, digest promotion, approvals and secret references.',
+    result = await _call(project, Repairs,
+                         'Make small, targeted edits to the supplied generated files to resolve the scanner findings. '
+                         'Each edit replaces the exact text `find` (quoted from the file, occurring once) with `replace`; '
+                         f'at most {MAX_EDITS} edits of at most {MAX_EDIT_LINES} lines. Never return whole files. '
+                         'Preserve the catalog topology, digest promotion, approvals and secret references. Findings '
+                         'that need a design decision are left for the DevOps Lead, not rewritten.',
                          {'files': content, 'gaps': gaps, 'checks': [c for c in checks if not c.get('passed')]}, callbacks, check)
-    for edit in result.edits:
-        files.write_text(project, 'infra/' + edit.path, edit.content)
+    new, _ = apply_edits(content, result.edits)
+    for path, text in new.items():
+        if text != content[path]:
+            files.write_text(project, 'infra/' + path, text)
     return {'messages': [AIMessage(content=infra.validate(project))]}

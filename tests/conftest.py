@@ -34,3 +34,16 @@ def _no_live_integrations(monkeypatch):
         raise httpx.ConnectError(f"network disabled in tests: {request.method} {request.url.host}", request=request)
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _blocked)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "real_preflight: run the orchestrator's input preflight (phase4/preflight.py)")
+
+
+@pytest.fixture(autouse=True)
+def _preflight_only_where_tested(request, monkeypatch):
+    """Orchestrator tests use deliberately minimal project folders to test decision logic; the input preflight is
+    tested on its own (and end to end) with @pytest.mark.real_preflight."""
+    if request.node.get_closest_marker("real_preflight") is None:
+        from agent_engine.phase4 import preflight
+        monkeypatch.setattr(preflight, "check_inputs", lambda project: ([], []))

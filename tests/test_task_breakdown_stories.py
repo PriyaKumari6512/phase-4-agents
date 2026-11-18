@@ -99,6 +99,38 @@ def run(coro):
     return asyncio.run(coro)
 
 
+
+def test_one_story_failing_its_checks_is_marked_and_the_others_finish(proj, monkeypatch):
+    """GR-10 still fails its checks after the retry: it needs attention, GR-9 is broken down, the stage goes on."""
+    from agent_engine.phase4 import attention
+    fake = FakeModel()
+
+    async def flaky(schema, system, human, callbacks, spec):
+        result = await fake(schema, system, human, callbacks, spec)
+        if schema is tb.StoryBreakdown and result.story_key == "GR-10":
+            for t in result.tasks:
+                t.covers = []                    # both attempts leave the story's criteria uncovered
+        return result
+    monkeypatch.setattr(tb, "_invoke", flaky)
+    reply = run(tb.generate(P, "Break the approved stories down into tasks.", []))
+    assert "0 blocking" in reply["messages"][0].content
+    b = files.read_json(P, files.BACKLOG, Backlog)
+    by = b.by_id()
+    assert by["GR-9"].needs_attention is None and b.tasks_of("GR-9")
+    assert by["GR-10"].needs_attention and not b.tasks_of("GR-10")
+    assert by["GR-10"].open_questions[0].startswith("NEEDS ATTENTION")
+    assert [c["key"] for c in fake.calls].count("GR-10") == 2            # one retry, then it is reported
+    assert any(i.rule == "needs_attention" and i.severity == "warning" for i in b.issues)
+    assert tb.needs_attention(P) == {"GR-10": by["GR-10"].needs_attention}
+    assert any(line.startswith("needs attention: GR-10") for line in attention.open_items(P, "task-breakdown"))
+    # The next run tries the failed story again (fresh) and reuses the good one as a cache.
+    fake.calls.clear()
+    monkeypatch.setattr(tb, "_invoke", fake)
+    run(tb.generate(P, "Break the approved stories down into tasks.", []))
+    assert [c["key"] for c in fake.calls] == ["GR-10"]
+    assert files.read_json(P, files.BACKLOG, Backlog).by_id()["GR-10"].needs_attention is None
+
+
 def test_stories_become_tasks_without_rewriting_the_story(proj, monkeypatch):
     fake = FakeModel()
     monkeypatch.setattr(tb, "_invoke", fake)
@@ -467,7 +499,8 @@ def test_frontier_tier_resolution(monkeypatch):
     assert agent.model_spec("frontier") == "openai:gpt-x"            # no bigger model known: stays on strong
 
 
-def test_cli_failed_review_escalates_one_fix_then_succeeds(proj, monkeypatch, tmp_path):
+def test_cli_model_review_findings_are_warnings_not_a_fix_loop(proj, monkeypatch, tmp_path):
+    """Only deterministic checks block: a model reviewer's 'blocking' finding is recorded for the gate approver."""
     from agent_engine import agent, cli, logging_setup
     from phase4_helpers import approve_design_gates
     approve_design_gates(proj)
@@ -484,11 +517,13 @@ def test_cli_failed_review_escalates_one_fix_then_succeeds(proj, monkeypatch, tm
     monkeypatch.setattr(tb, "_invoke", fake)
     assert asyncio.run(cli._run("Break the approved stories down into tasks.", "task-breakdown", P)) == 0
     report = json.loads((proj / "report.json").read_text())
-    assert [(p["kind"], p["model_tier"]) for p in report["passes"]] == [
-        ("write", "strong"), ("verify", "strong"), ("fix", "frontier"), ("verify", "strong")]
-    assert report["status"] == "success" and len(fake.review_calls) == 2
-    assert [(c["key"], c["spec"]) for c in fake.calls] == [
-        ("GR-9", "test:strong"), ("GR-10", "test:strong"), ("GR-9", "test:frontier")]
+    assert [(p["kind"], p["model_tier"]) for p in report["passes"]] == [("write", "strong"), ("verify", "strong")]
+    assert report["status"] == "success" and len(fake.review_calls) == 1
+    assert [(c["key"], c["spec"]) for c in fake.calls] == [("GR-9", "test:strong"), ("GR-10", "test:strong")]
+    assert report["review_findings"] and "GR-9-T02" in report["review_findings"][0]
+    notes = json.loads((proj / "backlog" / "review-notes.json").read_text())
+    assert notes["blocking"] is False and notes["findings"] == report["review_findings"]
+    assert cli.review_notes(P, "task-breakdown")["findings"] == report["review_findings"]
 
 
 def test_backlog_carries_the_roadmap_without_regenerating_on_reorder(proj, monkeypatch):
@@ -550,8 +585,9 @@ def test_findings_without_story_ids_rebuild_from_retained_results(proj, monkeypa
     assert json.loads(backlog.validate_report(P, write=False))["ready_for_review"]
 
 
-def test_only_a_reviewer_decision_may_leave_a_criterion_unplanned(proj):
-    """A gate decision ("do not build US-001.AC2") is expressed as a deferred criterion, never as a missing one."""
+def test_a_criterion_is_left_unplanned_only_by_a_decision_never_silently(proj):
+    """A gate decision ("do not build US-001.AC2") or an explicit DECISION NEEDED (PRD conflict / open product decision)
+    is expressed as a deferred criterion, never as a missing one."""
     from agent_engine.phase4 import files as phase4_files
     from agent_engine.phase4.contracts import ProjectSettings
     snap = tb.StorySnapshot.model_validate(snapshot())
@@ -562,8 +598,14 @@ def test_only_a_reviewer_decision_may_leave_a_criterion_unplanned(proj):
         t.covers = [c for c in t.covers if c != "US-001.AC2"]
     assert any("no task covers acceptance criteria ['US-001.AC2']" in e for e in tb.check_breakdown(story, result, settings))
     result.deferred_criteria = [tb.DeferredCriterion(ac_id="US-001.AC2", reason="Out of scope per PRD section 3 (P4-G1 decision)")]
-    assert any("only for criteria a reviewer_request" in e for e in tb.check_breakdown(story, result, settings))
+    assert any("DECISION NEEDED" in e for e in tb.check_breakdown(story, result, settings))   # no silent skipping
     assert tb.check_breakdown(story, result, settings, deferrable=True) == []
+    needed = result.model_copy(deep=True)
+    needed.deferred_criteria = [tb.DeferredCriterion(
+        ac_id="US-001.AC2", reason="DECISION NEEDED: the PRD caps lockout at 5 attempts, the story says 3")]
+    assert tb.check_breakdown(story, needed, settings) == []          # a PRD conflict is recorded, not a failure
+    decided = tb.story_items(story, "GR-1", needed, settings)
+    assert any("decision needed by the Tech Lead" in q for q in decided[0].open_questions)
     items = tb.story_items(story, "GR-1", result, settings)
     assert any("US-001.AC2 is not planned (reviewer decision)" in q for q in items[-1].open_questions + items[0].open_questions)
     story_item = next(i for i in items if i.level == "story")

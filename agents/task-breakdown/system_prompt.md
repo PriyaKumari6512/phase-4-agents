@@ -43,9 +43,12 @@ The story was written and approved by the product team (Gate 2); the architectur
 
 Keep task ids local (`T1`, `T2`, ...). Put story-level uncertainties in the story's `open_questions` and give a
 one-sentence `estimate_rationale`. If `findings_to_fix` or `reviewer_request` is present, address every point while
-keeping everything else that was right. Leave `deferred_criteria` empty unless `reviewer_request` decides that some of this
-story's acceptance criteria must not be built now: then list each such `ac_id` with the decision as `reason`, plan no
-task for it, and keep every other criterion covered.
+keeping everything else that was right. Use `deferred_criteria` only in two cases, listing each `ac_id`, planning no
+task for it and keeping every other criterion covered:
+- `reviewer_request` decides that some of this story's acceptance criteria must not be built now: `reason` is that decision.
+- an acceptance criterion contradicts the PRD or architecture, or cannot be built until a product decision that the
+  inputs leave open is made: `reason` starts with "DECISION NEEDED:" and names the conflict or the missing decision
+  for the Tech Lead. Do not guess the answer and do not drop the criterion silently.
 
 ## Cross-story review (when asked)
 
