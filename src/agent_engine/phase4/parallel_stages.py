@@ -18,7 +18,7 @@ OWNED = {"task-breakdown": {"backlog"}, "infra-pipeline": {"infra"}}
 # Engine-owned retained results each parallel stage may bring back, and the exact paths allowed inside them.
 RETAINED_BY_AGENT = {
     "task-breakdown": (".engine-task-breakdown",
-                       re.compile(r"(?:(?:stories|cross|reviews|repairs)/[0-9a-f]{64}|current)\.json")),
+                       re.compile(r"(?:(?:stories|cross|reviews|repairs)/[0-9a-f]{64}|current|attention|generation-request)\.json")),
     "infra-pipeline": (".engine-infra-pipeline", re.compile(r"[0-9a-f]{64}\.json")),
 }
 RETAINED_DIRS = {folder for folder, _ in RETAINED_BY_AGENT.values()}

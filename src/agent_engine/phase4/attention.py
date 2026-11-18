@@ -31,6 +31,9 @@ def open_items(project: str, agent: str) -> list[str]:
                 if not q.startswith("NEEDS ATTENTION"):
                     lines.append(f"open question: {item['item_id']}: {q[:300]}")
     elif agent == "sprint-planning":
+        auto = _read(project, "sprint/auto-option.json") or {}
+        if auto.get("applied_automatically"):
+            lines.append(f"decision needed: {auto['applied_automatically']}")
         plan = _read(project, files.SPRINT_PLAN) or {}
         for d in plan.get("deferred", []) or []:
             if isinstance(d, dict):

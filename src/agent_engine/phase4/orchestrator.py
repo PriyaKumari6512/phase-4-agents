@@ -7,10 +7,12 @@ every output exists and every gate is approved, or it needs a human:
   * an input is missing                       -> stop, say which file to add
   * a gate is waiting (or went stale)         -> stop, say which gate to approve (the orchestrator never approves
                                                  unless `--test-approve` is given, and that is recorded as a test)
-  * a gate asked for changes                  -> run the owning agent again with the gate comment as the request
+  * a gate asked for changes                  -> run the owning agent again; every decision recorded at a gate is
+                                                 part of that stage's request on every later run
   * an input an agent read has changed        -> run only that agent (and, through the changed outputs, the agents
                                                  after it); a team or calendar change never re-runs Task Breakdown
-  * an agent's deterministic checks fail      -> stop and show the open gaps (no endless retry)
+  * an agent's checks or reviewer find issues -> bounded automatic repair; what remains goes to the stage's gate as
+                                                 open issues and the pipeline continues (the approver decides)
   * a rate limit or transient provider error  -> wait and retry (bounded); beyond the bound stop with the reason
 
 Every run is fresh and depends only on its inputs. What each agent last read is kept in
@@ -185,6 +187,36 @@ def gate_state(root: Path, gate: Gate) -> tuple[str, dict]:
     return "pending", last
 
 
+def reviewer_decisions(root: Path, gate_name: str) -> list[dict]:
+    """Every 'changes requested' decision recorded at a gate, oldest first. Gate history is human input."""
+    history = root / "gates" / "history.jsonl"
+    if not history.is_file():
+        return []
+    decisions = []
+    for line in history.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            record = json.loads(line)
+            if (record.get("gate") == gate_name and record.get("decision") == "changes_requested"
+                    and (record.get("comment") or "").strip()):
+                decisions.append(record)
+    return decisions
+
+
+def stage_request(root: Path, stage: Stage, sprint: int) -> str:
+    """The stage's standard instruction plus every reviewer decision recorded at its gate.
+
+    The same gate history always gives the same request, so every run (fresh or not) applies all earlier decisions
+    without reading anything an earlier run produced."""
+    request = stage.request.format(sprint=sprint)
+    decisions = reviewer_decisions(root, stage.gate)
+    if not decisions:
+        return request
+    lines = [f"- ({d.get('decided_at', '')}, {(d.get('approver') or {}).get('name', 'reviewer')}) {d['comment'].strip()}"
+             for d in decisions]
+    return (f"{request}\n\nReviewer decisions recorded at gate {stage.gate} (apply every one; when two decisions "
+            "cover the same point, the later one wins):\n" + "\n".join(lines))
+
+
 def load_state(root: Path) -> dict:
     path = root / STATE_FILE
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
@@ -261,7 +293,7 @@ def assess(project: str, sprint: int = 1, gates: dict[str, Gate] | None = None,
             from agent_engine.phase4.approval_policy import automated, test_publication_allowed
             if automated(record) and not test_publication_allowed(project, stage.gate, record):
                 status = "pending"  # renew old test approvals only after current automated review
-        request = stage.request.format(sprint=sprint)
+        request = stage_request(root, stage, sprint)
         if resume and status not in ("changes_requested", "rejected", "approved"):
             from agent_engine.agent import load_pack
             pack = load_pack(stage.agent)
@@ -466,23 +498,40 @@ def _approve(root: Path, step: Step, gates: dict[str, Gate], status: str, verifi
         {"name": "Orchestrator (automated test approval)", "role": "NOT a human sign-off",
          **({"automation": TEST_ORIGIN} if verified_test_approval else {})},
         {"name": f"{step.stage.agent} agent"},
-        f"Automated test approval by the orchestrator ({source}), not a human review. Validator: {status}.",
+        f"Automated test approval by the orchestrator ({source}), not a human review. Validator: {status}."
+        + _issues_comment(root.name, step.stage.agent),
     )
+
+
+def _issues_comment(project: str, agent: str) -> str:
+    """The open items an approval was given with, so a test approval shows exactly what it accepted."""
+    lines = gate_issues(project, agent)
+    if not lines:
+        return " No open issues."
+    shown = "\n".join(f"- {line[:300]}" for line in lines[:40])
+    more = f"\n- ... and {len(lines) - 40} more (see the stage output)" if len(lines) > 40 else ""
+    return f" Approved with {len(lines)} open item(s) for a human to review:\n{shown}{more}"
 
 
 def _show_gate_notes(project: str, step: Step, out: Callable[[str], None]) -> None:
     """Advisory reviewer findings and open questions travel with the gate; they never block."""
-    from agent_engine.cli import review_notes
-    from agent_engine.phase4 import attention
-    notes = review_notes(project, step.stage.agent) or {}
-    items = attention.open_items(project, step.stage.agent)
-    if not notes.get("findings") and not items:
+    lines = gate_issues(project, step.stage.agent)
+    if not lines:
         return
     out(f"\n--- {step.stage.gate} notes for the approver ({step.stage.agent}); these do not block ---")
-    for f in (notes.get("findings") or [])[:20]:
-        out(f"  review: {f}")
-    for line in items[:30]:
+    for line in lines[:50]:
         out(f"  {line}")
+
+
+def gate_issues(project: str, agent: str) -> list[str]:
+    """Everything the approver of `agent`'s gate should decide on: open issues left after automatic repair,
+    advisory model review findings and the open items in the stage output."""
+    from agent_engine.cli import review_notes
+    from agent_engine.phase4 import attention
+    notes = review_notes(project, agent) or {}
+    return ([f"open issue: {i}" for i in notes.get("open_issues") or []]
+            + [f"review: {f}" for f in notes.get("findings") or []]
+            + attention.open_items(project, agent))
 
 
 def format_table(steps: list[Step]) -> str:
@@ -768,10 +817,21 @@ def _orchestrate(project: str, sprint: int, test_approve: bool, publish: bool, p
     if publish:
         from agent_engine.phase4.publish import PUBLISHERS
 
+        from agent_engine.phase4.publish import PublishError
+        unpublished = {}
         for what in ("infra", "backlog", "sprint", "assignments"):
             out(f"\n>>> publish {what}")
             with perf.span("publish", what, project=project):
-                out(json.dumps(PUBLISHERS[what](project), indent=2, default=str))
+                try:
+                    out(json.dumps(PUBLISHERS[what](project), indent=2, default=str))
+                except PublishError as exc:
+                    # One destination refusing (a missing setting, a changed file) never skips the others.
+                    unpublished[what] = str(exc)
+                    out(f"NOT PUBLISHED ({what}): {exc}")
+        if unpublished:
+            out("\nPublished everything except: " + "; ".join(f"{k} ({v})" for k, v in unpublished.items())
+                + ". Fix the cause and run the same command again; already published items are not duplicated.")
+            return FAILED
     else:
         out("Next: add --publish (or `agent-engine phase4 publish backlog|sprint|assignments|infra`) to push to the tracker / GitHub.")
     return DONE

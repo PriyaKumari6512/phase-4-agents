@@ -99,8 +99,10 @@ def test_preflight_lists_team_skills_and_undated_releases(tmp_path, monkeypatch)
         "project": "pf", "source": "file", "releases": [{"name": "MVP", "order": 1}],
         "stories": [{"key": "PF-1", "issue_id": "1", "summary": "s", "fix_versions": ["MVP"]}]}))
     errors, warnings = preflight.check_inputs("pf")
-    assert any("without declared_skills" in e and settings["team"][0]["member_id"] in e for e in errors)
-    assert any("releases without a date" in e and "MVP" in e for e in errors)
+    # A plan can still be made from these, so they are warnings: the run continues and the gaps show at the gates.
+    assert not errors
+    assert any("without declared_skills" in w and settings["team"][0]["member_id"] in w for w in warnings)
+    assert any("releases without a date" in w and "MVP" in w for w in warnings)
     assert any("without acceptance criteria" in w and "PF-1" in w for w in warnings)
     assert files.exists("pf", files.STORIES)
 

@@ -425,8 +425,12 @@ def check(project: str) -> str:
         warnings.append("infeasible with no verified options; the approver must change inputs")
     for r in plan.releases:
         if r.status == "late":
-            (problems if r.hard else warnings).append(
-                f"release {r.release} finishes {r.planned_finish}, after its {'hard ' if r.hard else ''}deadline {r.due_date}")
+            # A deadline an applied option deliberately relaxed (approver's choice, or the automatic choice handed to
+            # the approver) is reported, not a defect of the plan.
+            relaxed = any(release_ref(r.release) in c.split(":") for c in plan.relaxations)
+            (problems if r.hard and not relaxed else warnings).append(
+                f"release {r.release} finishes {r.planned_finish}, after its {'hard ' if r.hard else ''}deadline "
+                f"{r.due_date}" + (" (relaxed by an applied option; the approver confirms it)" if relaxed else ""))
         elif r.status == "incomplete":
             warnings.append(f"release {r.release} is not complete in the horizon: {', '.join(r.deferred_story_ids)} deferred")
         if r.due_date and r.p85_date and r.p85_date > r.due_date and r.status == "on_track":

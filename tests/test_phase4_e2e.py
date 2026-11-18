@@ -158,3 +158,79 @@ def test_whole_pipeline_finishes_and_reports_injected_failures(proj, monkeypatch
     # Every gate was approved (test approvals) and the final gate too.
     for gate in ("P4-G1", "P4-G2", "P4-G3", "P4-G4", "G4"):
         assert (proj / "gates" / f"{gate}.approved.json").is_file(), gate
+
+
+@pytest.mark.real_preflight
+def test_issues_that_used_to_stop_the_pipeline_go_to_the_gates_and_it_publishes(proj, monkeypatch, tmp_path):
+    """Once the inputs are right the pipeline always ends with every output: an infeasible hard deadline, a
+    deterministic check the repair cannot satisfy and a high-severity scanner finding are handed to the gates (test
+    approvals record them), and publishing goes ahead with the infra findings stated in the PR."""
+    from agent_engine.phase4 import allocation
+    _inputs(proj)
+    settings = files.read_json(P, files.PROJECT_SETTINGS)
+    settings["release_deadlines"] = [{"release": "MVP", "due_date": "2026-11-20", "hard": True}]   # cannot be met
+    files.write_json(P, files.PROJECT_SETTINGS, settings)
+    monkeypatch.setattr(cli, "OUTPUTS_DIR", proj.parent)
+    monkeypatch.setattr(logging_setup, "OUTPUTS_DIR", proj.parent)
+    monkeypatch.setattr(logging_setup, "LOGS_DIR", tmp_path / "logs")
+    monkeypatch.setattr(cli, "build_langfuse_handler", lambda: None)
+    from agent_engine.phase4 import capacity
+    monkeypatch.setattr(capacity, "utc_today", lambda: __import__("datetime").date(2026, 11, 10))
+    monkeypatch.setattr(tb, "_invoke", BreakdownModel())
+    monkeypatch.setattr(sp, "_invoke", SprintModel(recommend=None))
+
+    async def intent(*_):
+        data = _intent()
+        data["environments"] = ["dev", "qa", "stg", "prod"]
+        return InfraIntent.model_validate(data)
+    monkeypatch.setattr(ip, "_invoke", intent)
+    # A high-severity finding in our own Terraform: blocking under the checkov policy, so infra checks fail.
+    checkov = sandbox._checkov_result(sandbox.CmdResult(0, json.dumps({"results": {"failed_checks": [
+        {"check_id": "CKV_AWS_17", "check_name": "RDS instance is publicly accessible",
+         "file_path": "/envs/prod/core/main.tf"}]}, "summary": {"parsing_errors": 0}}), ""))
+    assert not checkov.passed
+    monkeypatch.setattr(sandbox, "run_checks", lambda wd, envs, **kw: [
+        checkov if t == "checkov" else CheckResult(tool=t, passed=True, outcome="passed", summary="fake scanner")
+        for t in sandbox.ALL_TOOLS if kw.get("only") is None or t in kw["only"]])
+    real_call = ip._call
+    async def no_repair(project, schema, *args, **kwargs):
+        if schema is ip.Repairs:              # the repair model cannot fix it either
+            raise ip.files.ProjectError("Repair must change the failing content")
+        return await real_call(project, schema, *args, **kwargs)
+    monkeypatch.setattr(ip, "_call", no_repair)
+    # A deterministic Work Allocation check that no repair satisfies.
+    real_check = allocation.check
+    def check(project):
+        result = json.loads(real_check(project))
+        result["problems"].append("injected: the Engineering Manager must confirm the on-call rota")
+        result["ok"] = False
+        return json.dumps(result)
+    monkeypatch.setattr(allocation, "check", check)
+    monkeypatch.setenv("AGENT_ENGINE_PERF_MODE", "publication")
+    monkeypatch.setenv("PHASE4_AUTO_APPROVE_FOR_TESTING", "true")      # as `agent-engine pipeline` does in test mode
+    lines = []
+    monkeypatch.setattr(orch, "_sleep", lambda s: pytest.fail("no provider wait expected"))
+    code = orch.orchestrate(P, test_approve=True, publish=True, verified_test_approval=True,
+                            runner=_in_process_runner(proj, monkeypatch), out=lines.append)
+    text = "\n".join(lines)
+    assert code == orch.DONE, text
+    assert "STOP" not in text
+    # Infeasible hard deadline: the first verified option was applied and handed to the P4-G2 approver.
+    plan = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
+    assert plan.solver.status in ("OPTIMAL", "FEASIBLE") and plan.relaxations and plan.options_if_infeasible
+    assert any(l.startswith("decision needed: ") for l in attention.open_items(P, "sprint-planning"))
+    # Unsatisfiable deterministic check: the stage finished and the issue went to its gate.
+    assert any("on-call rota" in i for i in cli.review_notes(P, "work-allocation")["open_issues"])
+    # High-severity scanner finding: infra finished, the finding is an open issue at P4-G4 ...
+    assert any("checks did not all pass" in i for i in cli.review_notes(P, "infra-pipeline")["open_issues"])
+    # ... every test approval records what it accepted ...
+    for gate, needle in (("P4-G2", "decision needed"), ("P4-G3", "on-call rota"), ("P4-G4", "checks did not all pass")):
+        approval = json.loads((proj / "gates" / f"{gate}.approved.json").read_text())
+        assert "open item(s) for a human to review" in approval["comment"] and needle in approval["comment"], gate
+    assert (proj / "gates" / "G4.approved.json").is_file()
+    # ... and everything was published, the infra PR stating the accepted findings at the top.
+    infra_report = files.read_json(P, "publish/infra.json")
+    assert infra_report["unresolved_findings"]
+    for what in ("backlog", "sprint", "assignments"):
+        assert f">>> publish {what}" in text
+    assert "NOT PUBLISHED" not in text

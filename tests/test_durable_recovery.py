@@ -73,19 +73,13 @@ def test_malformed_review_retries_only_review_then_resumes_after_model_change(st
             return {"messages": []}
         raise json.JSONDecodeError("empty", "", 0)
     monkeypatch.setattr(cli, "_stream", stream)
-    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 1
+    # The model review is advisory for Phase 4: one that cannot complete is a note for the gate, not a stop.
+    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 0
     assert calls == ["task-breakdown-write", "task-breakdown/validator-verify"]
-    history = (stage / "requests/task-breakdown.md").read_bytes()
-    before = (stage / "backlog/backlog.json").read_bytes()
-    monkeypatch.setenv("SDLC_AGENT_STRONG_MODEL", "different:reviewer")
-    async def review_only(built, message, callbacks, run_name):
-        assert run_name.endswith("-verify")
-        return verdict()
-    monkeypatch.setattr(cli, "_stream", review_only)
-    assert asyncio.run(cli._run("request", "task-breakdown", P, resume=True)) == 0
-    assert (stage / "requests/task-breakdown.md").read_bytes() == history
-    assert (stage / "backlog/backlog.json").read_bytes() == before
-    assert report(stage)["recovery_action"] == "verify"
+    assert any("model review could not complete" in i for i in report(stage)["open_issues"])
+    notes = json.loads((stage / "backlog/review-notes.json").read_text())
+    assert notes["blocking"] is False and notes["open_issues"]
+    assert recovery.next_action(stage, agent.load_pack("task-breakdown"), "request")[0] == "complete"
     assert not list((stage / "gates").glob("P4-*.approved.json"))
 
 
@@ -97,10 +91,10 @@ def test_empty_state_is_bounded_format_failure(stage, monkeypatch):
             artifacts(stage)
         return {"messages": []}
     monkeypatch.setattr(cli, "_stream", stream)
-    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 1
+    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 0
     assert len(calls) == 2
     assert report(stage)["passes"][-1]["invalid_verdict"]["response_chars"] == 0
-    assert recovery.next_action(stage, agent.load_pack("task-breakdown"), "request")[0] == "verify"
+    assert report(stage)["open_issues"]                     # an empty review is noted for the gate, not a stop
 
 
 def test_restart_during_review_retains_generation(stage, monkeypatch):
@@ -174,12 +168,13 @@ def test_changed_sources_invalidate_reuse_and_unresolved_gaps_do_not_loop(stage,
     # A model reviewer's unsatisfied verdict alone does not block a Phase 4 stage...
     assert asyncio.run(cli._run("request", "task-breakdown", P)) == 0
     assert report(stage)["review_findings"] == ["S-1: missing requirement"]
-    # ...a deterministic gap that the repair cannot resolve ends in a decision wait, not a loop.
+    # ...and a deterministic gap the bounded repair cannot resolve finishes the stage with an open issue for the
+    # gate (no loop, no stop).
     monkeypatch.setattr(cli, "_deterministic_gaps", lambda *a: (["S-1: missing requirement"], False))
-    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 1
-    assert recovery.next_action(stage, agent.load_pack("task-breakdown"))[0] == "wait"
-    monkeypatch.setattr(cli, "build_agent", lambda *args: pytest.fail("decision wait called a model"))
-    assert asyncio.run(cli._run("request", "task-breakdown", P, resume=True)) == 1
+    assert asyncio.run(cli._run("request", "task-breakdown", P)) == 0
+    assert report(stage)["open_issues"] == ["S-1: missing requirement"]
+    assert report(stage)["loops"] == agent.load_pack("task-breakdown").max_fix_loops + 1
+    assert recovery.next_action(stage, agent.load_pack("task-breakdown"))[0] == "complete"
     (stage / "prd.md").write_text("Changed actual requirement")
     assert recovery.next_action(stage, agent.load_pack("task-breakdown"))[0] == "generate"
 

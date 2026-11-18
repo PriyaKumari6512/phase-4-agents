@@ -663,15 +663,9 @@ def apply_cross(items: list[WorkItem], snap: StorySnapshot, settings: ProjectSet
 
 
 # ---------------------------------------------------------------------------------------------- stage operations
-def _generation_request(project: str, keys: set[str], key: str) -> str:
-    """The stage request a story was last generated under (results saved before requests were recorded)."""
-    from agent_engine import recovery
-    try:
-        request = json.loads(recovery.path(files.project_dir(project), "task-breakdown").read_text(encoding="utf-8"))["request"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return ""
-    targets = _targets(request, keys)
-    return request if targets is None or key in targets else ""
+def _run_request(project: str) -> str:
+    """The request this run's generation used (stage instruction plus recorded reviewer decisions)."""
+    return (_load(project, "generation-request.json") or {}).get("request", "")
 
 
 def _current(project: str) -> dict:
@@ -692,13 +686,8 @@ async def _results(project: str, snap: StorySnapshot, settings: ProjectSettings,
         story_request = request if targets is None or story.key in targets else ""
         fix = (repairs or {}).get(story.key)
         record = _load(project, "stories", current.get(story.key, "") + ".json") if current.get(story.key) else None
-        if not story_request:
-            # A reviewer request stays with its story (e.g. a decision to defer criteria) until a newer request names
-            # the story: repairs and rebuilds must not fall back to a result generated before the decision.
-            if record and "request" in record:
-                story_request = record["request"]
-            elif fix:
-                story_request = _generation_request(project, keys, story.key)
+        # Reviewer decisions reach every run through the stage request (built from the gate history), so nothing is
+        # carried over from an earlier run's saved records.
         base = _base_identity(project, story, settings, prefix, story_request, identity_spec)
         if not fix and record and record.get("base") == base:
             results[story.key] = StoryBreakdown.model_validate(record["result"])
@@ -781,6 +770,7 @@ def _summary(check: dict, generated: int, total: int) -> str:
 async def generate(project: str, request: str, callbacks):
     snap, settings = snapshot(project), _settings(project)
     before = dict(_current(project))
+    _save(project, {"request": request}, "generation-request.json")   # this run's request, for its repairs
     results = await _results(project, snap, settings, callbacks, request)
     generated = sum(1 for k, v in _current(project).items() if before.get(k) != v)
     check = await _write(project, snap, settings, results, callbacks)
@@ -906,17 +896,17 @@ async def repair(project: str, gaps: list[str], callbacks):
             findings.append({"message": gap, "item_ids": []})
     keys = {s.key for s in snap.stories}
     if any(f.get("rule") in ("stale_sources", "missing_story") for f in findings):
-        return await generate(project, "", callbacks)        # unchanged stories are reused, changed ones regenerated
+        return await generate(project, _run_request(project), callbacks)   # unchanged stories reused, changed regenerated
     current = files.read_json(project, files.BACKLOG, Backlog)
     affected = _affected_stories(current, findings, keys)
     if not affected:
         # Findings that name no story (e.g. a dependency loop reported by an older check): rebuild from retained
         # results — no new story calls — and let validation repair what it can deterministically.
-        return await generate(project, "", callbacks)
+        return await generate(project, _run_request(project), callbacks)
     attempt = _digest({"affected": affected, "backlog": [i.model_dump(mode="json") for i in current.items]})
     if _load(project, "repairs", attempt + ".json"):
         raise files.ProjectError("the same findings remain after a repair; partial backlog retained for the Tech Lead")
-    results = await _results(project, snap, settings, callbacks, "", repairs=affected)
+    results = await _results(project, snap, settings, callbacks, _run_request(project), repairs=affected)
     _save(project, {"affected": affected}, "repairs", attempt + ".json")
     check = await _write(project, snap, settings, results, callbacks)
     return {"messages": [AIMessage(content=f"Repaired {len(affected)} stories. " + _summary(check, len(affected), len(keys)))]}

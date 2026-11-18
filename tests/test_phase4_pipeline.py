@@ -194,8 +194,18 @@ def test_infra_intent_render_validate_publish_and_ci_readiness(proj, monkeypatch
     assert not json.loads(infra.check(P))["ok"]
     assert "Risk score" in (proj / "infra/PR.md").read_text(encoding="utf-8")
     approve(proj, "P4-G4")
-    with pytest.raises(publish.PublishError, match="not fully validated"):
+    # Problems the stage never handed to the gate were not seen by the approver: publishing refuses them.
+    with pytest.raises(publish.PublishError, match="did not cover"):
         publish.publish_infra(P)
+    # Once they were recorded as the stage's open issues, the approval accepted them: the PR states them at the top.
+    from agent_engine import cli as engine_cli
+    from agent_engine.agent import load_pack
+    monkeypatch.setattr(engine_cli, "OUTPUTS_DIR", proj.parent)
+    engine_cli._record_open_issues(load_pack("infra-pipeline"), P, json.loads(infra.check(P))["problems"])
+    report = publish.publish_infra(P)
+    assert report["unresolved_findings"]
+    body = Path(report["pull_requests"][0]["local_path"], "PR.md").read_text(encoding="utf-8")
+    assert "## Unresolved findings accepted at P4-G4" in body
     mock_passed_checks(monkeypatch)
     assert json.loads(infra.validate(P))["checks_passed"]
     approve(proj, "P4-G4")
