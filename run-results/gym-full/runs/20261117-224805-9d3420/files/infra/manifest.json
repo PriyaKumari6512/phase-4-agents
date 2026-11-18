@@ -1,0 +1,576 @@
+{
+  "schema_version": "1.0.0",
+  "project": "gym-full",
+  "intent_sha256": "d4385ea3a42724737299e5be3c95093b973e443a0e009874c45e83dfab50510f",
+  "source_hashes": {
+    "architecture.md": "1f2d2a4757b976cb9a00dec64647ec800ebe82c153617cd892721c09e4ac8d87",
+    "phase4/project.json": "34942bac4f5244ef057d2a36144041dd50f900334df42bd087d677ce0f4e16f2",
+    "catalog": "a14111fa307c191c220be0968883b85b6e0c1fe97eb1848822065b69310889a0"
+  },
+  "infra_repo": "acme/gym-infra",
+  "environments": [
+    "dev",
+    "qa",
+    "stg",
+    "prod"
+  ],
+  "files": [
+    {
+      "path": "repo/.github/workflows/drift.yml",
+      "sha256": "19564ac2bf6234ecdb61009c10494cfea53a10296ba7a5103282cc822a17aa0c",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "19564ac2bf6234ecdb61009c10494cfea53a10296ba7a5103282cc822a17aa0c"
+    },
+    {
+      "path": "repo/.github/workflows/promote.yml",
+      "sha256": "216bd89bb6e15695095d6d123c4f93c919408570083298f3879deeb418b33f10",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "216bd89bb6e15695095d6d123c4f93c919408570083298f3879deeb418b33f10"
+    },
+    {
+      "path": "repo/.trivyignore",
+      "sha256": "e70f72f68316b898c6acaeb262524690f0496db59b95fdbb5ec3ba7105141d86",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "e70f72f68316b898c6acaeb262524690f0496db59b95fdbb5ec3ba7105141d86"
+    },
+    {
+      "path": "repo/CODEOWNERS",
+      "sha256": "341845f36eaf735d1b7db7391e7c59a4330c971e8ba43cd3046ff20bbe7b18c7",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "341845f36eaf735d1b7db7391e7c59a4330c971e8ba43cd3046ff20bbe7b18c7"
+    },
+    {
+      "path": "repo/atlantis.yaml",
+      "sha256": "120508bff9aa46f7032ad411485238985036545eaadd2710a565f4c23d298bb5",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "120508bff9aa46f7032ad411485238985036545eaadd2710a565f4c23d298bb5"
+    },
+    {
+      "path": "repo/docs/BRANCHING.md",
+      "sha256": "08b4dac6ef41d0b6b62af6e8491852f28e9a6cf57bafc0082d43f27ac0253a8b",
+      "origin": "template",
+      "template_ref": "branching",
+      "rendered_sha256": "08b4dac6ef41d0b6b62af6e8491852f28e9a6cf57bafc0082d43f27ac0253a8b"
+    },
+    {
+      "path": "repo/docs/RUNBOOK.md",
+      "sha256": "9168f8bf11caad2ad5f309e8d684e6f9ae30256adadb205abd789c09532cf65d",
+      "origin": "template",
+      "template_ref": "runbook",
+      "rendered_sha256": "9168f8bf11caad2ad5f309e8d684e6f9ae30256adadb205abd789c09532cf65d"
+    },
+    {
+      "path": "repo/envs/dev/core/main.tf",
+      "sha256": "2cf055c943e296ef9a8903c6bcb018abf41d86f05d76d4c56262c82a79d08fd0",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "2cf055c943e296ef9a8903c6bcb018abf41d86f05d76d4c56262c82a79d08fd0"
+    },
+    {
+      "path": "repo/envs/prod/core/main.tf",
+      "sha256": "5b1d0fd1a6da614c85c8392fefc36a5166fbf4ee0a26df21564ee7111591870d",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "5b1d0fd1a6da614c85c8392fefc36a5166fbf4ee0a26df21564ee7111591870d"
+    },
+    {
+      "path": "repo/envs/qa/core/main.tf",
+      "sha256": "2e8efd1bcddcc765fbc1526178111b38b3012effee243ea33f2f4b0672a42440",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "2e8efd1bcddcc765fbc1526178111b38b3012effee243ea33f2f4b0672a42440"
+    },
+    {
+      "path": "repo/envs/stg/core/main.tf",
+      "sha256": "e459e602a0d0b5b28f98efd36d2efb5f1b78978f4f0e99eebb47a52683aea046",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "e459e602a0d0b5b28f98efd36d2efb5f1b78978f4f0e99eebb47a52683aea046"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-dev-platform.yaml",
+      "sha256": "d0941f25f18214eb79ddcd26df98ce0af33881725db7046e7bcf00bd07c60d23",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "d0941f25f18214eb79ddcd26df98ce0af33881725db7046e7bcf00bd07c60d23"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-dev.yaml",
+      "sha256": "c582a72a55c86eb9f48fbd612357b0c04298349e78c407e529ee4683576d8251",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "c582a72a55c86eb9f48fbd612357b0c04298349e78c407e529ee4683576d8251"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-prod-platform.yaml",
+      "sha256": "1f0e35ddaed84eae5120d4ed8f1b884d3c04d443ff69f832e7c0c9671cb4f580",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "1f0e35ddaed84eae5120d4ed8f1b884d3c04d443ff69f832e7c0c9671cb4f580"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-prod.yaml",
+      "sha256": "fffbd23062d3f0de8225308db3227f8e5212cd86a655ea47c67af52fa52ad84e",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "fffbd23062d3f0de8225308db3227f8e5212cd86a655ea47c67af52fa52ad84e"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-qa-platform.yaml",
+      "sha256": "a04cc22477ee0239243da9b691b9e22595d41d149d4fe42b896179fd8c4864db",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "a04cc22477ee0239243da9b691b9e22595d41d149d4fe42b896179fd8c4864db"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-qa.yaml",
+      "sha256": "7027b4ef8faeb0480d114a64d035a08bdb56766901e95125e803aa94dad6610f",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "7027b4ef8faeb0480d114a64d035a08bdb56766901e95125e803aa94dad6610f"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-stg-platform.yaml",
+      "sha256": "8c0849e9be789ca839cfcdb85f6ef2173048ff8ce29ae203effdd6699e2d6946",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "8c0849e9be789ca839cfcdb85f6ef2173048ff8ce29ae203effdd6699e2d6946"
+    },
+    {
+      "path": "repo/gitops/applicationsets/gym-full-stg.yaml",
+      "sha256": "4c2cd1d2b1da43dace33d0c31e2a49fe22816fb631886fe4fbe0b5c83a804dc2",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "4c2cd1d2b1da43dace33d0c31e2a49fe22816fb631886fe4fbe0b5c83a804dc2"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/dev/externalsecret.yaml",
+      "sha256": "4da86caf072bf8a2c9f89e670a0edfe0e70cb00901a4fb254c43f0ceea22d270",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "4da86caf072bf8a2c9f89e670a0edfe0e70cb00901a4fb254c43f0ceea22d270"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/dev/values.yaml",
+      "sha256": "a40badad15b79f8d01a109da77b241f85650c35ca6d726e18613eeb14850f8bf",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "a40badad15b79f8d01a109da77b241f85650c35ca6d726e18613eeb14850f8bf"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/prod/externalsecret.yaml",
+      "sha256": "f18e4c17c8d8c8381d6b7fe2096490683716a2a573fb6a9a2e90f3faa56c5dad",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "f18e4c17c8d8c8381d6b7fe2096490683716a2a573fb6a9a2e90f3faa56c5dad"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/prod/values.yaml",
+      "sha256": "c06519e0f28e85f3b9970dc77ee155dac8a99341f50fafa7c92c9f911bec53af",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "c06519e0f28e85f3b9970dc77ee155dac8a99341f50fafa7c92c9f911bec53af"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/qa/externalsecret.yaml",
+      "sha256": "afe955b2511f7bf387500575ff7a9a68e47c5d5a7c89e617da2488d83439c04f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "afe955b2511f7bf387500575ff7a9a68e47c5d5a7c89e617da2488d83439c04f"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/qa/values.yaml",
+      "sha256": "d53886562ef85ff2f16c3c3d1a0474ff24f32afc1dc162fc40ec7faa4e1af4ac",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d53886562ef85ff2f16c3c3d1a0474ff24f32afc1dc162fc40ec7faa4e1af4ac"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/stg/externalsecret.yaml",
+      "sha256": "c1f9b363d8fe90027a773a9964154640f5e35ddc88c416ec52086bf5b5c92b28",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "c1f9b363d8fe90027a773a9964154640f5e35ddc88c416ec52086bf5b5c92b28"
+    },
+    {
+      "path": "repo/gitops/apps/gym-api/stg/values.yaml",
+      "sha256": "1b6cc9c33876d9d4a127994e64baa21cbcd57cc7b72c0caaf0dd34608b8456e2",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "1b6cc9c33876d9d4a127994e64baa21cbcd57cc7b72c0caaf0dd34608b8456e2"
+    },
+    {
+      "path": "repo/gitops/charts/app/Chart.yaml",
+      "sha256": "c1902eb8f8fa54a25943387ab7200500536852a45f74d0121dd7847efdd9d48e",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "c1902eb8f8fa54a25943387ab7200500536852a45f74d0121dd7847efdd9d48e"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/deployment.yaml",
+      "sha256": "5473c313db014a0b292a92c89cf2fcfdd63247fd87ef5143963f3e1ce5579b97",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "5473c313db014a0b292a92c89cf2fcfdd63247fd87ef5143963f3e1ce5579b97"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/ingress.yaml",
+      "sha256": "d2f5aae33020e9b2f80b2a775474bee87a55ffa20fd850d25f9d00962c4a4ddd",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d2f5aae33020e9b2f80b2a775474bee87a55ffa20fd850d25f9d00962c4a4ddd"
+    },
+    {
+      "path": "repo/gitops/charts/app/templates/service.yaml",
+      "sha256": "d1d70fe8601070588c2be17d151fc4da51e9300cf574284628277a0b71606694",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "d1d70fe8601070588c2be17d151fc4da51e9300cf574284628277a0b71606694"
+    },
+    {
+      "path": "repo/gitops/charts/app/values.yaml",
+      "sha256": "48276fe1bb90fc6a9f24f322946a1fe2a4491e7554e3e871424978ff30582867",
+      "origin": "template",
+      "template_ref": "k8s-workload",
+      "rendered_sha256": "48276fe1bb90fc6a9f24f322946a1fe2a4491e7554e3e871424978ff30582867"
+    },
+    {
+      "path": "repo/gitops/platform/dev/access.yaml",
+      "sha256": "fa7a3278bdc4e92d43120231fb4aaa7daf65c3f981e3f4d88c7c77b507c30563",
+      "origin": "template",
+      "template_ref": "access",
+      "rendered_sha256": "fa7a3278bdc4e92d43120231fb4aaa7daf65c3f981e3f4d88c7c77b507c30563"
+    },
+    {
+      "path": "repo/gitops/platform/dev/alerts/gym-api.yaml",
+      "sha256": "4a9418e142dcb3d875bd87d6ecd89dcf19bd16770f41225dad957472b669b89a",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "4a9418e142dcb3d875bd87d6ecd89dcf19bd16770f41225dad957472b669b89a"
+    },
+    {
+      "path": "repo/gitops/platform/dev/clustersecretstore.yaml",
+      "sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f"
+    },
+    {
+      "path": "repo/gitops/platform/prod/access.yaml",
+      "sha256": "25ce80f3cf11850a9e4c888efce02cbc2f792a073c93034ac327987723bbfbd0",
+      "origin": "template",
+      "template_ref": "access",
+      "rendered_sha256": "25ce80f3cf11850a9e4c888efce02cbc2f792a073c93034ac327987723bbfbd0"
+    },
+    {
+      "path": "repo/gitops/platform/prod/alerts/gym-api.yaml",
+      "sha256": "024027c105b01a460a5d77b18d5b07fd7735925154c25c6eb3926dbc7ba0cc7f",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "024027c105b01a460a5d77b18d5b07fd7735925154c25c6eb3926dbc7ba0cc7f"
+    },
+    {
+      "path": "repo/gitops/platform/prod/clustersecretstore.yaml",
+      "sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f"
+    },
+    {
+      "path": "repo/gitops/platform/qa/access.yaml",
+      "sha256": "98a19e26294d791dd3e22b6c4cc9824573dc40840ac2295f358d22e33f8b1f16",
+      "origin": "template",
+      "template_ref": "access",
+      "rendered_sha256": "98a19e26294d791dd3e22b6c4cc9824573dc40840ac2295f358d22e33f8b1f16"
+    },
+    {
+      "path": "repo/gitops/platform/qa/alerts/gym-api.yaml",
+      "sha256": "8589788d09ef5ca52b7c97e7f4c3bc81925a0100e21e544f86e06989ddfebfe3",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "8589788d09ef5ca52b7c97e7f4c3bc81925a0100e21e544f86e06989ddfebfe3"
+    },
+    {
+      "path": "repo/gitops/platform/qa/clustersecretstore.yaml",
+      "sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f"
+    },
+    {
+      "path": "repo/gitops/platform/stg/access.yaml",
+      "sha256": "e1e4e5ec7d79f8194a8f278673843b45f927c92e0047ba61f99097049dd442da",
+      "origin": "template",
+      "template_ref": "access",
+      "rendered_sha256": "e1e4e5ec7d79f8194a8f278673843b45f927c92e0047ba61f99097049dd442da"
+    },
+    {
+      "path": "repo/gitops/platform/stg/alerts/gym-api.yaml",
+      "sha256": "97b5ac9126073cbc654d4d4be9ed2783a9c41109f9a5c618178054ed859a778a",
+      "origin": "template",
+      "template_ref": "observability",
+      "rendered_sha256": "97b5ac9126073cbc654d4d4be9ed2783a9c41109f9a5c618178054ed859a778a"
+    },
+    {
+      "path": "repo/gitops/platform/stg/clustersecretstore.yaml",
+      "sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f",
+      "origin": "template",
+      "template_ref": "external-secrets",
+      "rendered_sha256": "98489b8d98c549dbc66d071a8b97f41e4361dac50f97c7c075d4f782fef6246f"
+    },
+    {
+      "path": "repo/promotion.json",
+      "sha256": "cc6a895f147e5771b534d8128f5ad461bbdd18315ef3264af2f7935b7a714f46",
+      "origin": "generated",
+      "template_ref": "promotion",
+      "rendered_sha256": "cc6a895f147e5771b534d8128f5ad461bbdd18315ef3264af2f7935b7a714f46"
+    },
+    {
+      "path": "repo/scripts/promote.py",
+      "sha256": "1351bd50b7e3d5e1c3514b83e0f9216df3f014a47c655d74d925a1e857eed0da",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "1351bd50b7e3d5e1c3514b83e0f9216df3f014a47c655d74d925a1e857eed0da"
+    },
+    {
+      "path": "repo/scripts/verify-build.py",
+      "sha256": "91e7902d7cbb4a1d11b0aea77b985cdb953b5a5bff5a4a58186332c491362a25",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "91e7902d7cbb4a1d11b0aea77b985cdb953b5a5bff5a4a58186332c491362a25"
+    },
+    {
+      "path": "repo/scripts/verify-protection.py",
+      "sha256": "958dab99e40f88fe035140190e285a68296d0bc43d46f8cdd9c24d7df21f9489",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "958dab99e40f88fe035140190e285a68296d0bc43d46f8cdd9c24d7df21f9489"
+    },
+    {
+      "path": "ci/acme__gym-api/.github/workflows/ci-gym-api.yml",
+      "sha256": "c92acb416cd5db97ce52119c49a4619492c2be913f5cd4bb905776c3604606ef",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "c92acb416cd5db97ce52119c49a4619492c2be913f5cd4bb905776c3604606ef"
+    },
+    {
+      "path": "ci/acme__gym-api/.github/workflows/phase4-claude.yml",
+      "sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c"
+    },
+    {
+      "path": "ci/acme__gym-api/.github/workflows/promote-dev.yml",
+      "sha256": "fdcaa2db8fca284ea0ef7244f07b748f77a3e9bfaa2a393de96cff11b2eacaab",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "fdcaa2db8fca284ea0ef7244f07b748f77a3e9bfaa2a393de96cff11b2eacaab"
+    }
+  ],
+  "ci_repos": [
+    "acme/gym-api"
+  ],
+  "secrets_refs": [
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-app-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/whatsapp-webhook-app-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/database-credentials"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-app-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/whatsapp-webhook-app-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/database-credentials"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-app-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/whatsapp-webhook-app-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/database-credentials"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-app-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/whatsapp-webhook-app-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/database-credentials"
+    }
+  ],
+  "stateful_resources": [
+    "dev:aws-s3:Web app",
+    "dev:aws-rds-postgres:Database",
+    "qa:aws-s3:Web app",
+    "qa:aws-rds-postgres:Database",
+    "stg:aws-s3:Web app",
+    "stg:aws-rds-postgres:Database",
+    "prod:aws-s3:Web app",
+    "prod:aws-rds-postgres:Database"
+  ],
+  "gaps": [
+    "bootstrap: create the remote state bucket 'gym-full-tfstate' (versioned, encrypted) once per account",
+    "Web app: no catalog template for 'cdn' (left for human follow-up)",
+    "Gym API is public: set ingress.host and ingress.certificateArn in gitops/apps/gym-api/<env>/values.yaml; the AWS Load Balancer Controller and DNS come from the platform bootstrap",
+    "bootstrap: register Argo CD clusters named gym-full-dev, gym-full-qa, gym-full-stg, gym-full-prod; install platform CRDs before syncing platform applications",
+    "shared container registries are owned only by dev/core state; apply that state before image builds for other environments",
+    "platform add-ons (external-secrets operator, kube-prometheus-stack, OpenTelemetry Collector) are installed by the platform team's cluster bootstrap; their chart versions are not pinned here",
+    "module terraform-aws-modules/eks/aws ~> 21.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/ecr/aws ~> 2.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/s3-bucket/aws ~> 5.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/rds/aws ~> 6.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "Configure GitHub Environments: QA Lead for qa; client sign-off for stg; go/no-go plus DevOps Lead for prod. Enforce protected main and required PR reviews. Configure the GitOps GitHub App; bootstrap digest placeholders cannot be deployed."
+  ],
+  "checks_passed": false,
+  "checks_skipped": [],
+  "validation_complete": true,
+  "checks_incomplete": [],
+  "risk_score": 80,
+  "risk_reasons": [
+    "8 stateful resources (databases, caches, buckets)",
+    "public endpoints: Gym API, Web app",
+    "includes prod",
+    "failing checks: checkov"
+  ],
+  "generated_at": "2026-11-17T17:18:15Z"
+}

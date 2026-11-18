@@ -1,0 +1,17 @@
+{
+  "gate": "P4-G1",
+  "project": "gym-full",
+  "decision": "approved",
+  "approver": {
+    "name": "Test Tech Lead",
+    "role": "Test approver (automated test run, not a human sign-off)"
+  },
+  "submitted_by": {
+    "name": "Task Breakdown agent"
+  },
+  "decided_at": "2026-11-17T18:04:02+00:00",
+  "comment": "Test approval with two accepted review findings for the Tech Lead: GT-58-T03 must also show the archived member's check-ins (not only payments) on the kept record through the link (FR-035); GT-65-T01 must name where the 'delivered' reminder status is stored (add it to the Reminder status values). Neither blocks sprint planning.",
+  "artifacts": {
+    "backlog/backlog.json": "sha256:4a529df72d56d88d00542f4b85ee55f859f7930495a2d77efece350e2acbdb2a"
+  }
+}

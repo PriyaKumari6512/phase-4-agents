@@ -1,0 +1,101 @@
+{
+  "job_id": "20261117-233404-9e4b1f",
+  "agent": "sprint-planning",
+  "project": "gym-full",
+  "request": 1,
+  "request_text": "Plan the sprints.",
+  "invocation_id": "01a80954092d4ebabff21754",
+  "passes": [
+    {
+      "kind": "write",
+      "agent": "sprint-planning",
+      "model_tier": "fast",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "ok": true
+    },
+    {
+      "kind": "verify",
+      "agent": "sprint-planning/validator",
+      "model_tier": "fast",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "ok": true,
+      "satisfied": false
+    },
+    {
+      "kind": "fix",
+      "agent": "sprint-planning",
+      "model_tier": "strong",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true
+    },
+    {
+      "kind": "verify",
+      "agent": "sprint-planning/validator",
+      "model_tier": "fast",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "ok": true,
+      "satisfied": true
+    }
+  ],
+  "agent_reply": "Sprint plan: sprint/sprint-plan.json and sprint/sprint-plan.md. Solver OPTIMAL; 46 stories planned in 10 sprints, 9 deferred.",
+  "loops": 2,
+  "status": "success",
+  "verified": true,
+  "verdict": {
+    "satisfied": true,
+    "status_so_far": "success",
+    "gaps": [],
+    "summary": "Deterministic checks passed (13 warnings). Reviewed 1 flagged texts: 0 blocking, 1 warnings. gym-full Sprint 1: 15 SP is above the 85%-confidence capacity 12.5 gym-full Sprint 2: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 3: 15 SP is above the 85%-confidence capacity 12.5 gym-full Sprint 4: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 5: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 6: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 7: 16 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 8: 17 SP is above the 85%-confidence capacity 14.1"
+  },
+  "stage_budget": {
+    "model_calls": 4,
+    "input_tokens": 19548,
+    "output_tokens": 3255,
+    "elapsed_seconds": 35.32,
+    "stopped": null,
+    "max_calls": 16,
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 64000,
+    "timeout_seconds": 1800.0,
+    "token_limit_scope": "Provider-reported tokens; concurrent in-flight calls may overshoot. Missing usage cannot be charged."
+  },
+  "elapsed_seconds": 35.3,
+  "tokens": {
+    "claude-haiku-4-5-20251001": {
+      "total_tokens": 11615,
+      "output_tokens": 1715,
+      "input_tokens": 9900,
+      "input_token_details": {
+        "cache_creation": 0,
+        "ephemeral_5m_input_tokens": 0,
+        "cache_read": 0,
+        "ephemeral_1h_input_tokens": 0
+      }
+    },
+    "claude-sonnet-5-5": {
+      "input_tokens": 9648,
+      "output_tokens": 1540,
+      "total_tokens": 11188,
+      "input_token_details": {
+        "cache_read": 0,
+        "cache_creation": 0,
+        "ephemeral_5m_input_tokens": 1573,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_token_details": {
+        "reasoning": 0
+      }
+    }
+  },
+  "finished_at": "2026-11-17T18:04:40+00:00",
+  "files": {
+    "created": [
+      "sprint/capacity.json",
+      "sprint/solver-diagnostics.json",
+      "sprint/sprint-plan.json",
+      "sprint/sprint-plan.md"
+    ],
+    "changed": [],
+    "deleted": []
+  }
+}

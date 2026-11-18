@@ -1,0 +1,21 @@
+# gym-api (stg) - values for gitops/charts/app
+name: gym-api
+image:
+  repository: "ECR_REGISTRY/gym-full/gym-api"
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"  # bootstrap placeholder; promotion requires a real build
+replicas: 1
+http: true
+port: 8080
+healthPath: /healthz
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPU: 70
+ingress:
+  enabled: true
+  host: ""             # TODO public DNS name for stg
+  certificateArn: ""   # TODO ACM certificate ARN for HTTPS
+envFromSecret: "gym-api-env"
+env:
+  APP_ENV: "stg"

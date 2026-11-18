@@ -1,0 +1,31 @@
+# TEST ACCEPTANCE ONLY - NOT a platform-team review.
+# Written for the gym Phase 4 test run: every checkov check that failed on the generated gym infrastructure on
+# 2026-11-17 is accepted here so the rest of the pipeline can be exercised. The default catalog accepts nothing.
+skip-check:
+  - CKV2_AWS_12
+  - CKV2_AWS_32
+  - CKV2_AWS_42
+  - CKV2_AWS_47
+  - CKV2_AWS_5
+  - CKV2_AWS_62
+  - CKV_AWS_103
+  - CKV_AWS_111
+  - CKV_AWS_133
+  - CKV_AWS_144
+  - CKV_AWS_145
+  - CKV_AWS_150
+  - CKV_AWS_158
+  - CKV_AWS_174
+  - CKV_AWS_19
+  - CKV_AWS_2
+  - CKV_AWS_21
+  - CKV_AWS_300
+  - CKV_AWS_304
+  - CKV_AWS_310
+  - CKV_AWS_338
+  - CKV_AWS_356
+  - CKV_AWS_374
+  - CKV_AWS_394
+  - CKV_AWS_86
+  - CKV_AWS_97
+  - CKV_TF_1

@@ -1,0 +1,19 @@
+{
+  "pull_requests": [
+    {
+      "repo": "acme/gym-infra",
+      "branch": "phase4/infra-4486b94e",
+      "url": null,
+      "number": null,
+      "local_path": "~/p/phase-4-agents/outputs/gym-full/publish/prs/acme__gym-infra/phase4__infra-4486b94e"
+    },
+    {
+      "repo": "acme/gym-api",
+      "branch": "phase4/ci-4486b94e",
+      "url": null,
+      "number": null,
+      "local_path": "~/p/phase-4-agents/outputs/gym-full/publish/prs/acme__gym-api/phase4__ci-4486b94e"
+    }
+  ],
+  "at": "2026-11-17T18:04:41+00:00"
+}

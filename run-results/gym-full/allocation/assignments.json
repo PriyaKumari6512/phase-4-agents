@@ -1,0 +1,299 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "d41c3d39-c566-4b7a-94a7-edb610eac9c1",
+  "version": 1,
+  "project": "gym-full",
+  "sprint_plan_sha256": "cdf2c9dfa0e8fbd9d58eee0c9edc81b68830f0376f856046e1e6d916adb7434f",
+  "settings_sha256": "34942bac4f5244ef057d2a36144041dd50f900334df42bd087d677ce0f4e16f2",
+  "sprint_index": 1,
+  "assignments": [
+    {
+      "task_id": "GT-12-T02",
+      "story_id": "GT-12",
+      "sprint_index": 1,
+      "worker_id": "m-alice",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 10.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.58,
+        "cost": 1.0
+      },
+      "explanation": "Alice meets the required skills (fit 42%); ownership evidence 0%, planned load 58%.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "GT-18-T01",
+      "story_id": "GT-18",
+      "sprint_index": 1,
+      "worker_id": "m-alice",
+      "worker_kind": "human",
+      "planned_start_minute": 600,
+      "planned_hours": 5.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.58,
+        "cost": 1.0
+      },
+      "explanation": "Alice meets the required skills (fit 42%); ownership evidence 0%, planned load 58%.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "GT-11-T02",
+      "story_id": "GT-11",
+      "sprint_index": 1,
+      "worker_id": "m-alice",
+      "worker_kind": "human",
+      "planned_start_minute": 900,
+      "planned_hours": 10.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.58,
+        "cost": 1.0
+      },
+      "explanation": "Alice meets the required skills (fit 42%); ownership evidence 0%, planned load 58%.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    },
+    {
+      "task_id": "GT-11-T01",
+      "story_id": "GT-11",
+      "sprint_index": 1,
+      "worker_id": "m-carol",
+      "worker_kind": "human",
+      "planned_start_minute": 0,
+      "planned_hours": 4.0,
+      "score_breakdown": {
+        "skill_fit": 0.42,
+        "ownership": 0.0,
+        "load_after": 0.09,
+        "cost": 1.0
+      },
+      "explanation": "Carol meets the required skills (fit 42%); ownership evidence 0%, planned load 9%.",
+      "runner_up_worker_id": null,
+      "pinned": false
+    }
+  ],
+  "unassigned": [
+    {
+      "task_id": "GT-11-T03",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has ux-design."
+    },
+    {
+      "task_id": "GT-11-T04",
+      "reason_code": "blocked",
+      "explanation": "Waits for GT-11-T03, which could not be assigned this sprint."
+    },
+    {
+      "task_id": "GT-12-T01",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has ux-design."
+    },
+    {
+      "task_id": "GT-12-T03",
+      "reason_code": "blocked",
+      "explanation": "Waits for GT-12-T01, which could not be assigned this sprint."
+    },
+    {
+      "task_id": "GT-13-T01",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has auth-security."
+    },
+    {
+      "task_id": "GT-13-T02",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has auth-security."
+    },
+    {
+      "task_id": "GT-13-T03",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has auth-security."
+    },
+    {
+      "task_id": "GT-14-T01",
+      "reason_code": "blocked",
+      "explanation": "Waits for GT-13-T01, GT-13-T02, GT-13-T03, which could not be assigned this sprint."
+    },
+    {
+      "task_id": "GT-14-T02",
+      "reason_code": "blocked",
+      "explanation": "Waits for GT-13-T01, GT-13-T02, GT-13-T03, GT-14-T01, which could not be assigned this sprint."
+    },
+    {
+      "task_id": "GT-14-T03",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has auth-security."
+    },
+    {
+      "task_id": "GT-14-T04",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has ux-design."
+    },
+    {
+      "task_id": "GT-14-T05",
+      "reason_code": "blocked",
+      "explanation": "Waits for GT-13-T01, GT-13-T02, GT-13-T03, GT-14-T02, GT-14-T03, GT-14-T04, which could not be assigned this sprint."
+    },
+    {
+      "task_id": "GT-18-T02",
+      "reason_code": "no_skill_match",
+      "explanation": "Nobody has ux-design."
+    },
+    {
+      "task_id": "GT-18-T03",
+      "reason_code": "blocked",
+      "explanation": "Waits for GT-18-T02, which could not be assigned this sprint."
+    }
+  ],
+  "eligibility": {
+    "GT-11-T01": {
+      "eligible": false,
+      "reason": "DB discipline",
+      "shadow": false
+    },
+    "GT-11-T02": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-11-T03": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-11-T04": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-12-T01": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-12-T02": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-12-T03": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-13-T01": {
+      "eligible": false,
+      "reason": "sensitive skill: auth-security",
+      "shadow": false
+    },
+    "GT-13-T02": {
+      "eligible": false,
+      "reason": "sensitive skill: auth-security",
+      "shadow": false
+    },
+    "GT-13-T03": {
+      "eligible": false,
+      "reason": "sensitive skill: auth-security",
+      "shadow": false
+    },
+    "GT-14-T01": {
+      "eligible": false,
+      "reason": "DB discipline",
+      "shadow": false
+    },
+    "GT-14-T02": {
+      "eligible": false,
+      "reason": "backend of a story other stories depend on",
+      "shadow": false
+    },
+    "GT-14-T03": {
+      "eligible": false,
+      "reason": "sensitive skill: auth-security",
+      "shadow": false
+    },
+    "GT-14-T04": {
+      "eligible": false,
+      "reason": "sensitive security, payments, infrastructure or architecture area",
+      "shadow": false
+    },
+    "GT-14-T05": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-18-T01": {
+      "eligible": false,
+      "reason": "backend of a story other stories depend on",
+      "shadow": false
+    },
+    "GT-18-T02": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    },
+    "GT-18-T03": {
+      "eligible": false,
+      "reason": "file scope missing or more than 4 files",
+      "shadow": false
+    }
+  },
+  "workers": [
+    {
+      "worker_id": "m-alice",
+      "name": "Alice",
+      "kind": "human",
+      "capacity_hours": 43.2,
+      "planned_hours": 25.0
+    },
+    {
+      "worker_id": "m-bob",
+      "name": "Bob",
+      "kind": "human",
+      "capacity_hours": 43.2,
+      "planned_hours": 0.0
+    },
+    {
+      "worker_id": "m-carol",
+      "name": "Carol",
+      "kind": "human",
+      "capacity_hours": 43.2,
+      "planned_hours": 4.0
+    },
+    {
+      "worker_id": "m-dave",
+      "name": "Dave",
+      "kind": "human",
+      "capacity_hours": 21.6,
+      "planned_hours": 0.0
+    },
+    {
+      "worker_id": "claude-code",
+      "name": "claude-code",
+      "kind": "ai_agent",
+      "capacity_hours": 33.6,
+      "planned_hours": 0.0
+    },
+    {
+      "worker_id": "copilot",
+      "name": "copilot",
+      "kind": "ai_agent",
+      "capacity_hours": 33.6,
+      "planned_hours": 0.0
+    }
+  ],
+  "solver_engine": "local_cpsat",
+  "solver_status": "SOLVING_COMPLETED",
+  "solver_score": "objective=3788760",
+  "pins": {},
+  "vetoes": {},
+  "block_ai": [],
+  "annotated": true,
+  "generated_at": "2026-11-17T18:04:41Z"
+}

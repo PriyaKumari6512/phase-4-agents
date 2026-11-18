@@ -1,0 +1,98 @@
+{
+  "cloud": "aws",
+  "regions": [
+    "ap-south-1"
+  ],
+  "environments": [
+    "dev",
+    "qa",
+    "stg",
+    "prod"
+  ],
+  "deploy_target": "kubernetes",
+  "components": [
+    {
+      "component_id": "ctr-gym-api",
+      "name": "Gym API",
+      "kind": "service",
+      "needs": [
+        "k8s_workload",
+        "container_registry",
+        "public_endpoint"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": true,
+      "data_classification": "confidential",
+      "runtime": "Python 3.12 / FastAPI",
+      "repo": "acme/gym-api",
+      "depends_on": [
+        "ctr-db"
+      ],
+      "secrets": [
+        "razorpay-api-key",
+        "razorpay-webhook-secret",
+        "whatsapp-access-token",
+        "whatsapp-webhook-app-secret",
+        "jwt-signing-key",
+        "qr-signing-key",
+        "database-credentials"
+      ],
+      "source": "architecture.md section 4, 8, 9, 13"
+    },
+    {
+      "component_id": "ctr-web",
+      "name": "Web app",
+      "kind": "frontend",
+      "needs": [
+        "object_storage",
+        "cdn"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": true,
+      "data_classification": "internal",
+      "runtime": "React, TypeScript, service worker",
+      "repo": "acme/gym-web",
+      "depends_on": [
+        "ctr-gym-api"
+      ],
+      "secrets": [],
+      "source": "architecture.md section 4, 8 (static files on S3 and CloudFront CDN)"
+    },
+    {
+      "component_id": "ctr-db",
+      "name": "Database",
+      "kind": "database",
+      "needs": [
+        "postgres"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "confidential",
+      "runtime": "PostgreSQL 16 (managed RDS)",
+      "repo": null,
+      "depends_on": [],
+      "secrets": [
+        "database-credentials"
+      ],
+      "source": "architecture.md section 4, 5, 8"
+    }
+  ],
+  "slos": {},
+  "monthly_budget_usd": null,
+  "notes": [
+    "Deployment target is AWS EKS (Kubernetes) per the TEST COPY override in the architecture header; this is not an approved architecture change and the original design used ECS Fargate. DevOps Lead and Solution Architect must approve.",
+    "Region ap-south-1 (Mumbai) is in the catalog allowed_regions.",
+    "NFRs preserved: check-in p95 server <=500 ms and screen <=2 s; member pages p95 <=3 s on 4G; availability 99.5% monthly 06:00-22:00 India time (design objective, no SLA); 99% of captured payments reflected within 2 minutes; reminders >=95% sent on due day; RPO <=15 minutes, RTO <=1 hour; capacity 3,000 members with 3x headroom.",
+    "Constraints preserved: English only; mobile-friendly web only; Razorpay and WhatsApp only (no SMS); no card or UPI data stored; DPDP practice with no health data; prod uses multi-AZ with 2 API replicas across 2 zones and autoscaling to 4 at CPU above 60%; prod RDS Multi-AZ with 50 GB storage, which may exceed the small size class; staging and dev use 1 replica and single-zone databases.",
+    "The size class is small for all components (catalog db.t4g.small); the architecture asks prod RDS for 2 vCPU/8 GB, so prod may need medium and a sizing decision from DevOps.",
+    "Catalog has no templates for CDN, WAF, ALB, Secrets Manager provisioning or scheduled jobs. CloudFront, WAF and ALB are needed by the architecture and are not covered by catalog templates, so they are flagged as gaps. The external-secrets template is the catalog mechanism for secrets, and only secret names are listed here.",
+    "Catalog supports object_storage via aws-s3 and has no cdn template, so the cdn need is flagged as a catalog gap.",
+    "External systems Razorpay and WhatsApp Business are not provisioned. They are client-owned with keys provided as secrets.",
+    "Jobs (reminders, reconciliation) run inside the API with a database outbox. No queue, cache or broker is needed.",
+    "The one-off Excel import (JOB-005) runs as a container task under the operator IAM role and is not a separate component.",
+    "Required tags: project, environment, owner, managed-by."
+  ]
+}

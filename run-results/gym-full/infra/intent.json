@@ -1,0 +1,141 @@
+{
+  "cloud": "aws",
+  "regions": [
+    "ap-south-1"
+  ],
+  "environments": [
+    "dev",
+    "qa",
+    "stg",
+    "prod"
+  ],
+  "deploy_target": "ecs_fargate",
+  "components": [
+    {
+      "component_id": "ctr-web",
+      "name": "Web app",
+      "kind": "frontend",
+      "needs": [
+        "object_storage",
+        "cdn"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": false,
+      "data_classification": "internal",
+      "runtime": "React, TypeScript, service worker",
+      "repo": "acme/gym-web",
+      "depends_on": [
+        "ctr-gym-api"
+      ],
+      "secrets": [],
+      "source": "architecture.md section 4 ctr-web; section 8 CloudFront with S3"
+    },
+    {
+      "component_id": "ctr-gym-api",
+      "name": "Gym API",
+      "kind": "service",
+      "needs": [
+        "ecs_service",
+        "public_endpoint",
+        "container_registry"
+      ],
+      "size_class": "small",
+      "public_endpoint": true,
+      "exposes_http": true,
+      "data_classification": "confidential",
+      "runtime": "Python 3.12, FastAPI",
+      "repo": "acme/gym-api",
+      "depends_on": [
+        "ctr-db",
+        "act-razorpay",
+        "act-whatsapp"
+      ],
+      "secrets": [
+        "razorpay-api-key",
+        "razorpay-webhook-secret",
+        "whatsapp-access-token",
+        "whatsapp-webhook-secret",
+        "jwt-signing-key",
+        "qr-signing-key",
+        "database-credentials"
+      ],
+      "source": "architecture.md sections 4, 8, 9; ALB with WAF routes /api"
+    },
+    {
+      "component_id": "ctr-db",
+      "name": "Database",
+      "kind": "database",
+      "needs": [
+        "postgres"
+      ],
+      "size_class": "medium",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "confidential",
+      "runtime": "PostgreSQL 16 (RDS)",
+      "repo": null,
+      "depends_on": [],
+      "secrets": [
+        "database-credentials"
+      ],
+      "source": "architecture.md section 8 RDS Multi-AZ 2 vCPU 8 GB prod; section 5 PII; QA-015 RPO 15 min RTO 1 h"
+    },
+    {
+      "component_id": "act-razorpay",
+      "name": "Razorpay",
+      "kind": "external_api",
+      "needs": [
+        "external"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "confidential",
+      "runtime": null,
+      "repo": null,
+      "depends_on": [],
+      "secrets": [
+        "razorpay-api-key",
+        "razorpay-webhook-secret"
+      ],
+      "source": "architecture.md rel-007, rel-008, rel-009; client-owned account (CON-002)"
+    },
+    {
+      "component_id": "act-whatsapp",
+      "name": "WhatsApp Business",
+      "kind": "external_api",
+      "needs": [
+        "external"
+      ],
+      "size_class": "small",
+      "public_endpoint": false,
+      "exposes_http": false,
+      "data_classification": "confidential",
+      "runtime": null,
+      "repo": null,
+      "depends_on": [],
+      "secrets": [
+        "whatsapp-access-token",
+        "whatsapp-webhook-secret"
+      ],
+      "source": "architecture.md rel-010, rel-011; CON-003"
+    }
+  ],
+  "slos": {},
+  "monthly_budget_usd": null,
+  "notes": [
+    "Cloud is AWS only, region ap-south-1 (Mumbai), per ASM-009; ap-south-1 is in the catalog allowed regions.",
+    "Deploy target is ecs_fargate per architecture section 8: ECS Fargate service gym-api behind an Application Load Balancer with WAF; ctr-web is static files on S3 and CloudFront.",
+    "NFRs (design objectives, no SLA): check-in lookup p95 server <= 500 ms and screen <= 2 s; member pages p95 <= 3 s on 4G; availability 99.5% monthly during gym hours 06:00-22:00 India time; 99% of captured payments reflected within 2 minutes; >= 95% of due reminders sent on due day; RPO <= 15 minutes, RTO <= 1 hour; ctr-web RTO <= 30 minutes.",
+    "Capacity: about 1 request per second at peak with 3x headroom; 2 API tasks of 0.5 vCPU and 1 GB across 2 zones for availability, scaling to 4 when CPU is above 60% for 5 minutes; prod database Multi-AZ 2 vCPU 8 GB 50 GB with growth; stg and dev use 1 task, single-zone database, smaller tier.",
+    "Constraints: no native app, client's existing Razorpay account, WhatsApp only (never SMS), English only, no card or UPI data stored or logged, DPDP practice with no health data, launch 1 January 2027 (assumed).",
+    "Data classification: PII (names, phones) and payment records are treated as confidential; no card or UPI details are held. Encryption at rest for database, backups and S3; TLS on all edges.",
+    "Secrets are held in AWS Secrets Manager and passed to the task as environment variables; only names are listed here, never values.",
+    "Architecture names a Secrets Manager and WAF; ALB with WAF, network (VPC), ECS cluster and registry are platform needs derived from the ECS Fargate target.",
+    "Catalog has no WAF template and no secrets template for ECS; any gap should be reported by validation rather than substituting another topology.",
+    "Repository identities supplied: acme/gym-api (backend ctr-gym-api) and acme/gym-web (ctr-web).",
+    "Jobs and outbox run inside the API and use the database, so no queue or cache component is needed (ADR-0005, no cache per ADR-0002).",
+    "Approval is owned by the DevOps Lead and Solution Architect; code renders templates, validates output and makes bounded repairs of flagged files."
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "gate": "P4-G2",
+  "project": "gym-full",
+  "decision": "approved",
+  "approver": {
+    "name": "Orchestrator (automated test approval)",
+    "role": "NOT a human sign-off",
+    "automation": "phase4-env-test-mode"
+  },
+  "submitted_by": {
+    "name": "sprint-planning agent"
+  },
+  "decided_at": "2026-11-17T18:04:40+00:00",
+  "comment": "Automated test approval by the orchestrator (PHASE4_AUTO_APPROVE_FOR_TESTING), not a human review. Validator: success.",
+  "artifacts": {
+    "sprint/sprint-plan.json": "sha256:cdf2c9dfa0e8fbd9d58eee0c9edc81b68830f0376f856046e1e6d916adb7434f"
+  }
+}

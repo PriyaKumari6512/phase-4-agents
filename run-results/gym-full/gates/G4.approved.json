@@ -1,0 +1,24 @@
+{
+  "gate": "G4",
+  "project": "gym-full",
+  "decision": "approved",
+  "approver": {
+    "name": "Orchestrator test",
+    "role": "NOT a human sign-off",
+    "automation": "phase4-env-test-mode"
+  },
+  "submitted_by": {
+    "name": "Phase 4 agents"
+  },
+  "decided_at": "2026-11-17T18:04:41+00:00",
+  "comment": "",
+  "artifacts": {
+    "backlog/backlog.json": "sha256:4a529df72d56d88d00542f4b85ee55f859f7930495a2d77efece350e2acbdb2a",
+    "sprint/sprint-plan.json": "sha256:cdf2c9dfa0e8fbd9d58eee0c9edc81b68830f0376f856046e1e6d916adb7434f",
+    "allocation/assignments.json": "sha256:b17274dd8b81609bcba71210e8e1796ff34215e35888fb1ffaf4804da31baf65",
+    "infra/intent.json": "sha256:4486b94ef85d34884cc8acf7c9fb5ed2c80ec6efa62d99c43766c008f7d4ef87",
+    "infra/manifest.json": "sha256:656ac2b8787f6ec22944c26400b8312dada0155529fc61ada9d3197acc531121",
+    "infra/checks.json": "sha256:f93d57d8e16f22ceae36920bc18115fdd2015175170fa7592f18f2a5a34a5863",
+    "infra/PR.md": "sha256:98c2ea6dc0bda8167ebcbb18567cd0ce612cb042353fbfb587c76d30747a8773"
+  }
+}

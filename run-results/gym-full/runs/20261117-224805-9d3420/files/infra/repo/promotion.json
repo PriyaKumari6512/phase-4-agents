@@ -1,0 +1,16 @@
+{
+  "environments": [
+    "dev",
+    "qa",
+    "stg",
+    "prod"
+  ],
+  "images": {
+    "gym-api": [
+      "gym-api"
+    ]
+  },
+  "repositories": {
+    "gym-api": "acme/gym-api"
+  }
+}

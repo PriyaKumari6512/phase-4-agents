@@ -1,0 +1,121 @@
+TEST MODE: successful automated reviews authorize gates/publication; these are not human sign-offs.
+agent             gate   state                why
+task-breakdown    P4-G1  done                 P4-G1 approved, output up to date
+infra-pipeline    P4-G4  done                 P4-G4 approved, output up to date
+sprint-planning   P4-G2  RUN                  no output yet
+work-allocation   P4-G3  waiting for gate     sprint-planning is not done (no output yet)
+
+>>> running sprint-planning: no output yet
+
+<frozen runpy>:130: RuntimeWarning: 'agent_engine.cli' found in sys.modules after import of package 'agent_engine', but prior to execution of 'agent_engine.cli'; this may result in unpredictable behaviour
+Sprint plan: sprint/sprint-plan.json and sprint/sprint-plan.md. Solver OPTIMAL; 46 stories planned in 10 sprints, 9 deferred.
+
+=== sprint-planning/validator verdict (attempt 1): partial ===
+Deterministic checks passed (13 warnings). Reviewed 10 flagged texts: 2 blocking, 8 warnings. gym-full Sprint 1: 15 SP is above the 85%-confidence capacity 12.5 gym-full Sprint 2: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 3: 15 SP is above the 85%-confidence capacity 12.5 gym-full Sprint 4: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 5: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 6: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 7: 16 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 8: 17 SP is above the 85%-confidence capacity 14.1
+  - sprint 7: Goal lists four distinct outcomes (staff record payments, staff fix records, members see expiry, members see history). Rewrite as a single outcome, e.g. 'Members and staff track payment activity with current status visibility' or split into two sprints.
+  - sprint 8: Goal lists five outcomes across three user groups (members get receipts, members get consent prompts, members get reminders, owner sees dashboards, owner sees expiry). Rewrite as one outcome, e.g. 'Members consent to WhatsApp and receive receipts; owner monitors multi-branch expiry' or split across sprints.
+
+[sprint-planning: escalating fix pass to the strong model]
+
+=== sprint-planning/validator verdict (attempt 2): success ===
+Deterministic checks passed (13 warnings). Reviewed 1 flagged texts: 0 blocking, 1 warnings. gym-full Sprint 1: 15 SP is above the 85%-confidence capacity 12.5 gym-full Sprint 2: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 3: 15 SP is above the 85%-confidence capacity 12.5 gym-full Sprint 4: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 5: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 6: 17 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 7: 16 SP is above the 85%-confidence capacity 14.1 gym-full Sprint 8: 17 SP is above the 85%-confidence capacity 14.1
+
+Status: success  |  time: 35.3s
+Pass write  sprint-planning  fast   anthropic:claude-haiku-4-5-20251001
+Pass verify sprint-planning/validator fast   anthropic:claude-haiku-4-5-20251001
+Pass fix    sprint-planning  strong anthropic:claude-sonnet-5-5
+Pass verify sprint-planning/validator fast   anthropic:claude-haiku-4-5-20251001
+Tokens claude-haiku-4-5-20251001: input=9900 output=1715 total=11615
+Tokens claude-sonnet-5-5: input=9648 output=1540 total=11188
+Report: ~/p/phase-4-agents/outputs/gym-full/report.json
+Run history: ~/p/phase-4-agents/outputs/gym-full/runs/20261117-233404-9e4b1f
+Job log: ~/p/phase-4-agents/outputs/gym-full/logs/20261117-233404-9e4b1f.log  |  transcript: ~/p/phase-4-agents/logs/deepagent.log  |  app log: ~/p/phase-4-agents/logs/app.log
+agent             gate   state                why
+task-breakdown    P4-G1  done                 P4-G1 approved, output up to date
+infra-pipeline    P4-G4  done                 P4-G4 approved, output up to date
+sprint-planning   P4-G2  WAIT: approve gate   retained review is complete; awaiting gate
+work-allocation   P4-G3  waiting for gate     sprint-planning is not done (retained review is complete; awaiting gate)
+>>> TEST-approved P4-G2 (not a human sign-off)
+agent             gate   state                why
+task-breakdown    P4-G1  done                 P4-G1 approved, output up to date
+infra-pipeline    P4-G4  done                 P4-G4 approved, output up to date
+sprint-planning   P4-G2  done                 P4-G2 approved, output up to date
+work-allocation   P4-G3  RUN                  no output yet
+
+>>> running work-allocation: no output yet
+
+<frozen runpy>:130: RuntimeWarning: 'agent_engine.cli' found in sys.modules after import of package 'agent_engine', but prior to execution of 'agent_engine.cli'; this may result in unpredictable behaviour
+Assignment plan ready for Engineering Manager review.
+
+=== work-allocation/validator verdict (attempt 1): success ===
+Deterministic assignment checks passed; 14 tasks unassigned: GT-11-T03, GT-11-T04, GT-12-T01, GT-12-T03, GT-13-T01, GT-13-T02, GT-13-T03, GT-14-T01, GT-14-T02, GT-14-T03, GT-14-T04, GT-14-T05, GT-18-T02, GT-18-T03
+
+Status: success  |  time: 0.1s
+Pass write  work-allocation  fast   anthropic:claude-haiku-4-5-20251001
+Pass verify work-allocation/validator fast   anthropic:claude-haiku-4-5-20251001
+Report: ~/p/phase-4-agents/outputs/gym-full/report.json
+Run history: ~/p/phase-4-agents/outputs/gym-full/runs/20261117-233441-ebfb78
+Job log: ~/p/phase-4-agents/outputs/gym-full/logs/20261117-233441-ebfb78.log  |  transcript: ~/p/phase-4-agents/logs/deepagent.log  |  app log: ~/p/phase-4-agents/logs/app.log
+agent             gate   state                why
+task-breakdown    P4-G1  done                 P4-G1 approved, output up to date
+infra-pipeline    P4-G4  done                 P4-G4 approved, output up to date
+sprint-planning   P4-G2  done                 P4-G2 approved, output up to date
+work-allocation   P4-G3  WAIT: approve gate   retained review is complete; awaiting gate
+>>> TEST-approved P4-G3 (not a human sign-off)
+agent             gate   state                why
+task-breakdown    P4-G1  done                 P4-G1 approved, output up to date
+infra-pipeline    P4-G4  done                 P4-G4 approved, output up to date
+sprint-planning   P4-G2  done                 P4-G2 approved, output up to date
+work-allocation   P4-G3  done                 P4-G3 approved, output up to date
+>>> TEST-approved final G4 (not a human sign-off)
+
+ALL DONE for gym-full: every output exists and every gate is approved. Agents run this time: sprint-planning, work-allocation.
+
+>>> publish infra
+{
+  "pull_requests": [
+    {
+      "repo": "acme/gym-infra",
+      "branch": "phase4/infra-4486b94e",
+      "url": null,
+      "number": null,
+      "local_path": "~/p/phase-4-agents/outputs/gym-full/publish/prs/acme__gym-infra/phase4__infra-4486b94e"
+    },
+    {
+      "repo": "acme/gym-api",
+      "branch": "phase4/ci-4486b94e",
+      "url": null,
+      "number": null,
+      "local_path": "~/p/phase-4-agents/outputs/gym-full/publish/prs/acme__gym-api/phase4__ci-4486b94e"
+    }
+  ]
+}
+
+>>> publish backlog
+{
+  "tracker": "local",
+  "created": 239,
+  "updated_or_unchanged": 0,
+  "kept_human_edits": {},
+  "links": 207,
+  "closed": 0
+}
+
+>>> publish sprint
+{
+  "tracker": "local",
+  "sprints": 10,
+  "moved": 46,
+  "to_backlog": 9,
+  "missing_in_tracker": [],
+  "adopted": []
+}
+
+>>> publish assignments
+{
+  "tracker": "local",
+  "assigned": 4,
+  "ai_owners_recorded": 0,
+  "missing_in_tracker": []
+}
+EXIT CODE: 0

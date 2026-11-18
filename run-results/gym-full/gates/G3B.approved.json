@@ -1,0 +1,17 @@
+{
+  "gate": "G3B",
+  "project": "gym-full",
+  "decision": "approved",
+  "approver": {
+    "name": "Test Lead",
+    "role": "Test approver (automated test run, not a human sign-off)"
+  },
+  "submitted_by": {
+    "name": "Test upstream agent"
+  },
+  "decided_at": "2026-11-17T17:33:39+00:00",
+  "comment": "Test run approval: real architecture (ECS Fargate) restored",
+  "artifacts": {
+    "architecture.md": "sha256:a83ea62f2e8d8dab82bdd2f5e282be6def19cc135347f543fe64d3fbbb15e4f9"
+  }
+}
