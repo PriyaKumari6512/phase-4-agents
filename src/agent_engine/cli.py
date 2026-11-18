@@ -497,6 +497,8 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
 
     try:
         verification_resume.checkpoint_path(OUTPUTS_DIR / project_name, agent_name).unlink(missing_ok=True)
+        if not resumed_from and pack.name in ADVISORY_REVIEW_STAGES:
+            _clear_review_notes(pack, project_name)
         state = None if resumed_from else await run_pass(pack, "write", _agent_message(pack, request, project_name, request_number))
         report["agent_reply"] = _text(state["messages"][-1].content) if state and state.get("messages") else None
         print(report["agent_reply"] or "(agent produced no reply)")
@@ -517,6 +519,7 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
         else:
             for attempt in range(1, pack.max_fix_loops + 2):
                 report["loops"] = attempt
+                deterministic, human_needed = [], False
                 try:
                     deterministic, human_needed = _deterministic_gaps(pack.name, project_name)
                     if deterministic:
@@ -551,6 +554,20 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                         passes[-1]["satisfied"] = verdict.satisfied
                 except Exception as e:
                     logger.exception("verifier %s failed on attempt %d", verifier.name, attempt)
+                    if pack.name in ADVISORY_REVIEW_STAGES and not deterministic and not _provider_problem(e) \
+                            and "changed during" not in str(e) and not _missing(project_name, pack.output_files):
+                        # The model review is advisory here and the deterministic checks already passed: a review
+                        # that could not complete is a note for the gate, never a reason to stop.
+                        issues = [f"the model review could not complete ({' '.join(str(e).split())[:300]}); "
+                                  "review this output at the gate"]
+                        report["open_issues"] = _record_open_issues(pack, project_name, issues)
+                        verdict = Verdict(satisfied=True, status_so_far="success", gaps=[],
+                                          summary="Deterministic checks passed; the advisory model review could not "
+                                                  "complete and is noted for the gate approver.")
+                        report.update(status="success", verified=True, verdict=verdict.model_dump())
+                        checkpoint("verified", gaps=[])
+                        print(f"\n=== {verifier.name} could not complete; noted for the gate (not blocking) ===")
+                        break
                     verdict = Verdict(
                         satisfied=False, status_so_far="partial", gaps=[f"verifier failed: {e}"],
                         summary="The verifier could not complete this attempt; the output was not judged.",
@@ -576,6 +593,19 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                 print(f"\n=== {verifier.name} verdict (attempt {attempt}): {verdict.status_so_far} ===\n{verdict.summary}")
                 for gap in verdict.gaps:
                     print(f"  - {gap}")
+                if (not verdict.satisfied and deterministic and pack.name in ADVISORY_REVIEW_STAGES
+                        and (attempt > pack.max_fix_loops or human_needed)
+                        and not _missing(project_name, pack.output_files)):
+                    # Bounded automatic repair is done. The stage still produced its output, so it finishes: what is
+                    # left goes to its gate as open issues, and the reviewer decides whether it must change.
+                    report["open_issues"] = _record_open_issues(pack, project_name, verdict.gaps)
+                    verdict = Verdict(
+                        satisfied=True, status_so_far="success", gaps=[],
+                        summary=(f"{len(verdict.gaps)} issue(s) remain after automatic repair; recorded as open issues "
+                                 f"for the {pack.name} gate. They do not stop the pipeline."))
+                    status = "success"
+                    report.update(status=status, verified=True, verdict=verdict.model_dump())
+                    print(f"\n=== {pack.name}: {len(report['open_issues'])} open issue(s) handed to the gate ===")
                 if verdict.satisfied or attempt > pack.max_fix_loops or human_needed:
                     checkpoint(
                                   "verified" if verdict.satisfied and status in ("success", "done") else "awaiting_decision",
@@ -587,7 +617,23 @@ async def _run_stage(request: str, agent_name: str, project_name: str, stage, re
                     print(f"\n[{pack.name}: escalating fix pass to the {pack.models[level[pack.name]]} model]")
                 checkpoint("repair_pending", gaps=verdict.gaps)
                 checkpoint("repair_running", gaps=verdict.gaps)
-                await run_pass(pack, "fix", _fix_message(pack, project_name, verdict.gaps))
+                try:
+                    await run_pass(pack, "fix", _fix_message(pack, project_name, verdict.gaps))
+                except Exception as e:
+                    if (pack.name not in ADVISORY_REVIEW_STAGES or _provider_problem(e)
+                            or _missing(project_name, pack.output_files)):
+                        raise
+                    # A repair that cannot make progress ("the same findings remain", "nothing changed") ends the
+                    # repair loop; the last valid output and its open issues go to the gate.
+                    logger.warning("%s repair stopped: %s", pack.name, e)
+                    print(f"\n[{pack.name}: automatic repair stopped ({e}); remaining issues go to the gate]")
+                    report["open_issues"] = _record_open_issues(pack, project_name, verdict.gaps)
+                    verdict = Verdict(satisfied=True, status_so_far="success", gaps=[],
+                                      summary=(f"{len(verdict.gaps)} issue(s) remain after automatic repair; recorded "
+                                               f"as open issues for the {pack.name} gate."))
+                    report.update(status="success", verified=True, verdict=verdict.model_dump())
+                    checkpoint("verified", gaps=[])
+                    break
                 checkpoint("generated")
             # Fix passes can delete or move files: success also needs every declared output to still exist.
             missing = _missing(project_name, pack.output_files)
@@ -652,12 +698,53 @@ def _record_review_notes(pack: AgentPack, project: str, verdict: Verdict) -> lis
     if not pack.output_files:
         return findings
     rel = Path(pack.output_files[0]).parent / REVIEW_NOTES
+    try:
+        kept = json.loads((OUTPUTS_DIR / project / rel).read_text(encoding="utf-8")).get("open_issues", [])
+    except (OSError, ValueError):
+        kept = []
     atomic_json(OUTPUTS_DIR / project / rel, {
         "agent": pack.name, "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "blocking": False, "reviewer_status": verdict.status_so_far, "summary": verdict.summary,
-        "findings": findings,
-        "note": "Model review findings are advisory: consider them at the gate. Deterministic checks are what block."})
+        "findings": findings, "open_issues": kept,
+        "note": "Open issues and model review findings for the gate approver. They do not stop the pipeline; "
+                "the approver decides whether the output must change."})
     return findings
+
+
+def _clear_review_notes(pack: AgentPack, project: str) -> None:
+    """A new generation starts with no notes: findings from an earlier run never describe this output."""
+    if pack.output_files:
+        (OUTPUTS_DIR / project / Path(pack.output_files[0]).parent / REVIEW_NOTES).unlink(missing_ok=True)
+
+
+def _provider_problem(error: BaseException) -> bool:
+    """Problems no output can fix (rate limits, provider outages, budget stops): they stop the stage so the
+    orchestrator can wait and run it again. Everything else in a Phase 4 stage becomes an open issue."""
+    from agent_engine.stage_controls import StageBudgetExceeded
+    if isinstance(error, (StageBudgetExceeded, asyncio.CancelledError)):
+        return True
+    text = f"{type(error).__name__} {error}"
+    return any(marker in text for marker in ("SUBSCRIPTION_RATE_LIMITED", "RateLimit", "rate_limit", "Overloaded",
+                                             "overloaded", "APIConnectionError", "APITimeoutError", "InternalServerError"))
+
+
+def _record_open_issues(pack: AgentPack, project: str, issues: list[str]) -> list[str]:
+    """Add deterministic issues left after automatic repair to the stage's gate notes. Returns them."""
+    issues = list(dict.fromkeys(issues))
+    if not pack.output_files:
+        return issues
+    rel = Path(pack.output_files[0]).parent / REVIEW_NOTES
+    path = OUTPUTS_DIR / project / rel
+    try:
+        notes = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        notes = {"agent": pack.name, "findings": []}
+    notes.update(blocking=False, open_issues=list(dict.fromkeys([*notes.get("open_issues", []), *issues])),
+                 recorded_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                 note="Open issues and model review findings for the gate approver. They do not stop the pipeline; "
+                      "the approver decides whether the output must change.")
+    atomic_json(path, notes)
+    return issues
 
 
 def review_notes(project: str, agent: str) -> dict | None:

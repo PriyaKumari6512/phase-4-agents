@@ -21,7 +21,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from agent_engine.phase4 import files, sprint
-from agent_engine.phase4.contracts import Backlog, ProjectSettings, SprintPlan
+from agent_engine.phase4.contracts import Backlog, PlanOption, ProjectSettings, SprintPlan
 from agent_engine.phase4.structured import invoke as _invoke
 
 STATE_DIR = ".engine-sprint-planning"
@@ -160,6 +160,13 @@ async def decide(project: str, request: str, backlog: Backlog, settings: Project
     human = ("Decisions request (see 'Reviewer decisions' in your instructions):\n"
              + json.dumps(payload, ensure_ascii=False, indent=1))
     spec = _spec()
+    # The same request on the same backlog always gives the same decisions (a cached answer keyed by its request).
+    identity = _digest({"human": human, "rules": _rules(), "model": spec, "schema": Decisions.model_json_schema()})
+    saved = _load(project, "decisions", identity + ".json")
+    if saved is not None:
+        cached = Decisions.model_validate(saved)
+        if not check_decisions(cached, backlog, settings.calendar.planning_horizon_sprints, previous):
+            return cached
     result = await _invoke(Decisions, _rules(), human, callbacks, spec)
     errors = check_decisions(result, backlog, settings.calendar.planning_horizon_sprints, previous)
     if errors:
@@ -169,6 +176,7 @@ async def decide(project: str, request: str, backlog: Backlog, settings: Project
         errors = check_decisions(result, backlog, settings.calendar.planning_horizon_sprints, previous)
         if errors:
             raise files.ProjectError("could not turn the request into valid decisions: " + "; ".join(errors))
+    _save(project, result.model_dump(mode="json"), "decisions", identity + ".json")
     return result
 
 
@@ -247,13 +255,29 @@ async def annotate(project: str, callbacks, request: str = "", findings=()) -> A
     return result
 
 
+AUTO_OPTION = "auto-option.json"
+
+
+def _save_auto_option(project: str, text: str, changes: list[str] | None = None) -> None:
+    """The option applied automatically to an infeasible plan (empty when none was needed), for the gate."""
+    path = files.path(project, f"sprint/{AUTO_OPTION}", write=True)
+    if text:
+        files.write_json(project, f"sprint/{AUTO_OPTION}", {"applied_automatically": text, "changes": changes or [],
+                                                            "decision_needed": "Confirm or choose another option at P4-G2."})
+    else:
+        path.unlink(missing_ok=True)
+
+
 # ---------------------------------------------------------------------------------------------- stage operations
 async def generate(project: str, request: str, callbacks, findings=()):
     settings = files.read_json(project, files.PROJECT_SETTINGS, ProjectSettings)
     backlog = files.read_json(project, files.BACKLOG, Backlog)
     previous = _previous(project)
     pins = dict(previous.pins) if previous else {}
-    relax = list(previous.relaxations) if previous else []
+    # An option applied automatically to an infeasible plan is never kept as if an approver had chosen it.
+    auto_changes = set((files.read_json(project, f"sprint/{AUTO_OPTION}") if files.exists(project, f"sprint/{AUTO_OPTION}")
+                        else {}).get("changes", []))
+    relax = [c for c in (previous.relaxations if previous else []) if c not in auto_changes]
     note = ""
     if request.strip() not in DEFAULT_REQUESTS:
         decisions = await decide(project, request, backlog, settings, previous, callbacks)
@@ -269,6 +293,25 @@ async def generate(project: str, request: str, callbacks, findings=()):
     pins = {k: v for k, v in pins.items() if k in stories}          # stories that left the backlog drop their pins
     sprint.capacity_report(project)
     solved = json.loads(sprint.solve(project, pins, relax))
+    if solved["solver"] == "INFEASIBLE" and solved.get("options_if_infeasible"):
+        # A plan that cannot meet a hard deadline does not stop the pipeline: the first verified option (each one is
+        # proven to make the plan feasible) is applied, and the choice is recorded for the P4-G2 approver to confirm
+        # or replace ("we choose OPT-2" as a gate decision).
+        options = solved["options_if_infeasible"]
+        option = options[0]
+        relax = list(dict.fromkeys([*relax, *option["changes"]]))
+        solved = json.loads(sprint.solve(project, pins, relax))
+        applied = (f"The plan could not meet every hard deadline, so option {option['option_id']} was applied "
+                   f"automatically: {option['summary']} ({option['impact']}). The approver confirms it or chooses "
+                   "another option at P4-G2.")
+        _save_auto_option(project, applied, list(option["changes"]))
+        # Keep every verified option on the plan, so the approver can still choose another one.
+        plan = files.read_json(project, files.SPRINT_PLAN, SprintPlan)
+        plan.options_if_infeasible = [PlanOption(**o) for o in options]
+        files.write_json(project, files.SPRINT_PLAN, plan)
+        note = f"{note} {applied}".strip()
+    else:
+        _save_auto_option(project, "")
     await annotate(project, callbacks, request if not note else f"{request}\n(Answer in the summary: {note})", findings)
     planned = sum(len(s["stories"]) for s in solved["sprints"])
     text = (f"Sprint plan: sprint/sprint-plan.json and sprint/sprint-plan.md. Solver {solved['solver']}; "

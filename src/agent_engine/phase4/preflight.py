@@ -1,9 +1,9 @@
 """Check every Phase 4 input before any model call, and report all problems at once.
 
-Problems that would otherwise surface mid-run (a missing approval, a team member without skills, a roadmap release
-without a date, an unreadable stories file) stop the run up front with the complete list. Things a human may
-reasonably leave open (a story without acceptance criteria, missing story points) are warnings: the run continues and
-they are reported at the gate.
+Only inputs the pipeline cannot work without stop the run, up front and all at once: a missing or invalid file, no
+approved stories, no repository, no capacity at all, or a missing G3A/G3B approval. Everything a plan can still be
+made from (a release without a date, a team member without declared skills, a story without acceptance criteria) is a
+warning: the run continues and the gap shows in the outputs and at the gates.
 """
 from __future__ import annotations
 
@@ -57,8 +57,8 @@ def check_inputs(project: str) -> tuple[list[str], list[str]]:
             errors.append("project.json code_repos is empty: tasks cannot name a repository")
         no_skills = [m.member_id for m in settings.team if not m.declared_skills]
         if no_skills:
-            errors.append("team members without declared_skills (Work Allocation cannot match them to tasks): "
-                          + ", ".join(no_skills))
+            warnings.append("team members without declared_skills (Work Allocation cannot give them tasks until "
+                            "skills are added): " + ", ".join(no_skills))
         if all(m.allocation_pct == 0 for m in settings.team):
             errors.append("every team member has allocation_pct 0: there is no capacity to plan")
     if snap is not None:
@@ -67,8 +67,8 @@ def check_inputs(project: str) -> tuple[list[str], list[str]]:
         undated = [r.name for r in snap.releases if r.name in used and not r.release_date and r.name not in dated
                    and not r.released]
         if undated:
-            errors.append("roadmap releases without a date (set it on the tracker version or in project.json "
-                          "release_deadlines): " + ", ".join(undated))
+            warnings.append("roadmap releases without a date, so they get no deadline in the plan (set it on the "
+                            "tracker version or in project.json release_deadlines): " + ", ".join(undated))
         no_ac = [s.key for s in snap.stories if not s.acceptance_criteria]
         if no_ac:
             warnings.append("stories without acceptance criteria (the product owner should add them): "

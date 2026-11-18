@@ -106,20 +106,25 @@ def test_infeasible_plans_need_a_recommended_option_and_the_choice_is_applied(pl
     (planned / files.PROJECT_SETTINGS).write_text(json.dumps(settings))
     from agent_engine.phase4 import capacity
     monkeypatch.setattr(capacity, "utc_today", lambda: __import__("datetime").date(2026, 11, 5))
+    # An infeasible plan does not stop the pipeline: the first verified option is applied automatically and the
+    # choice is handed to the P4-G2 approver, with every option still on the plan.
     monkeypatch.setattr(spa, "_invoke", FakeModel(recommend=None))
-    with pytest.raises(files.ProjectError, match="recommend one of"):
-        run(spa.generate(P, "", []))
-    monkeypatch.setattr(spa, "_invoke", FakeModel(recommend="OPT-1"))
     run(spa.generate(P, "", []))
     plan = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
-    assert plan.solver.status == "INFEASIBLE" and "**Recommended option OPT-1:**" in plan.summary_md
-    verdict = run(spa.review(P))["structured_response"]
-    assert not verdict.satisfied and any("infeasible" in g for g in verdict.gaps)
+    assert plan.solver.status in ("OPTIMAL", "FEASIBLE") and plan.relaxations
+    assert plan.options_if_infeasible and plan.options_if_infeasible[0].option_id == "OPT-1"
+    auto = files.read_json(P, "sprint/auto-option.json")
+    assert "OPT-1 was applied automatically" in auto["applied_automatically"]
+    from agent_engine.phase4 import attention
+    assert any(line.startswith("decision needed: ") for line in attention.open_items(P, "sprint-planning"))
+    assert run(spa.review(P))["structured_response"].satisfied
+    # The approver's own choice replaces the automatic one and clears the open decision.
     choice = spa.Decisions(pins=[], clear_pins=[], option_id="OPT-1", note="")
     monkeypatch.setattr(spa, "_invoke", FakeModel(decisions=choice))
     run(spa.generate(P, "We choose OPT-1.", []))
     plan = files.read_json(P, files.SPRINT_PLAN, SprintPlan)
     assert plan.solver.status in ("OPTIMAL", "FEASIBLE") and plan.relaxations
+    assert not files.exists(P, "sprint/auto-option.json")
 
 
 def test_review_is_deterministic_and_repair_reruns_once(planned, monkeypatch):
