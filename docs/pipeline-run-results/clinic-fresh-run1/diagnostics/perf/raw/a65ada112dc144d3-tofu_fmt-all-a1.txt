@@ -1,6 +1,0 @@
-$ tofu fmt -check -recursive -diff
-exit=0 timed_out=False
---- stdout ---
-
---- stderr ---
-

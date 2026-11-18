@@ -87,7 +87,8 @@ def test_soft_deadline_candidate_matches_actual_transformation():
 
 
 def test_recorded_clinic_capacity_option_passes_its_own_checker(tmp_path, monkeypatch):
-    root = Path(__file__).resolve().parents[1] / "docs/pipeline-run-results/clinic-fresh-run1/pipeline-artifacts/clinic-test-2"
+    # A recorded clinic project (settings, backlog and sprint plan from a real run), kept as a test fixture.
+    root = Path(__file__).resolve().parent / "fixtures/clinic-capacity-option"
     for rel in (files.PROJECT_SETTINGS, files.BACKLOG, files.SPRINT_PLAN):
         target = tmp_path / "clinic-test-2" / rel
         target.parent.mkdir(parents=True, exist_ok=True)

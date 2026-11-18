@@ -37,14 +37,14 @@ $PY  = "$WT\.venv\Scripts\python.exe"
 
 ## 1. A fresh workspace from the project's real inputs
 
-The orchestrator treats existing outputs as up to date, so a run against `$ORG\outputs\clinic-test-2` would do
-almost nothing. Start from the inputs only. For `clinic-test-2` they are `prd.md`, `architecture.md` and
-`phase4/project.json` (it has no `history.json`, `skill-profiles.json` or `agent-outcomes.json`). Generated
-state (`specs/`, `backlog/`, `sprint/`, `allocation/`, `infra/`, `gates/`, `requests/`, `runs/`, `logs/`,
-`report.json`) and approvals are deliberately **not** copied: every gate is decided again by a human.
+A benchmark measures a run from the inputs only, so copy just the inputs into a separate workspace: `prd.md`,
+`architecture.md`, `designs/`, `api/` and `phase4/` inputs (`project.json`, `stories.json`, and `history.json`,
+`skill-profiles.json` or `agent-outcomes.json` when the project has them). Generated state (`backlog/`,
+`sprint/`, `allocation/`, `infra/`, `gates/`, `requests/`, `runs/`, `logs/`, `report.json`, `.engine-*`) and
+approvals are deliberately **not** copied: every gate is decided again.
 
 ```powershell
-$P     = "clinic-test-2"
+$P     = "my-project"                                                       # your folder under outputs/
 $SRC   = "$ORG\outputs\$P"
 $BENCH = "C:\Users\admin\Desktop\agent-sprint-planner\perf-bench\run-1"     # outside both repositories
 New-Item -ItemType Directory -Force "$BENCH\outputs\$P\phase4" | Out-Null
@@ -52,7 +52,7 @@ Copy-Item "$SRC\prd.md", "$SRC\architecture.md" "$BENCH\outputs\$P\"
 Copy-Item "$SRC\phase4\project.json" "$BENCH\outputs\$P\phase4\"
 ```
 
-The project name stays `clinic-test-2`, so prompts and paths the agents see are the same as before; only the
+The project name stays the same, so prompts and paths the agents see are the same as before; only the
 host folder differs (recorded in the manifests).
 
 ## 2. Turn diagnostics on (this shell only)
@@ -122,9 +122,9 @@ Where everything is:
 | Full sandbox command output (redacted) | `...\clinic-fresh-run1\raw\` (file names in the summary's infrastructure and failure tables) |
 | Provenance manifests | `...\clinic-fresh-run1\manifests\pipeline-*.json`, `invocation-*.json` |
 | Diagnostics problems | `...\clinic-fresh-run1\INCOMPLETE-*.txt` (absent when complete) |
-| Generated artifacts | `$BENCH\outputs\clinic-test-2\` |
-| Per-stage report and changed files | `$BENCH\outputs\clinic-test-2\runs\<job-id>\` and `report.json` |
-| Transcript per stage | `$BENCH\outputs\clinic-test-2\logs\<job-id>.log`; global `$BENCH\logs\deepagent.log`, `app.log` |
+| Generated artifacts | `$BENCH\outputs\my-project\` |
+| Per-stage report and changed files | `$BENCH\outputs\my-project\runs\<job-id>\` and `report.json` |
+| Transcript per stage | `$BENCH\outputs\my-project\logs\<job-id>.log`; global `$BENCH\logs\deepagent.log`, `app.log` |
 
 ## 5. If something fails
 
@@ -134,7 +134,7 @@ Keep everything: do not delete `$BENCH`, do not rerun straight away.
    output file; spans that never ended; diagnostics problems.
 2. The stage row's outcome and `report_problem` (e.g. "report.json is not from this invocation") and its verdicts
    (gap counts, inconsistent verdicts).
-3. `$BENCH\outputs\clinic-test-2\runs\<job-id>\report.json` for the validator's gaps and passes, the job log for
+3. `$BENCH\outputs\my-project\runs\<job-id>\report.json` for the validator's gaps and passes, the job log for
    the transcript, `phase4\orchestrator-state.json` for what the orchestrator recorded.
 4. For infrastructure: `infra\checks.json` (each check's `outcome`), `infra\manifest.json`
    (`validation_complete`, `checks_incomplete`) and the matching `raw\` files.
@@ -174,8 +174,8 @@ different case (incremental feedback); label it as such.
 
 Things that differ between runs even with identical inputs, so record them next to each result:
 
-* **Date.** Sprint windows and capacity are computed from the UTC date (`as_of`); `clinic-test-2`'s first
-  sprint starts 2026-11-16, so a run on another day can plan different sprints.
+* **Date.** Sprint windows and capacity are computed from the UTC date (`as_of`); a project's first sprint
+  date is fixed in `project.json`, so a run on another day can plan different sprints.
 * **Caches.** The Docker plugin-cache volume and its state, Python bytecode caches, the OS file cache, and the
   provider's prompt cache (visible as cache-read tokens per call) can all be warmer on a second run. The pipeline
   manifest records what it can observe (`caches`); neither run is automatically "cold" or "warm".

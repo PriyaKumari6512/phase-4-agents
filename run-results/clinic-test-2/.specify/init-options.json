@@ -1,8 +1,0 @@
-{
-  "ai": "deepagents",
-  "ai_skills": true,
-  "feature_numbering": "sequential",
-  "here": true,
-  "script": "phase4_speckit_script",
-  "speckit_version": "1.3.0"
-}

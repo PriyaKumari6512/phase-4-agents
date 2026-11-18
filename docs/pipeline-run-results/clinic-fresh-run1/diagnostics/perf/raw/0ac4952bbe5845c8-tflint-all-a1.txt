@@ -1,6 +1,0 @@
-$ tflint --recursive --format json --minimum-failure-severity=error
-exit=0 timed_out=False
---- stdout ---
-{"issues":[],"errors":[]}
---- stderr ---
-

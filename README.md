@@ -431,8 +431,8 @@ project folders; `agent-engine perf summarize --session <id>` turns it into a
 report offline. Off by default. See [docs/PERF_DIAGNOSTICS.md](docs/PERF_DIAGNOSTICS.md)
 and, for a benchmark of a real project, [docs/PERF_BENCHMARK_RUNBOOK.md](docs/PERF_BENCHMARK_RUNBOOK.md).
 
-The reliability fixes, validation evidence, remaining gaps, and checkout/run
-instructions are in [docs/FIXES_AND_VALIDATION.md](docs/FIXES_AND_VALIDATION.md).
+What stops the pipeline and what is only reported to the gate approvers is in
+[docs/PIPELINE_RELIABILITY.md](docs/PIPELINE_RELIABILITY.md).
 After generated workflows are merged and run, `agent-engine phase4 check-ci
 --project-name YOUR-PROJECT` records actual CI readiness. `agent-engine phase4
 reconcile --project-name YOUR-PROJECT` refreshes coding-agent outcomes. Neither

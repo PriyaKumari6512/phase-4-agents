@@ -1,6 +1,0 @@
-apiVersion: v2
-name: app
-description: Phase 4 golden-path chart for a stateless workload (Deployment + Service + HPA)
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

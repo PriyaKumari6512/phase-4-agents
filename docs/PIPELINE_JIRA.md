@@ -4,7 +4,7 @@ Keep your existing model credentials and Jira email/API token in the repository'
 Add the following values there. Replace the project folder and Jira destination with your actual values:
 
 ```dotenv
-PHASE4_PROJECT_NAME=clinic-test-2
+PHASE4_PROJECT_NAME=my-project
 PHASE4_TRACKER=jira
 JIRA_BASE_URL=https://your-company.atlassian.net
 JIRA_PROJECT_KEY=YOURPROJECT
