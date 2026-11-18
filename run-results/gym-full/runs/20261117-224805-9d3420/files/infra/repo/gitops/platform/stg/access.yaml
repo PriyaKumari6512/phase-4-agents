@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gym-full-stg
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workload-observer
+  namespace: gym-full-stg
+rules:
+  - apiGroups: ["", apps]
+    resources: [pods, pods/log, services, deployments, replicasets]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workload-observers
+  namespace: gym-full-stg
+subjects:
+  - kind: Group
+    name: gym-full-stg-observers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: workload-observer
+  apiGroup: rbac.authorization.k8s.io

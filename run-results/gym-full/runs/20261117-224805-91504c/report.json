@@ -1,0 +1,106 @@
+{
+  "job_id": "20261117-224805-91504c",
+  "agent": "task-breakdown",
+  "project": "gym-full",
+  "request": 1,
+  "request_text": "Break the approved stories down into tasks.",
+  "invocation_id": "e9f66e24b8954fce9d428ae6",
+  "passes": [
+    {
+      "kind": "write",
+      "agent": "task-breakdown",
+      "model_tier": "strong",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true
+    },
+    {
+      "kind": "verify",
+      "agent": "task-breakdown/validator",
+      "model_tier": "strong",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true,
+      "satisfied": false
+    },
+    {
+      "kind": "fix",
+      "agent": "task-breakdown",
+      "model_tier": "frontier",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true
+    },
+    {
+      "kind": "verify",
+      "agent": "task-breakdown/validator",
+      "model_tier": "strong",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true,
+      "satisfied": false
+    },
+    {
+      "kind": "fix",
+      "agent": "task-breakdown",
+      "model_tier": "frontier",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true
+    },
+    {
+      "kind": "verify",
+      "agent": "task-breakdown/validator",
+      "model_tier": "strong",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": true,
+      "satisfied": false
+    }
+  ],
+  "agent_reply": "Backlog: backlog/backlog.json and backlog/backlog.md. 55 stories, 188 tasks, 188 story points (55 of 55 stories generated, the rest unchanged). 0 blocking issues, 37 warnings.",
+  "loops": 3,
+  "status": "partial",
+  "verified": true,
+  "verdict": {
+    "satisfied": false,
+    "status_so_far": "partial",
+    "gaps": [
+      "{\"rule\": \"review\", \"severity\": \"blocking\", \"item_ids\": [\"GT-29-T03\"], \"message\": \"Story AC US-052.AC2 (merge same-phone rows into one member) conflicts with architecture ASM-016/RSK-006 and PRD FR-032 (rows are loaded as they are, duplicates not merged, flagged shared). Do not build the merge until product decides. Keep the task but state the chosen rule in its description (merge vs load-and-flag as shared) and add the decision as a story open question. If ASM-016 wins, rewrite the criteria to 'both rows loaded and flagged shared'. Same fix for GT-29-T05 and GT-30-T02/T04.\"}",
+      "{\"rule\": \"review\", \"severity\": \"blocking\", \"item_ids\": [\"GT-42-T03\"], \"message\": \"This task builds WhatsApp receipt messages, which PRD section 3 and A-005 list as out of scope (payment confirmation messages). It must not be scheduled until the Tech Lead keeps or withdraws US-023.AC2/AC3. It also depends on the consent column from GT-43/GT-44, so add a dependency on GT-43-T01. Keep it flagged provisional.\"}"
+    ],
+    "summary": "Deterministic checks passed (36 warnings) over 55 stories. Reviewed 53 flagged items in 37 stories: 2 blocking, 51 warnings for the Tech Lead. GT-12: Tasks total 32h for a 2-point story (12h at 6h/point), which is a large mismatch. Part of it is a second catalog in ctr-gym-api, which the story's single-place AC2 may not need. Ask the Tech Lead to confirm whether two catalogs are in scope or to re-size the story. Do not change the points yourself.; GT-13: Tasks total 34h against 3 points (18h). The role-to-endpoint matrix is an open question, and T01 and T03 may grow once it is decided. Tech Lead to confirm the matrix and either accept the hours or re-size upstream.; GT-15: Tasks total 42h against 3 points (18h). T01 repeats the GET /auth/me work already planned in GT-13-T02, so move it out of T01 and trim its hours. T02 and the reset screen depend on the open decision on who triggers a reset and over what channel. Resolve that before building them.; GT-15-T02: The 12h estimate is low confidence because the reset delivery channel is undecided (PRD silent, no reset endpoint in the contract). It is usable as a placeholder only. Raise the open question with the product team and re-estimate once the channel is decided.; GT-18: Tasks total 16h against 2 points (12h), a modest mismatch. The seed task depends on the client price list (A-014), and T02 may duplicate a plans seed from the base schema story. Check for overlap and confirm the price source before starting.; GT-18-T02: The 2h estimate is low confidence because plan prices are not in the inputs. Keep the task, but supply the prices as configuration. Add the missing price list as an open question and confirm whether the base schema already creates ent-plan and seeds plans.; GT-20: Tasks total 22h against 5 points (30h), so the story looks under-estimated, but the scope is unsettled. The story's AC1, AC2 and AC4 require email and plan on the form, while the contract and designs have neither. Confirm Q-012 and where plan choice sits before re-estimating.; GT-20-T01: Hours depend on the open fields decision (email, plan on the form). The task is buildable for name, phone and branch only. Re-estimate after Q-012 is answered. Keep the AC covering the missing-field message, because it applies to every field once the set is known.; GT-20-T02: Hours depend on where email and plan sit on the Join form (Q-012). The task is buildable for the three contract fields. Check that the home branch selector is not duplicated in GT-11-T02.; GT-20-T03: US-013.AC4 (WhatsApp answer in the member record) cannot be tested until that data is defined. The estimate is usable for the other ACs. Add the AC4 test once the decision is made."
+  },
+  "stage_budget": {
+    "model_calls": 88,
+    "input_tokens": 7732198,
+    "output_tokens": 158196,
+    "elapsed_seconds": 316.472,
+    "stopped": null,
+    "max_calls": 1000,
+    "max_input_tokens": 30000000,
+    "max_output_tokens": 2000000,
+    "timeout_seconds": 7200.0,
+    "token_limit_scope": "Provider-reported tokens; concurrent in-flight calls may overshoot. Missing usage cannot be charged."
+  },
+  "elapsed_seconds": 316.5,
+  "tokens": {
+    "claude-sonnet-5-5": {
+      "total_tokens": 7890394,
+      "input_tokens": 7732198,
+      "output_token_details": {
+        "reasoning": 462
+      },
+      "output_tokens": 158196,
+      "input_token_details": {
+        "ephemeral_1h_input_tokens": 0,
+        "cache_read": 6821742,
+        "ephemeral_5m_input_tokens": 239874,
+        "cache_creation": 0
+      }
+    }
+  },
+  "finished_at": "2026-11-17T17:23:21+00:00",
+  "files": {
+    "created": [
+      "backlog/backlog.json",
+      "backlog/backlog.md"
+    ],
+    "changed": [],
+    "deleted": []
+  }
+}

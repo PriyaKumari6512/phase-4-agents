@@ -1,0 +1,3066 @@
+{
+  "schema_version": "1.0.0",
+  "project": "gym-full",
+  "source": "jira",
+  "site": "https://xccelera-team-k7pyxoz6.atlassian.net",
+  "project_key": "GT",
+  "jql": "project = \"GT\" AND issuetype = Story AND statusCategory = \"To Do\" ORDER BY key ASC",
+  "story_points_field": "customfield_10016",
+  "approval_marker": "Approved at gate G2",
+  "releases": [
+    {
+      "name": "MVP",
+      "order": 1,
+      "release_date": null,
+      "released": false
+    },
+    {
+      "name": "R2",
+      "order": 2,
+      "release_date": null,
+      "released": false
+    },
+    {
+      "name": "R3",
+      "order": 3,
+      "release_date": null,
+      "released": false
+    }
+  ],
+  "epics": [
+    {
+      "key": "GT-1",
+      "issue_id": "10013",
+      "summary": "Foundations: home branch, check-in records and English texts",
+      "description_md": "Epic EPIC-01. Functional requirements: FR-001, FR-002.",
+      "labels": [
+        "EPIC-01"
+      ],
+      "requirement_ids": [
+        "FR-001",
+        "FR-002"
+      ]
+    },
+    {
+      "key": "GT-2",
+      "issue_id": "10014",
+      "summary": "Sign-in, roles and branch access",
+      "description_md": "Epic EPIC-02. Functional requirements: FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009.",
+      "labels": [
+        "EPIC-02"
+      ],
+      "requirement_ids": [
+        "FR-003",
+        "FR-004",
+        "FR-005",
+        "FR-006",
+        "FR-007",
+        "FR-008",
+        "FR-009"
+      ]
+    },
+    {
+      "key": "GT-3",
+      "issue_id": "10015",
+      "summary": "Plans, sign-up and free trial",
+      "description_md": "Epic EPIC-03. Functional requirements: FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017.",
+      "labels": [
+        "EPIC-03"
+      ],
+      "requirement_ids": [
+        "FR-010",
+        "FR-011",
+        "FR-012",
+        "FR-013",
+        "FR-014",
+        "FR-015",
+        "FR-016",
+        "FR-017"
+      ]
+    },
+    {
+      "key": "GT-4",
+      "issue_id": "10016",
+      "summary": "Online and cash payments",
+      "description_md": "Epic EPIC-04. Functional requirements: FR-018, FR-019, FR-020, FR-021, FR-022, FR-023.",
+      "labels": [
+        "EPIC-04"
+      ],
+      "requirement_ids": [
+        "FR-018",
+        "FR-019",
+        "FR-020",
+        "FR-021",
+        "FR-022",
+        "FR-023"
+      ]
+    },
+    {
+      "key": "GT-5",
+      "issue_id": "10017",
+      "summary": "Member self-service and renewal",
+      "description_md": "Epic EPIC-05. Functional requirements: FR-024, FR-025, FR-026, FR-027, FR-028.",
+      "labels": [
+        "EPIC-05"
+      ],
+      "requirement_ids": [
+        "FR-024",
+        "FR-025",
+        "FR-026",
+        "FR-027",
+        "FR-028"
+      ]
+    },
+    {
+      "key": "GT-6",
+      "issue_id": "10018",
+      "summary": "Front-desk check-in and expiry warning",
+      "description_md": "Epic EPIC-06. Functional requirements: FR-029, FR-030, FR-031, FR-032, FR-033, FR-034.",
+      "labels": [
+        "EPIC-06"
+      ],
+      "requirement_ids": [
+        "FR-029",
+        "FR-030",
+        "FR-031",
+        "FR-032",
+        "FR-033",
+        "FR-034"
+      ]
+    },
+    {
+      "key": "GT-7",
+      "issue_id": "10019",
+      "summary": "Check-in while the internet is down",
+      "description_md": "Epic EPIC-07. Functional requirements: FR-035, FR-036, FR-037, FR-038.",
+      "labels": [
+        "EPIC-07"
+      ],
+      "requirement_ids": [
+        "FR-035",
+        "FR-036",
+        "FR-037",
+        "FR-038"
+      ]
+    },
+    {
+      "key": "GT-8",
+      "issue_id": "10020",
+      "summary": "Owner dashboard",
+      "description_md": "Epic EPIC-08. Functional requirements: FR-039, FR-040, FR-041.",
+      "labels": [
+        "EPIC-08"
+      ],
+      "requirement_ids": [
+        "FR-039",
+        "FR-040",
+        "FR-041"
+      ]
+    },
+    {
+      "key": "GT-9",
+      "issue_id": "10021",
+      "summary": "WhatsApp agreement and expiry reminders",
+      "description_md": "Epic EPIC-09. Functional requirements: FR-042, FR-043, FR-044, FR-045, FR-046, FR-047.",
+      "labels": [
+        "EPIC-09"
+      ],
+      "requirement_ids": [
+        "FR-042",
+        "FR-043",
+        "FR-044",
+        "FR-045",
+        "FR-046",
+        "FR-047"
+      ]
+    },
+    {
+      "key": "GT-10",
+      "issue_id": "10022",
+      "summary": "Loading and fixing the Excel members",
+      "description_md": "Epic EPIC-10. Functional requirements: FR-048, FR-049, FR-050, FR-051.",
+      "labels": [
+        "EPIC-10"
+      ],
+      "requirement_ids": [
+        "FR-048",
+        "FR-049",
+        "FR-050",
+        "FR-051"
+      ]
+    }
+  ],
+  "stories": [
+    {
+      "key": "GT-11",
+      "issue_id": "10023",
+      "summary": "Home branch and check-in records are stored",
+      "statement": "As the gym owner, I want every member to have a home branch and every check-in to be stored with its branch, date and time so that I know where and when members come in.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-001.AC1",
+          "text": "Given a person signing up chooses \"Kothrud\" as home branch (one of the 3 branches), When the member is created, Then the member's record shows \"Kothrud\" as home branch."
+        },
+        {
+          "ac_id": "US-001.AC2",
+          "text": "Given a member whose home branch is Kothrud, When staff at another branch check that member in at 18:30 on 12 Jan 2027, Then the stored check-in has the member, that other branch, the date 12 Jan 2027 and the time 18:30."
+        },
+        {
+          "ac_id": "US-001.AC3",
+          "text": "Given a person signing up, When they try to finish without choosing a home branch, Then the system refuses and asks for a home branch."
+        }
+      ],
+      "notes": "The branch list is exactly the 3 FitZone branches. Check-in at any branch per A-018.",
+      "traceability": "Story US-001 · Epic EPIC-01 · Persona P-04 · Traces FR-001 · MoSCoW Must\nPriority rationale: proposed: no client priority given. REQ-025 (inferred): home branch and check-in records; Must because US-013 and US-031 need it.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want every member to have a home branch and every check-in to be stored with its branch, date and time so that I know where and when members come in.\n### Acceptance criteria\n- US-001.AC1: Given a person signing up chooses \"Kothrud\" as home branch (one of the 3 branches), When the member is created, Then the member's record shows \"Kothrud\" as home branch.\n- US-001.AC2: Given a member whose home branch is Kothrud, When staff at another branch check that member in at 18:30 on 12 Jan 2027, Then the stored check-in has the member, that other branch, the date 12 Jan 2027 and the time 18:30.\n- US-001.AC3: Given a person signing up, When they try to finish without choosing a home branch, Then the system refuses and asks for a home branch.\n### Notes\nThe branch list is exactly the 3 FitZone branches. Check-in at any branch per A-018.\n### Traceability\nStory US-001 · Epic EPIC-01 · Persona P-04 · Traces FR-001 · MoSCoW Must\nPriority rationale: proposed: no client priority given. REQ-025 (inferred): home branch and check-in records; Must because US-013 and US-031 need it.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-001",
+        "P-04",
+        "US-001",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-001",
+        "US-001",
+        "US-013",
+        "US-031"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-01 Platform and foundation: responsive English web app, branch data model, release plan"
+      ],
+      "epic_key": "GT-1",
+      "story_points": 3.0,
+      "rank": "0|i0004u:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-12",
+      "issue_id": "10024",
+      "summary": "Every screen and message is in English, kept in one place",
+      "statement": "As a member, I want every screen and message in English so that I understand the app.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-002.AC1",
+          "text": "Given any member, staff, manager or owner screen, or any message (including WhatsApp messages and error messages), When it is shown, Then its text is in English."
+        },
+        {
+          "ac_id": "US-002.AC2",
+          "text": "Given a message text is changed in the single place where texts are kept, When the screens that use it are reloaded, Then they show the new text without any other change."
+        }
+      ],
+      "notes": "Another language is a non-goal; only the ability to add one later is required (NFR-009).",
+      "traceability": "Story US-002 · Epic EPIC-01 · Persona P-01 · Traces FR-002 · MoSCoW Must\nPriority rationale: REQ-043 client: English for now (a language choice, not a priority). proposed as Must: every screen depends on the text store (FR-002).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want every screen and message in English so that I understand the app.\n### Acceptance criteria\n- US-002.AC1: Given any member, staff, manager or owner screen, or any message (including WhatsApp messages and error messages), When it is shown, Then its text is in English.\n- US-002.AC2: Given a message text is changed in the single place where texts are kept, When the screens that use it are reloaded, Then they show the new text without any other change.\n### Notes\nAnother language is a non-goal; only the ability to add one later is required (NFR-009).\n### Traceability\nStory US-002 · Epic EPIC-01 · Persona P-01 · Traces FR-002 · MoSCoW Must\nPriority rationale: REQ-043 client: English for now (a language choice, not a priority). proposed as Must: every screen depends on the text store (FR-002).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-002",
+        "P-01",
+        "US-002",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-002",
+        "US-002"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-01 Platform and foundation: responsive English web app, branch data model, release plan"
+      ],
+      "epic_key": "GT-1",
+      "story_points": 2.0,
+      "rank": "0|i00058:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-13",
+      "issue_id": "10025",
+      "summary": "Each user has one role and only that role's functions",
+      "statement": "As the gym owner, I want each user to have one of four roles (member, front-desk staff, branch manager, owner) so that people see and do only what their role allows.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-003.AC1",
+          "text": "Given a signed-in front-desk staff user, When the app shows the menu, Then it shows only front-desk functions (check-in, cash payment, records to fix) and not owner functions such as plans or staff accounts."
+        },
+        {
+          "ac_id": "US-003.AC2",
+          "text": "Given a signed-in front-desk staff user, When they type the address of the owner's plans screen directly in the browser, Then the system refuses the request and shows no plan-editing function."
+        },
+        {
+          "ac_id": "US-003.AC3",
+          "text": "Given a signed-in member, When they type the address of the staff check-in screen directly, Then the system refuses the request."
+        }
+      ],
+      "notes": "Enforced by the system, not only by hiding screens (NFR-013).",
+      "traceability": "Story US-003 · Epic EPIC-02 · Persona P-04 · Traces FR-003 · MoSCoW Must\nPriority rationale: proposed: no client priority given. REQ-027 (inferred); roles needed by US-005, US-006, US-031. NFR-013.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want each user to have one of four roles (member, front-desk staff, branch manager, owner) so that people see and do only what their role allows.\n### Acceptance criteria\n- US-003.AC1: Given a signed-in front-desk staff user, When the app shows the menu, Then it shows only front-desk functions (check-in, cash payment, records to fix) and not owner functions such as plans or staff accounts.\n- US-003.AC2: Given a signed-in front-desk staff user, When they type the address of the owner's plans screen directly in the browser, Then the system refuses the request and shows no plan-editing function.\n- US-003.AC3: Given a signed-in member, When they type the address of the staff check-in screen directly, Then the system refuses the request.\n### Notes\nEnforced by the system, not only by hiding screens (NFR-013).\n### Traceability\nStory US-003 · Epic EPIC-02 · Persona P-04 · Traces FR-003 · MoSCoW Must\nPriority rationale: proposed: no client priority given. REQ-027 (inferred); roles needed by US-005, US-006, US-031. NFR-013.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-003",
+        "P-04",
+        "US-003",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-003",
+        "US-003",
+        "US-005",
+        "US-006",
+        "US-031",
+        "NFR-013"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 3.0,
+      "rank": "0|i0005e:",
+      "blocks": [
+        "GT-14",
+        "GT-15",
+        "GT-32"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-14",
+      "issue_id": "10026",
+      "summary": "Owner creates and deactivates staff and manager accounts",
+      "statement": "As the gym owner, I want to create and deactivate front-desk staff and branch manager accounts for a branch so that only current employees can use the app.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-006.AC1",
+          "text": "Given the owner is signed in, When they create a front-desk staff account and assign it to the Kothrud branch, Then the account can sign in and is tied to Kothrud only."
+        },
+        {
+          "ac_id": "US-006.AC2",
+          "text": "Given the owner is signed in, When they create a branch manager account for a branch, Then that account can sign in as the manager of that branch (each branch has a manager account, A-020)."
+        },
+        {
+          "ac_id": "US-006.AC3",
+          "text": "Given an active staff account, When the owner deactivates it, Then that user can no longer sign in."
+        },
+        {
+          "ac_id": "US-006.AC4",
+          "text": "Given a signed-in front-desk staff user, When they try to open the staff-accounts screen, Then the system refuses (only the owner manages accounts)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-006 · Epic EPIC-02 · Persona P-04 · Traces FR-006 · MoSCoW Must\nPriority rationale: proposed: no client priority given. Needed by US-005: staff accounts must exist before anyone can sign in, and US-031 needs a staff user; A-020. Q-018 open (which manager functions). Manager accounts can be created now, but manager screens come in R2 (US-007, US-009).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to create and deactivate front-desk staff and branch manager accounts for a branch so that only current employees can use the app.\n### Acceptance criteria\n- US-006.AC1: Given the owner is signed in, When they create a front-desk staff account and assign it to the Kothrud branch, Then the account can sign in and is tied to Kothrud only.\n- US-006.AC2: Given the owner is signed in, When they create a branch manager account for a branch, Then that account can sign in as the manager of that branch (each branch has a manager account, A-020).\n- US-006.AC3: Given an active staff account, When the owner deactivates it, Then that user can no longer sign in.\n- US-006.AC4: Given a signed-in front-desk staff user, When they try to open the staff-accounts screen, Then the system refuses (only the owner manages accounts).\n### Traceability\nStory US-006 · Epic EPIC-02 · Persona P-04 · Traces FR-006 · MoSCoW Must\nPriority rationale: proposed: no client priority given. Needed by US-005: staff accounts must exist before anyone can sign in, and US-031 needs a staff user; A-020. Q-018 open (which manager functions). Manager accounts can be created now, but manager screens come in R2 (US-007, US-009).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-006",
+        "P-04",
+        "US-006",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-006",
+        "US-006",
+        "US-005",
+        "US-031",
+        "US-007",
+        "US-009"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 5.0,
+      "rank": "0|i0005r:",
+      "blocks": [
+        "GT-15",
+        "GT-32"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-15",
+      "issue_id": "10027",
+      "summary": "Staff, managers and owner sign in with username and password",
+      "statement": "As front-desk staff, I want to sign in with a username and password, and reset it if I forget it, so that I can use the check-in screen on the tablet.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-005.AC1",
+          "text": "Given an active staff account, When the user enters the correct username and password, Then they are signed in and see the functions of their role."
+        },
+        {
+          "ac_id": "US-005.AC2",
+          "text": "Given an active account, When the user enters a wrong password, Then the system shows an error message and does not sign them in."
+        },
+        {
+          "ac_id": "US-005.AC3",
+          "text": "Given a user who forgot their password, When they use password reset, Then they can set a new password and sign in with it (per A-016, A-037)."
+        }
+      ],
+      "notes": "The PRD does not describe how the reset is delivered (for example by whom or on which channel). Not decided here; a Questions-to-raise item for the PRD. Applies to P-02, P-03 and P-04. NFR-001: works in the browser on the tablet or a computer with nothing to install. NFR-018: labelled fields and buttons, readable text and good contrast.",
+      "traceability": "Story US-005 · Epic EPIC-02 · Persona P-02 · Traces FR-005 · MoSCoW Must\nPriority rationale: proposed: no client priority given. Needs US-006 (staff accounts); needed by US-031 (staff check-in on the tablet); A-016, A-037. Q-018 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to sign in with a username and password, and reset it if I forget it, so that I can use the check-in screen on the tablet.\n### Acceptance criteria\n- US-005.AC1: Given an active staff account, When the user enters the correct username and password, Then they are signed in and see the functions of their role.\n- US-005.AC2: Given an active account, When the user enters a wrong password, Then the system shows an error message and does not sign them in.\n- US-005.AC3: Given a user who forgot their password, When they use password reset, Then they can set a new password and sign in with it (per A-016, A-037).\n### Notes\nThe PRD does not describe how the reset is delivered (for example by whom or on which channel). Not decided here; a Questions-to-raise item for the PRD. Applies to P-02, P-03 and P-04. NFR-001: works in the browser on the tablet or a computer with nothing to install. NFR-018: labelled fields and buttons, readable text and good contrast.\n### Traceability\nStory US-005 · Epic EPIC-02 · Persona P-02 · Traces FR-005 · MoSCoW Must\nPriority rationale: proposed: no client priority given. Needs US-006 (staff accounts); needed by US-031 (staff check-in on the tablet); A-016, A-037. Q-018 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-005",
+        "P-02",
+        "US-005",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-005",
+        "US-005",
+        "US-006",
+        "US-031"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 3.0,
+      "rank": "0|i0005w:",
+      "blocks": [
+        "GT-32"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-16",
+      "issue_id": "10028",
+      "summary": "Messages go by WhatsApp only, from the Kothrud number",
+      "statement": "As the gym owner, I want all messages sent by WhatsApp from FitZone's existing WhatsApp Business number so that members get one consistent sender and no SMS.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-048.AC1",
+          "text": "Given a reminder is sent for a member of any of the 3 branches, When it is delivered, Then it comes by WhatsApp from the WhatsApp Business number FitZone has for the Kothrud branch (per A-035)."
+        },
+        {
+          "ac_id": "US-048.AC2",
+          "text": "Given a sign-in code, a trial code or a receipt is sent, When it is delivered, Then it comes from the same number."
+        },
+        {
+          "ac_id": "US-048.AC3",
+          "text": "Given any message the app sends, When it is sent, Then it is never sent by SMS."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-048 · Epic EPIC-09 · Persona P-04 · Traces FR-046 · MoSCoW Must\nPriority rationale: REQ-032 client: WhatsApp from the Kothrud number, REQ-019 no SMS; needed by US-004 and US-014 (codes go by WhatsApp). proposed as Must: no client priority given, dependency of the sign-in and sign-up codes. This is the messaging set-up only; reminders are in R2.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want all messages sent by WhatsApp from FitZone's existing WhatsApp Business number so that members get one consistent sender and no SMS.\n### Acceptance criteria\n- US-048.AC1: Given a reminder is sent for a member of any of the 3 branches, When it is delivered, Then it comes by WhatsApp from the WhatsApp Business number FitZone has for the Kothrud branch (per A-035).\n- US-048.AC2: Given a sign-in code, a trial code or a receipt is sent, When it is delivered, Then it comes from the same number.\n- US-048.AC3: Given any message the app sends, When it is sent, Then it is never sent by SMS.\n### Traceability\nStory US-048 · Epic EPIC-09 · Persona P-04 · Traces FR-046 · MoSCoW Must\nPriority rationale: REQ-032 client: WhatsApp from the Kothrud number, REQ-019 no SMS; needed by US-004 and US-014 (codes go by WhatsApp). proposed as Must: no client priority given, dependency of the sign-in and sign-up codes. This is the messaging set-up only; reminders are in R2.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-046",
+        "P-04",
+        "US-048",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-046",
+        "US-048",
+        "US-004",
+        "US-014"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 3.0,
+      "rank": "0|i00068:",
+      "blocks": [
+        "GT-17",
+        "GT-19"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-17",
+      "issue_id": "10029",
+      "summary": "Member signs in with phone number and WhatsApp code",
+      "statement": "As a member, I want to sign in with my phone number and a code sent on WhatsApp so that I can see my membership without remembering a password.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-004.AC1",
+          "text": "Given a registered member, When they enter their phone number and then the correct code received on WhatsApp within 10 minutes, Then the member's page opens."
+        },
+        {
+          "ac_id": "US-004.AC2",
+          "text": "Given a code sent 11 minutes ago, When the member enters it, Then the system shows that the code has expired and lets them ask for a new code (per PD-008)."
+        },
+        {
+          "ac_id": "US-004.AC3",
+          "text": "Given a member who has entered 5 wrong codes, When they enter a sixth code (even the correct one), Then the system refuses it and requires them to ask for a new code (per PD-008)."
+        },
+        {
+          "ac_id": "US-004.AC4",
+          "text": "Given a phone number that is not registered, When it is entered, Then the system shows a message offering sign-up or the free trial and sends no code."
+        },
+        {
+          "ac_id": "US-004.AC5",
+          "text": "Given a member loaded from Excel whose record has no phone number, When staff have not yet added a number, Then the member cannot sign in and the app tells them to ask at the front desk (per A-031)."
+        }
+      ],
+      "notes": "The PRD does not say how the app recognises a member whose record has no phone number when only a phone number is typed; US-004.AC5 follows the PRD's sign-in flow wording. Raise with the PRD agent if it matters for test design. Receiving the code before agreeing to WhatsApp messages is allowed (A-035). NFR-001: the sign-in works in the browser with nothing to install. NFR-018: readable text, good contrast and labelled buttons on the sign-in screens.",
+      "traceability": "Story US-004 · Epic EPIC-02 · Persona P-01 · Traces FR-004 · MoSCoW Must\nPriority rationale: proposed: no client priority given. Needed by US-025, US-028, US-030. REQ-027 (inferred); Q-007 open, proposed default WhatsApp code (SA-006).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to sign in with my phone number and a code sent on WhatsApp so that I can see my membership without remembering a password.\n### Acceptance criteria\n- US-004.AC1: Given a registered member, When they enter their phone number and then the correct code received on WhatsApp within 10 minutes, Then the member's page opens.\n- US-004.AC2: Given a code sent 11 minutes ago, When the member enters it, Then the system shows that the code has expired and lets them ask for a new code (per PD-008).\n- US-004.AC3: Given a member who has entered 5 wrong codes, When they enter a sixth code (even the correct one), Then the system refuses it and requires them to ask for a new code (per PD-008).\n- US-004.AC4: Given a phone number that is not registered, When it is entered, Then the system shows a message offering sign-up or the free trial and sends no code.\n- US-004.AC5: Given a member loaded from Excel whose record has no phone number, When staff have not yet added a number, Then the member cannot sign in and the app tells them to ask at the front desk (per A-031).\n### Notes\nThe PRD does not say how the app recognises a member whose record has no phone number when only a phone number is typed; US-004.AC5 follows the PRD's sign-in flow wording. Raise with the PRD agent if it matters for test design. Receiving the code before agreeing to WhatsApp messages is allowed (A-035). NFR-001: the sign-in works in the browser with nothing to install. NFR-018: readable text, good contrast and labelled buttons on the sign-in screens.\n### Traceability\nStory US-004 · Epic EPIC-02 · Persona P-01 · Traces FR-004 · MoSCoW Must\nPriority rationale: proposed: no client priority given. Needed by US-025, US-028, US-030. REQ-027 (inferred); Q-007 open, proposed default WhatsApp code (SA-006).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-004",
+        "P-01",
+        "US-004",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-004",
+        "US-004",
+        "US-025",
+        "US-028",
+        "US-030"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 8.0,
+      "rank": "0|i0006c:",
+      "blocks": [
+        "GT-26",
+        "GT-28",
+        "GT-38"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-18",
+      "issue_id": "10030",
+      "summary": "Member sees the plans and prices",
+      "statement": "As a new member, I want to see the monthly, quarterly and yearly plans with their prices so that I can choose one.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-010.AC1",
+          "text": "Given a person opens \"Sign up\", When the plan list shows, Then it lists the monthly, quarterly and yearly plans, each with its price."
+        },
+        {
+          "ac_id": "US-010.AC2",
+          "text": "Given two people choosing different home branches (for example Kothrud and another branch), When each opens the plan list, Then both see the same plans at the same prices (per A-019)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-010 · Epic EPIC-03 · Persona P-01 · Traces FR-010 · MoSCoW Must\nPriority rationale: REQ-004 client: monthly, quarterly, yearly plans; REQ-045 sign-up on day one; needed by US-013.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a new member, I want to see the monthly, quarterly and yearly plans with their prices so that I can choose one.\n### Acceptance criteria\n- US-010.AC1: Given a person opens \"Sign up\", When the plan list shows, Then it lists the monthly, quarterly and yearly plans, each with its price.\n- US-010.AC2: Given two people choosing different home branches (for example Kothrud and another branch), When each opens the plan list, Then both see the same plans at the same prices (per A-019).\n### Traceability\nStory US-010 · Epic EPIC-03 · Persona P-01 · Traces FR-010 · MoSCoW Must\nPriority rationale: REQ-004 client: monthly, quarterly, yearly plans; REQ-045 sign-up on day one; needed by US-013.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-010",
+        "P-01",
+        "US-010",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-010",
+        "US-010",
+        "US-013"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 2.0,
+      "rank": "0|i0006n:",
+      "blocks": [
+        "GT-20"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-19",
+      "issue_id": "10031",
+      "summary": "Sign-up phone number is confirmed with a WhatsApp code",
+      "statement": "As a new member, I want to confirm my phone number with a WhatsApp code so that nobody can register using my number.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-014.AC1",
+          "text": "Given a completed sign-up form with a new phone number, When the person enters the correct code received on WhatsApp, Then the account is created."
+        },
+        {
+          "ac_id": "US-014.AC2",
+          "text": "Given a person who enters a wrong code, When they submit it, Then no account is created, the system shows a message and lets them ask for a new code."
+        },
+        {
+          "ac_id": "US-014.AC3",
+          "text": "Given a code sent 11 minutes ago, When the person enters it, Then no account is created and the system lets them ask for a new code (per PD-008)."
+        },
+        {
+          "ac_id": "US-014.AC4",
+          "text": "Given a sign-up form submitted, When the code has not yet been entered correctly, Then no member account exists for that phone number (per PD-009, A-034)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-014 · Epic EPIC-03 · Persona P-01 · Traces FR-013 · MoSCoW Must\nPriority rationale: Needed by US-013: the sign-up is only complete once the WhatsApp code is confirmed; PD-009 and A-017 (one number, one member). proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a new member, I want to confirm my phone number with a WhatsApp code so that nobody can register using my number.\n### Acceptance criteria\n- US-014.AC1: Given a completed sign-up form with a new phone number, When the person enters the correct code received on WhatsApp, Then the account is created.\n- US-014.AC2: Given a person who enters a wrong code, When they submit it, Then no account is created, the system shows a message and lets them ask for a new code.\n- US-014.AC3: Given a code sent 11 minutes ago, When the person enters it, Then no account is created and the system lets them ask for a new code (per PD-008).\n- US-014.AC4: Given a sign-up form submitted, When the code has not yet been entered correctly, Then no member account exists for that phone number (per PD-009, A-034).\n### Traceability\nStory US-014 · Epic EPIC-03 · Persona P-01 · Traces FR-013 · MoSCoW Must\nPriority rationale: Needed by US-013: the sign-up is only complete once the WhatsApp code is confirmed; PD-009 and A-017 (one number, one member). proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-013",
+        "P-01",
+        "US-014",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-013",
+        "US-014",
+        "US-013"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 5.0,
+      "rank": "0|i0006q:",
+      "blocks": [
+        "GT-20"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-20",
+      "issue_id": "10032",
+      "summary": "New member signs up with the required details",
+      "statement": "As a new member, I want to sign up on my phone by entering my details and choosing a plan so that I do not have to fill in a paper form.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-013.AC1",
+          "text": "Given a person on the sign-up form, When they enter name, phone number, email and home branch and choose a plan, Then the system accepts the form and moves on to the WhatsApp code step."
+        },
+        {
+          "ac_id": "US-013.AC2",
+          "text": "Given a person on the sign-up form, When they leave any one of the five (name, phone number, email, home branch, plan) empty, Then the system refuses and names the missing field."
+        },
+        {
+          "ac_id": "US-013.AC3",
+          "text": "Given the sign-up form, When it is shown, Then it asks for no photo, health detail or emergency-contact detail (per SA-009)."
+        },
+        {
+          "ac_id": "US-013.AC4",
+          "text": "Given a person who completes the sign-up form, When the member record is created, Then it holds only the FR-012 details (name, phone number, email, home branch, plan) and the person's WhatsApp answer (FR-042), and no other personal detail is collected (per NFR-014)."
+        }
+      ],
+      "notes": "NFR-003 applies: a first-time member completes sign-up with payment in under 5 minutes without help (PD-018). NFR-002: usable at phone width. NFR-001: sign-up is done in the browser with nothing to install. NFR-018: readable text, good contrast and labelled buttons on the form. NFR-014 (privacy, DPDP): only the FR-012 fields are collected and handled with consent; deletion requests are handled manually. Fields per Q-012 (open).",
+      "traceability": "Story US-013 · Epic EPIC-03 · Persona P-01 · Traces FR-012 · MoSCoW Must\nPriority rationale: REQ-003 and REQ-001 client; REQ-045 sign-up on day one. Needs US-010 and US-014. Q-012 open (fields).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a new member, I want to sign up on my phone by entering my details and choosing a plan so that I do not have to fill in a paper form.\n### Acceptance criteria\n- US-013.AC1: Given a person on the sign-up form, When they enter name, phone number, email and home branch and choose a plan, Then the system accepts the form and moves on to the WhatsApp code step.\n- US-013.AC2: Given a person on the sign-up form, When they leave any one of the five (name, phone number, email, home branch, plan) empty, Then the system refuses and names the missing field.\n- US-013.AC3: Given the sign-up form, When it is shown, Then it asks for no photo, health detail or emergency-contact detail (per SA-009).\n- US-013.AC4: Given a person who completes the sign-up form, When the member record is created, Then it holds only the FR-012 details (name, phone number, email, home branch, plan) and the person's WhatsApp answer (FR-042), and no other personal detail is collected (per NFR-014).\n### Notes\nNFR-003 applies: a first-time member completes sign-up with payment in under 5 minutes without help (PD-018). NFR-002: usable at phone width. NFR-001: sign-up is done in the browser with nothing to install. NFR-018: readable text, good contrast and labelled buttons on the form. NFR-014 (privacy, DPDP): only the FR-012 fields are collected and handled with consent; deletion requests are handled manually. Fields per Q-012 (open).\n### Traceability\nStory US-013 · Epic EPIC-03 · Persona P-01 · Traces FR-012 · MoSCoW Must\nPriority rationale: REQ-003 and REQ-001 client; REQ-045 sign-up on day one. Needs US-010 and US-014. Q-012 open (fields).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-012",
+        "P-01",
+        "US-013",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-012",
+        "US-013",
+        "US-010",
+        "US-014"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 5.0,
+      "rank": "0|i00070:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-21",
+      "issue_id": "10033",
+      "summary": "Registered phone number does not create a second member",
+      "statement": "As a person who is already a member, I want to be told that my number is registered so that I sign in or renew instead of creating a duplicate.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-015.AC1",
+          "text": "Given phone number 98xxxxxx01 already belongs to a member, When a person submits the sign-up form with that number, Then the system creates no second member and tells them to sign in or renew, offering \"Sign in\" and \"Renew\" (per A-017)."
+        },
+        {
+          "ac_id": "US-015.AC2",
+          "text": "Given the same situation, When the person has been told, Then no code is sent for the sign-up and no payment screen opens."
+        }
+      ],
+      "notes": "Phone numbers in examples are placeholders, not real numbers.",
+      "traceability": "Story US-015 · Epic EPIC-03 · Persona P-01 · Traces FR-014 · MoSCoW Must\nPriority rationale: A-017; needed by US-050 (loaded numbers must not be duplicated by new sign-ups). proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a person who is already a member, I want to be told that my number is registered so that I sign in or renew instead of creating a duplicate.\n### Acceptance criteria\n- US-015.AC1: Given phone number 98xxxxxx01 already belongs to a member, When a person submits the sign-up form with that number, Then the system creates no second member and tells them to sign in or renew, offering \"Sign in\" and \"Renew\" (per A-017).\n- US-015.AC2: Given the same situation, When the person has been told, Then no code is sent for the sign-up and no payment screen opens.\n### Notes\nPhone numbers in examples are placeholders, not real numbers.\n### Traceability\nStory US-015 · Epic EPIC-03 · Persona P-01 · Traces FR-014 · MoSCoW Must\nPriority rationale: A-017; needed by US-050 (loaded numbers must not be duplicated by new sign-ups). proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-014",
+        "P-01",
+        "US-015",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-014",
+        "US-015",
+        "US-050"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 2.0,
+      "rank": "0|i00072:",
+      "blocks": [
+        "GT-30"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-22",
+      "issue_id": "10034",
+      "summary": "Membership starts or extends only after payment is confirmed",
+      "statement": "As a member, I want my membership to start once my payment is confirmed so that I get exactly what I paid for.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-020.AC1",
+          "text": "Given a new member whose monthly payment is confirmed by Razorpay on 10 Nov 2026, When the membership is created, Then it starts on 10 Nov 2026 and runs to 10 Dec 2026 (per PD-010)."
+        },
+        {
+          "ac_id": "US-020.AC2",
+          "text": "Given confirmed payments on 10 Nov 2026 for the quarterly plan and for the yearly plan, When memberships are created, Then they end on 10 Feb 2027 and 10 Nov 2027 respectively."
+        },
+        {
+          "ac_id": "US-020.AC3",
+          "text": "Given a member whose payment has not been confirmed by Razorpay, When they open their page, Then no new membership has started and no expiry date has been extended (per A-025)."
+        }
+      ],
+      "notes": "The rule for renewals before expiry is in US-028.",
+      "traceability": "Story US-020 · Epic EPIC-04 · Persona P-01 · Traces FR-019 · MoSCoW Must\nPriority rationale: REQ-005; REQ-045 payment on day one. Needed by US-019 to mean anything: a confirmed payment must start the membership (A-025).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want my membership to start once my payment is confirmed so that I get exactly what I paid for.\n### Acceptance criteria\n- US-020.AC1: Given a new member whose monthly payment is confirmed by Razorpay on 10 Nov 2026, When the membership is created, Then it starts on 10 Nov 2026 and runs to 10 Dec 2026 (per PD-010).\n- US-020.AC2: Given confirmed payments on 10 Nov 2026 for the quarterly plan and for the yearly plan, When memberships are created, Then they end on 10 Feb 2027 and 10 Nov 2027 respectively.\n- US-020.AC3: Given a member whose payment has not been confirmed by Razorpay, When they open their page, Then no new membership has started and no expiry date has been extended (per A-025).\n### Notes\nThe rule for renewals before expiry is in US-028.\n### Traceability\nStory US-020 · Epic EPIC-04 · Persona P-01 · Traces FR-019 · MoSCoW Must\nPriority rationale: REQ-005; REQ-045 payment on day one. Needed by US-019 to mean anything: a confirmed payment must start the membership (A-025).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-019",
+        "P-01",
+        "US-020",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-019",
+        "US-020",
+        "US-019"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-04 Online payments (Razorpay)"
+      ],
+      "epic_key": "GT-4",
+      "story_points": 3.0,
+      "rank": "0|i0007b:",
+      "blocks": [
+        "GT-23"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-23",
+      "issue_id": "10035",
+      "summary": "Member pays online with UPI or card through Razorpay",
+      "statement": "As a member, I want to pay online with UPI or a card so that I can sign up or renew without going to the desk.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-019.AC1",
+          "text": "Given a member who has chosen a plan, When they continue to payment, Then the system opens Razorpay with the plan's price as the amount and offers UPI and cards only (no net banking, no wallets)."
+        },
+        {
+          "ac_id": "US-019.AC2",
+          "text": "Given a member who pays by card, When the payment completes, Then the app has stored only the payment status, amount, date and Razorpay's reference and no card number or UPI PIN (per PD-024, NFR-016)."
+        },
+        {
+          "ac_id": "US-019.AC3",
+          "text": "Given members of different home branches pay, When their payments are made, Then all go through the same FitZone Razorpay account (per A-032)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-019 · Epic EPIC-04 · Persona P-01 · Traces FR-018 · MoSCoW Must\nPriority rationale: REQ-005, REQ-028, REQ-029 client: Razorpay, UPI and cards; REQ-045 payment on day one. Needs US-020 (the membership rule it feeds).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to pay online with UPI or a card so that I can sign up or renew without going to the desk.\n### Acceptance criteria\n- US-019.AC1: Given a member who has chosen a plan, When they continue to payment, Then the system opens Razorpay with the plan's price as the amount and offers UPI and cards only (no net banking, no wallets).\n- US-019.AC2: Given a member who pays by card, When the payment completes, Then the app has stored only the payment status, amount, date and Razorpay's reference and no card number or UPI PIN (per PD-024, NFR-016).\n- US-019.AC3: Given members of different home branches pay, When their payments are made, Then all go through the same FitZone Razorpay account (per A-032).\n### Traceability\nStory US-019 · Epic EPIC-04 · Persona P-01 · Traces FR-018 · MoSCoW Must\nPriority rationale: REQ-005, REQ-028, REQ-029 client: Razorpay, UPI and cards; REQ-045 payment on day one. Needs US-020 (the membership rule it feeds).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-018",
+        "P-01",
+        "US-019",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-018",
+        "US-019",
+        "US-020"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-04 Online payments (Razorpay)"
+      ],
+      "epic_key": "GT-4",
+      "story_points": 3.0,
+      "rank": "0|i0007c:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-24",
+      "issue_id": "10036",
+      "summary": "Failed or abandoned payment creates no membership",
+      "statement": "As a member, I want to be told when my payment did not go through and try again so that I do not think I am a member when I am not.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-021.AC1",
+          "text": "Given a new member whose card is declined, When Razorpay reports failure, Then the system shows that the payment did not go through, creates no membership and keeps the sign-up as unpaid."
+        },
+        {
+          "ac_id": "US-021.AC2",
+          "text": "Given a member who closes the Razorpay page without paying, When they return to the app, Then the same result as for a decline applies and they can try again at once."
+        },
+        {
+          "ac_id": "US-021.AC3",
+          "text": "Given an unpaid sign-up, When the dashboard counts active members, Then this member is not counted (per A-025, PD-016)."
+        },
+        {
+          "ac_id": "US-021.AC4",
+          "text": "Given a renewal whose payment failed, When the member opens their page, Then the expiry date is unchanged."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-021 · Epic EPIC-04 · Persona P-01 · Traces FR-020 · MoSCoW Must\nPriority rationale: REQ-005 and A-025; REQ-045 payment on day one: a failed payment must not create a membership; protects the money flow.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to be told when my payment did not go through and try again so that I do not think I am a member when I am not.\n### Acceptance criteria\n- US-021.AC1: Given a new member whose card is declined, When Razorpay reports failure, Then the system shows that the payment did not go through, creates no membership and keeps the sign-up as unpaid.\n- US-021.AC2: Given a member who closes the Razorpay page without paying, When they return to the app, Then the same result as for a decline applies and they can try again at once.\n- US-021.AC3: Given an unpaid sign-up, When the dashboard counts active members, Then this member is not counted (per A-025, PD-016).\n- US-021.AC4: Given a renewal whose payment failed, When the member opens their page, Then the expiry date is unchanged.\n### Traceability\nStory US-021 · Epic EPIC-04 · Persona P-01 · Traces FR-020 · MoSCoW Must\nPriority rationale: REQ-005 and A-025; REQ-045 payment on day one: a failed payment must not create a membership; protects the money flow.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-020",
+        "P-01",
+        "US-021",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-020",
+        "US-021"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-04 Online payments (Razorpay)"
+      ],
+      "epic_key": "GT-4",
+      "story_points": 5.0,
+      "rank": "0|i0007k:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-25",
+      "issue_id": "10037",
+      "summary": "Member is told a payment is being confirmed",
+      "statement": "As a member, I want to see \"payment is being confirmed\" while Razorpay has not yet confirmed so that I do not pay twice.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-022.AC1",
+          "text": "Given a payment that Razorpay has not yet confirmed, When the member returns to the app, Then the screen shows \"payment is being confirmed\"."
+        },
+        {
+          "ac_id": "US-022.AC2",
+          "text": "Given the same state, When the member looks for a way to pay again for the same plan, Then the app does not ask them to pay again (per PD-011)."
+        },
+        {
+          "ac_id": "US-022.AC3",
+          "text": "Given Razorpay's confirmation arrives later, When the member reopens the app, Then the membership has started and the receipt is available."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-022 · Epic EPIC-04 · Persona P-01 · Traces FR-021 · MoSCoW Must\nPriority rationale: PD-011: stops double payment when Razorpay is slow; part of the payment flow. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to see \"payment is being confirmed\" while Razorpay has not yet confirmed so that I do not pay twice.\n### Acceptance criteria\n- US-022.AC1: Given a payment that Razorpay has not yet confirmed, When the member returns to the app, Then the screen shows \"payment is being confirmed\".\n- US-022.AC2: Given the same state, When the member looks for a way to pay again for the same plan, Then the app does not ask them to pay again (per PD-011).\n- US-022.AC3: Given Razorpay's confirmation arrives later, When the member reopens the app, Then the membership has started and the receipt is available.\n### Traceability\nStory US-022 · Epic EPIC-04 · Persona P-01 · Traces FR-021 · MoSCoW Must\nPriority rationale: PD-011: stops double payment when Razorpay is slow; part of the payment flow. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-021",
+        "P-01",
+        "US-022",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-021",
+        "US-022"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-04 Online payments (Razorpay)"
+      ],
+      "epic_key": "GT-4",
+      "story_points": 3.0,
+      "rank": "0|i0007z:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-26",
+      "issue_id": "10038",
+      "summary": "Member sees plan and membership status",
+      "statement": "As a member, I want to see my current plan and whether I am active, expired or on a free trial so that I know my status.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-025.AC1",
+          "text": "Given a signed-in member with a paid monthly plan whose expiry date is in the future, When their page opens, Then it shows \"Monthly\" and the status \"Active\"."
+        },
+        {
+          "ac_id": "US-025.AC2",
+          "text": "Given a signed-in member whose plan expired yesterday, When their page opens, Then it shows the plan and the status \"Expired\"."
+        },
+        {
+          "ac_id": "US-025.AC3",
+          "text": "Given a signed-in member on a free trial, When their page opens, Then it shows the status \"Free trial\"."
+        }
+      ],
+      "notes": "NFR-005: member pages open in under 3 seconds on a typical 4G phone. NFR-001: the member page is a web page in the browser, nothing to install. NFR-018: readable text, good contrast and labelled buttons on member screens (also for US-026 to US-030).",
+      "traceability": "Story US-025 · Epic EPIC-05 · Persona P-01 · Traces FR-024 · MoSCoW Must\nPriority rationale: REQ-006 states the feature only (no client priority). proposed: member sees current plan; also shows the status that check-in relies on.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to see my current plan and whether I am active, expired or on a free trial so that I know my status.\n### Acceptance criteria\n- US-025.AC1: Given a signed-in member with a paid monthly plan whose expiry date is in the future, When their page opens, Then it shows \"Monthly\" and the status \"Active\".\n- US-025.AC2: Given a signed-in member whose plan expired yesterday, When their page opens, Then it shows the plan and the status \"Expired\".\n- US-025.AC3: Given a signed-in member on a free trial, When their page opens, Then it shows the status \"Free trial\".\n### Notes\nNFR-005: member pages open in under 3 seconds on a typical 4G phone. NFR-001: the member page is a web page in the browser, nothing to install. NFR-018: readable text, good contrast and labelled buttons on member screens (also for US-026 to US-030).\n### Traceability\nStory US-025 · Epic EPIC-05 · Persona P-01 · Traces FR-024 · MoSCoW Must\nPriority rationale: REQ-006 states the feature only (no client priority). proposed: member sees current plan; also shows the status that check-in relies on.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-024",
+        "P-01",
+        "US-025",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-024",
+        "US-025"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-05 Member self-service and renewal"
+      ],
+      "epic_key": "GT-5",
+      "story_points": 3.0,
+      "rank": "0|i00086:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-27",
+      "issue_id": "10039",
+      "summary": "Member sees expiry date and days left",
+      "statement": "As a member, I want to see my expiry date and the days left so that I know when to renew.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-026.AC1",
+          "text": "Given a member whose membership expires 20 Jan 2027, When they open their page on 13 Jan 2027, Then it shows the expiry date 20 Jan 2027 and \"7 days left\"."
+        },
+        {
+          "ac_id": "US-026.AC2",
+          "text": "Given a member whose membership expired on 10 Jan 2027, When they open their page on 13 Jan 2027, Then it shows the expiry date 10 Jan 2027 and \"3 days since expiry\"."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-026 · Epic EPIC-05 · Persona P-01 · Traces FR-025 · MoSCoW Must\nPriority rationale: REQ-007 states the feature only (no client priority). proposed: member sees expiry date; REQ-048 goal (missed renewals).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to see my expiry date and the days left so that I know when to renew.\n### Acceptance criteria\n- US-026.AC1: Given a member whose membership expires 20 Jan 2027, When they open their page on 13 Jan 2027, Then it shows the expiry date 20 Jan 2027 and \"7 days left\".\n- US-026.AC2: Given a member whose membership expired on 10 Jan 2027, When they open their page on 13 Jan 2027, Then it shows the expiry date 10 Jan 2027 and \"3 days since expiry\".\n### Traceability\nStory US-026 · Epic EPIC-05 · Persona P-01 · Traces FR-025 · MoSCoW Must\nPriority rationale: REQ-007 states the feature only (no client priority). proposed: member sees expiry date; REQ-048 goal (missed renewals).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-025",
+        "P-01",
+        "US-026",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-025",
+        "US-026"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-05 Member self-service and renewal"
+      ],
+      "epic_key": "GT-5",
+      "story_points": 2.0,
+      "rank": "0|i0008k:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-28",
+      "issue_id": "10040",
+      "summary": "Member sees their QR code",
+      "statement": "As a member, I want to see a QR code on my own page so that staff can identify me at check-in.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-030.AC1",
+          "text": "Given a signed-in member with an active membership, When their page opens, Then a QR code is shown."
+        },
+        {
+          "ac_id": "US-030.AC2",
+          "text": "Given a signed-in trial member, When their page opens, Then a QR code is shown."
+        },
+        {
+          "ac_id": "US-030.AC3",
+          "text": "Given a person who is not signed in, When they open the member page address, Then no QR code is shown and they are asked to sign in."
+        }
+      ],
+      "notes": "Q-011 is open (where the QR code lives); follows SA-009.",
+      "traceability": "Story US-030 · Epic EPIC-06 · Persona P-01 · Traces FR-029 · MoSCoW Must\nPriority rationale: REQ-012 confirmed (QR on the member's phone); needed by US-032 (REQ-045 check-in). proposed as Must: not named on the day-one list. Q-011 open (where the QR lives).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to see a QR code on my own page so that staff can identify me at check-in.\n### Acceptance criteria\n- US-030.AC1: Given a signed-in member with an active membership, When their page opens, Then a QR code is shown.\n- US-030.AC2: Given a signed-in trial member, When their page opens, Then a QR code is shown.\n- US-030.AC3: Given a person who is not signed in, When they open the member page address, Then no QR code is shown and they are asked to sign in.\n### Notes\nQ-011 is open (where the QR code lives); follows SA-009.\n### Traceability\nStory US-030 · Epic EPIC-06 · Persona P-01 · Traces FR-029 · MoSCoW Must\nPriority rationale: REQ-012 confirmed (QR on the member's phone); needed by US-032 (REQ-045 check-in). proposed as Must: not named on the day-one list. Q-011 open (where the QR lives).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-029",
+        "P-01",
+        "US-030",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-029",
+        "US-030",
+        "US-032"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-06 Front-desk check-in (online)"
+      ],
+      "epic_key": "GT-6",
+      "story_points": 3.0,
+      "rank": "0|i0008q:",
+      "blocks": [
+        "GT-34"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-29",
+      "issue_id": "10041",
+      "summary": "Load flags missing phone numbers and possible duplicates",
+      "statement": "As the gym owner, I want the load to flag records with problems so that staff can fix them after launch.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-052.AC1",
+          "text": "Given a row with no phone number, When the load runs, Then the member is loaded and flagged \"phone missing\"."
+        },
+        {
+          "ac_id": "US-052.AC2",
+          "text": "Given two rows with the same phone number, When the load runs, Then they are loaded as one member."
+        },
+        {
+          "ac_id": "US-052.AC3",
+          "text": "Given two rows with the same name and different phone numbers, When the load runs, Then both are loaded as they are and flagged \"possible duplicate\" for staff to review (per A-031)."
+        }
+      ],
+      "notes": "NFR-014: flags are kept only on the member record and no extra personal data is added by the load.",
+      "traceability": "Story US-052 · Epic EPIC-10 · Persona P-04 · Traces FR-050 · MoSCoW Must\nPriority rationale: REQ-038 client states the data problem (missing phones and duplicates in the Excel), not a priority. proposed: needed by US-050 (same phone = one member, A-017). Q-003 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want the load to flag records with problems so that staff can fix them after launch.\n### Acceptance criteria\n- US-052.AC1: Given a row with no phone number, When the load runs, Then the member is loaded and flagged \"phone missing\".\n- US-052.AC2: Given two rows with the same phone number, When the load runs, Then they are loaded as one member.\n- US-052.AC3: Given two rows with the same name and different phone numbers, When the load runs, Then both are loaded as they are and flagged \"possible duplicate\" for staff to review (per A-031).\n### Notes\nNFR-014: flags are kept only on the member record and no extra personal data is added by the load.\n### Traceability\nStory US-052 · Epic EPIC-10 · Persona P-04 · Traces FR-050 · MoSCoW Must\nPriority rationale: REQ-038 client states the data problem (missing phones and duplicates in the Excel), not a priority. proposed: needed by US-050 (same phone = one member, A-017). Q-003 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-050",
+        "P-04",
+        "US-052",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-050",
+        "US-052",
+        "US-050"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-10 Existing member data load and record fixing"
+      ],
+      "epic_key": "GT-10",
+      "story_points": 3.0,
+      "rank": "0|i00093:",
+      "blocks": [
+        "GT-30"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-30",
+      "issue_id": "10042",
+      "summary": "Existing members are loaded from the Excel sheet",
+      "statement": "As the gym owner, I want my existing members loaded from the Excel sheet once before launch so that I do not have to type in about 1,200 members.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-050.AC1",
+          "text": "Given the client's Excel sheet with about 1,200 rows, When the load runs, Then every row becomes a member record and none is left out (per A-031)."
+        },
+        {
+          "ac_id": "US-050.AC2",
+          "text": "Given the load has run once, When the load result is checked, Then the number of member records matches the number of rows after rows with the same phone number are combined into one member (see US-052)."
+        },
+        {
+          "ac_id": "US-050.AC3",
+          "text": "Given the load has run, When the member records are counted, Then all rows of about 1,200 members are present and the app still works for the 3,000 members expected within a year (per NFR-004)."
+        }
+      ],
+      "notes": "NFR-004: 1,200 members at launch, 3,000 within a year, across 3 branches. NFR-014 (privacy, DPDP): the loaded personal data is handled under the DPDP Act and is used only for the membership; the loaded members' WhatsApp agreement is asked at first sign-in (US-044). Q-003 is open (whether all members are loaded); follows A-031. The load is a one-time action before launch; no repeat load is described.",
+      "traceability": "Story US-050 · Epic EPIC-10 · Persona P-04 · Traces FR-048 · MoSCoW Must\nPriority rationale: REQ-026 client shares the Excel; REQ-049 (inferred). proposed: no client priority given; needed so check-in finds the 1,200 members on day one. Needs US-052. Q-003 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want my existing members loaded from the Excel sheet once before launch so that I do not have to type in about 1,200 members.\n### Acceptance criteria\n- US-050.AC1: Given the client's Excel sheet with about 1,200 rows, When the load runs, Then every row becomes a member record and none is left out (per A-031).\n- US-050.AC2: Given the load has run once, When the load result is checked, Then the number of member records matches the number of rows after rows with the same phone number are combined into one member (see US-052).\n- US-050.AC3: Given the load has run, When the member records are counted, Then all rows of about 1,200 members are present and the app still works for the 3,000 members expected within a year (per NFR-004).\n### Notes\nNFR-004: 1,200 members at launch, 3,000 within a year, across 3 branches. NFR-014 (privacy, DPDP): the loaded personal data is handled under the DPDP Act and is used only for the membership; the loaded members' WhatsApp agreement is asked at first sign-in (US-044). Q-003 is open (whether all members are loaded); follows A-031. The load is a one-time action before launch; no repeat load is described.\n### Traceability\nStory US-050 · Epic EPIC-10 · Persona P-04 · Traces FR-048 · MoSCoW Must\nPriority rationale: REQ-026 client shares the Excel; REQ-049 (inferred). proposed: no client priority given; needed so check-in finds the 1,200 members on day one. Needs US-052. Q-003 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-048",
+        "P-04",
+        "US-050",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-048",
+        "US-050",
+        "US-052"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-10 Existing member data load and record fixing"
+      ],
+      "epic_key": "GT-10",
+      "story_points": 3.0,
+      "rank": "0|i00098:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-31",
+      "issue_id": "10043",
+      "summary": "Loaded members keep their plan, expiry date and home branch",
+      "statement": "As front-desk staff, I want loaded members to have their plan, expiry date and home branch so that the expiry warning and reminders work on day one.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-051.AC1",
+          "text": "Given a row with plan \"Monthly\", expiry date 20 Jan 2027 and home branch Kothrud, When the load runs, Then the member shows these three values."
+        },
+        {
+          "ac_id": "US-051.AC2",
+          "text": "Given a loaded member whose expiry date in the sheet is 9 Jan 2027, When staff check them in on 10 Jan 2027, Then the expiry warning shows."
+        },
+        {
+          "ac_id": "US-051.AC3",
+          "text": "Given a row with no plan or no expiry date, When the load runs, Then the member is loaded as expired and flagged \"plan or expiry missing\" (per A-038)."
+        }
+      ],
+      "notes": "Q-021 is open (Excel columns); plan, expiry date and home branch are assumed. NFR-014: the loaded member data is handled as in US-050.",
+      "traceability": "Story US-051 · Epic EPIC-10 · Persona P-02 · Traces FR-049 · MoSCoW Must\nPriority rationale: REQ-050 (inferred). proposed: no client priority given; plan and expiry make the expiry warning work on day one (REQ-002). Q-021 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want loaded members to have their plan, expiry date and home branch so that the expiry warning and reminders work on day one.\n### Acceptance criteria\n- US-051.AC1: Given a row with plan \"Monthly\", expiry date 20 Jan 2027 and home branch Kothrud, When the load runs, Then the member shows these three values.\n- US-051.AC2: Given a loaded member whose expiry date in the sheet is 9 Jan 2027, When staff check them in on 10 Jan 2027, Then the expiry warning shows.\n- US-051.AC3: Given a row with no plan or no expiry date, When the load runs, Then the member is loaded as expired and flagged \"plan or expiry missing\" (per A-038).\n### Notes\nQ-021 is open (Excel columns); plan, expiry date and home branch are assumed. NFR-014: the loaded member data is handled as in US-050.\n### Traceability\nStory US-051 · Epic EPIC-10 · Persona P-02 · Traces FR-049 · MoSCoW Must\nPriority rationale: REQ-050 (inferred). proposed: no client priority given; plan and expiry make the expiry warning work on day one (REQ-002). Q-021 open.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-049",
+        "P-02",
+        "US-051",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-049",
+        "US-051"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-10 Existing member data load and record fixing"
+      ],
+      "epic_key": "GT-10",
+      "story_points": 3.0,
+      "rank": "0|i0009k:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-32",
+      "issue_id": "10044",
+      "summary": "Staff check a member in by phone number",
+      "statement": "As front-desk staff, I want to enter a member's phone number to check them in so that I can let them in quickly.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-031.AC1",
+          "text": "Given a member with an active membership expiring 20 Jan 2027, When staff enter their phone number on the check-in screen, Then the screen shows name, plan, home branch and expiry date and a clear \"OK\" result, and the check-in is recorded."
+        },
+        {
+          "ac_id": "US-031.AC2",
+          "text": "Given a member whose home branch is Kothrud, When staff at another branch enter the member's number, Then the member is found and checked in (per A-018)."
+        },
+        {
+          "ac_id": "US-031.AC3",
+          "text": "Given an online tablet, When staff enter a phone number, Then the result shows in under 2 seconds (NFR-005) and the whole check-in takes staff no more than 10 seconds from entering the number (NFR-003)."
+        }
+      ],
+      "notes": "Not-found, expired and repeat check-in cases are US-033 to US-035. NFR-001: the check-in screen runs in the tablet's browser, nothing to install from an app store. NFR-018: readable text, good contrast and labelled buttons on the check-in screens (also for US-032 to US-035).",
+      "traceability": "Story US-031 · Epic EPIC-06 · Persona P-02 · Traces FR-030 · MoSCoW Must\nPriority rationale: REQ-011 confirmed; REQ-045 check-in on day one.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to enter a member's phone number to check them in so that I can let them in quickly.\n### Acceptance criteria\n- US-031.AC1: Given a member with an active membership expiring 20 Jan 2027, When staff enter their phone number on the check-in screen, Then the screen shows name, plan, home branch and expiry date and a clear \"OK\" result, and the check-in is recorded.\n- US-031.AC2: Given a member whose home branch is Kothrud, When staff at another branch enter the member's number, Then the member is found and checked in (per A-018).\n- US-031.AC3: Given an online tablet, When staff enter a phone number, Then the result shows in under 2 seconds (NFR-005) and the whole check-in takes staff no more than 10 seconds from entering the number (NFR-003).\n### Notes\nNot-found, expired and repeat check-in cases are US-033 to US-035. NFR-001: the check-in screen runs in the tablet's browser, nothing to install from an app store. NFR-018: readable text, good contrast and labelled buttons on the check-in screens (also for US-032 to US-035).\n### Traceability\nStory US-031 · Epic EPIC-06 · Persona P-02 · Traces FR-030 · MoSCoW Must\nPriority rationale: REQ-011 confirmed; REQ-045 check-in on day one.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-030",
+        "P-02",
+        "US-031",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-030",
+        "US-031"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-06 Front-desk check-in (online)"
+      ],
+      "epic_key": "GT-6",
+      "story_points": 3.0,
+      "rank": "0|i0009o:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-33",
+      "issue_id": "10045",
+      "summary": "Staff see an expiry warning and decide",
+      "statement": "As front-desk staff, I want a clear warning when a membership has expired so that expired members do not walk in unnoticed.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-033.AC1",
+          "text": "Given a member whose plan expired yesterday (for example 9 Jan 2027, today 10 Jan 2027), When staff check them in, Then the screen shows a clear expiry warning with the member's name, plan and the expiry date 9 Jan 2027."
+        },
+        {
+          "ac_id": "US-033.AC2",
+          "text": "Given the expiry warning is shown, When staff choose \"let in\", Then the check-in is recorded as \"expired\" (per PD-005)."
+        },
+        {
+          "ac_id": "US-033.AC3",
+          "text": "Given the expiry warning is shown, When staff choose \"do not let in\", Then the member is not let in by the app and the screen offers the renewal or cash payment screen (per PD-005)."
+        },
+        {
+          "ac_id": "US-033.AC4",
+          "text": "Given a trial member whose trial has ended, When staff check them in, Then the same warning shows with the trial end date."
+        },
+        {
+          "ac_id": "US-033.AC5",
+          "text": "Given any check-in of an expired or trial-ended member, When the check-in screen loads, Then the warning is always shown (PD-002 target: 100%)."
+        }
+      ],
+      "notes": "The app does not lock a door or block the member (A-002). Questions to raise item 3 (let-in right of staff vs. manager) is open; do not add a manager-only rule.",
+      "traceability": "Story US-033 · Epic EPIC-06 · Persona P-02 · Traces FR-032 · MoSCoW Must\nPriority rationale: REQ-002 client goal and REQ-013 client: the expiry warning. Day one is proposed (Q-020 open, SA-002).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want a clear warning when a membership has expired so that expired members do not walk in unnoticed.\n### Acceptance criteria\n- US-033.AC1: Given a member whose plan expired yesterday (for example 9 Jan 2027, today 10 Jan 2027), When staff check them in, Then the screen shows a clear expiry warning with the member's name, plan and the expiry date 9 Jan 2027.\n- US-033.AC2: Given the expiry warning is shown, When staff choose \"let in\", Then the check-in is recorded as \"expired\" (per PD-005).\n- US-033.AC3: Given the expiry warning is shown, When staff choose \"do not let in\", Then the member is not let in by the app and the screen offers the renewal or cash payment screen (per PD-005).\n- US-033.AC4: Given a trial member whose trial has ended, When staff check them in, Then the same warning shows with the trial end date.\n- US-033.AC5: Given any check-in of an expired or trial-ended member, When the check-in screen loads, Then the warning is always shown (PD-002 target: 100%).\n### Notes\nThe app does not lock a door or block the member (A-002). Questions to raise item 3 (let-in right of staff vs. manager) is open; do not add a manager-only rule.\n### Traceability\nStory US-033 · Epic EPIC-06 · Persona P-02 · Traces FR-032 · MoSCoW Must\nPriority rationale: REQ-002 client goal and REQ-013 client: the expiry warning. Day one is proposed (Q-020 open, SA-002).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-032",
+        "P-02",
+        "US-033",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-032",
+        "US-033"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-06 Front-desk check-in (online)"
+      ],
+      "epic_key": "GT-6",
+      "story_points": 8.0,
+      "rank": "0|i0009z:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-34",
+      "issue_id": "10046",
+      "summary": "Staff check a member in by scanning the QR code",
+      "statement": "As front-desk staff, I want to scan the QR code on a member's phone with the tablet camera so that check-in needs no typing.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-032.AC1",
+          "text": "Given a member showing their QR code, When staff scan it with the tablet camera in the tablet's browser, Then the screen shows name, plan, home branch and expiry date and records the check-in as in US-031."
+        },
+        {
+          "ac_id": "US-032.AC2",
+          "text": "Given a trial member within their 7 days, When staff scan their QR code, Then the check-in is recorded like any other member's."
+        },
+        {
+          "ac_id": "US-032.AC3",
+          "text": "Given a QR code that does not belong to any member, When staff scan it, Then the screen shows \"member not found\" (see US-034)."
+        }
+      ],
+      "notes": "A-021, A-037. NFR-011: one Android tablet per desk. NFR-003: check-in within 10 seconds of scanning.",
+      "traceability": "Story US-032 · Epic EPIC-06 · Persona P-02 · Traces FR-031 · MoSCoW Must\nPriority rationale: REQ-012 confirmed and REQ-036 client: QR check-in on the Android tablet; REQ-045. Needs US-030.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to scan the QR code on a member's phone with the tablet camera so that check-in needs no typing.\n### Acceptance criteria\n- US-032.AC1: Given a member showing their QR code, When staff scan it with the tablet camera in the tablet's browser, Then the screen shows name, plan, home branch and expiry date and records the check-in as in US-031.\n- US-032.AC2: Given a trial member within their 7 days, When staff scan their QR code, Then the check-in is recorded like any other member's.\n- US-032.AC3: Given a QR code that does not belong to any member, When staff scan it, Then the screen shows \"member not found\" (see US-034).\n### Notes\nA-021, A-037. NFR-011: one Android tablet per desk. NFR-003: check-in within 10 seconds of scanning.\n### Traceability\nStory US-032 · Epic EPIC-06 · Persona P-02 · Traces FR-031 · MoSCoW Must\nPriority rationale: REQ-012 confirmed and REQ-036 client: QR check-in on the Android tablet; REQ-045. Needs US-030.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-031",
+        "P-02",
+        "US-032",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-031",
+        "US-032",
+        "US-030"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-06 Front-desk check-in (online)"
+      ],
+      "epic_key": "GT-6",
+      "story_points": 3.0,
+      "rank": "0|i000a2:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-35",
+      "issue_id": "10047",
+      "summary": "Staff see \"member not found\" and can retry or sign up the person",
+      "statement": "As front-desk staff, I want a clear message when no member is found so that I can retry or sign the person up and not get stuck at the door.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-034.AC1",
+          "text": "Given a phone number that is not registered, When staff enter it at check-in, Then the screen says \"member not found\" and offers \"try again\" and \"start a sign-up\" (per PD-006)."
+        },
+        {
+          "ac_id": "US-034.AC2",
+          "text": "Given the \"member not found\" screen, When staff choose \"start a sign-up\", Then the sign-up opens on the same device (per A-027)."
+        },
+        {
+          "ac_id": "US-034.AC3",
+          "text": "Given the \"member not found\" screen, When staff choose \"try again\", Then the check-in screen is empty and ready for another number or scan."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-034 · Epic EPIC-06 · Persona P-02 · Traces FR-033 · MoSCoW Must\nPriority rationale: PD-006: staff must not be stuck at the door when a member is not found; needed by US-024.AC5. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want a clear message when no member is found so that I can retry or sign the person up and not get stuck at the door.\n### Acceptance criteria\n- US-034.AC1: Given a phone number that is not registered, When staff enter it at check-in, Then the screen says \"member not found\" and offers \"try again\" and \"start a sign-up\" (per PD-006).\n- US-034.AC2: Given the \"member not found\" screen, When staff choose \"start a sign-up\", Then the sign-up opens on the same device (per A-027).\n- US-034.AC3: Given the \"member not found\" screen, When staff choose \"try again\", Then the check-in screen is empty and ready for another number or scan.\n### Traceability\nStory US-034 · Epic EPIC-06 · Persona P-02 · Traces FR-033 · MoSCoW Must\nPriority rationale: PD-006: staff must not be stuck at the door when a member is not found; needed by US-024.AC5. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-033",
+        "P-02",
+        "US-034",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-033",
+        "US-034",
+        "US-024"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-06 Front-desk check-in (online)"
+      ],
+      "epic_key": "GT-6",
+      "story_points": 3.0,
+      "rank": "0|i000ac:",
+      "blocks": [
+        "GT-36"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-36",
+      "issue_id": "10048",
+      "summary": "Staff record a cash payment",
+      "statement": "As front-desk staff, I want to record a cash payment by choosing the member and the plan so that the membership is extended and the payment is counted.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-024.AC1",
+          "text": "Given staff have found a member with an active membership expiring 20 Jan 2027, When they choose the monthly plan and confirm the cash was received on 15 Jan 2027, Then the amount is the plan's price and the expiry date becomes 20 Feb 2027, the same as for an online renewal (per PD-013)."
+        },
+        {
+          "ac_id": "US-024.AC2",
+          "text": "Given a cash payment was recorded, When the member opens their payment history, Then the payment shows as \"cash\" with its date, plan and amount."
+        },
+        {
+          "ac_id": "US-024.AC3",
+          "text": "Given a cash payment was recorded, When the owner looks at revenue for that month, Then the amount is included (per SA-004)."
+        },
+        {
+          "ac_id": "US-024.AC4",
+          "text": "Given a cash payment was recorded, When the record is opened, Then it shows which staff member entered it (per PD-013)."
+        },
+        {
+          "ac_id": "US-024.AC5",
+          "text": "Given staff on the cash payment screen, When they search for a member who is not found, Then the screen says \"member not found\", records no payment and offers to sign the person up first (FR-033, see US-034)."
+        }
+      ],
+      "notes": "Q-005 is open. NFR-018: readable text, good contrast and labelled buttons on the cash payment screen. Refunds are not in the app. Branch managers cannot record cash (US-009).",
+      "traceability": "Story US-024 · Epic EPIC-04 · Persona P-02 · Traces FR-023 · MoSCoW Must\nPriority rationale: Members pay cash today (SRC-001, see register Summary); US-053 note says a flagged \"plan or expiry missing\" record is cleared by a cash payment. Q-005 open: proposed, no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to record a cash payment by choosing the member and the plan so that the membership is extended and the payment is counted.\n### Acceptance criteria\n- US-024.AC1: Given staff have found a member with an active membership expiring 20 Jan 2027, When they choose the monthly plan and confirm the cash was received on 15 Jan 2027, Then the amount is the plan's price and the expiry date becomes 20 Feb 2027, the same as for an online renewal (per PD-013).\n- US-024.AC2: Given a cash payment was recorded, When the member opens their payment history, Then the payment shows as \"cash\" with its date, plan and amount.\n- US-024.AC3: Given a cash payment was recorded, When the owner looks at revenue for that month, Then the amount is included (per SA-004).\n- US-024.AC4: Given a cash payment was recorded, When the record is opened, Then it shows which staff member entered it (per PD-013).\n- US-024.AC5: Given staff on the cash payment screen, When they search for a member who is not found, Then the screen says \"member not found\", records no payment and offers to sign the person up first (FR-033, see US-034).\n### Notes\nQ-005 is open. NFR-018: readable text, good contrast and labelled buttons on the cash payment screen. Refunds are not in the app. Branch managers cannot record cash (US-009).\n### Traceability\nStory US-024 · Epic EPIC-04 · Persona P-02 · Traces FR-023 · MoSCoW Must\nPriority rationale: Members pay cash today (SRC-001, see register Summary); US-053 note says a flagged \"plan or expiry missing\" record is cleared by a cash payment. Q-005 open: proposed, no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-023",
+        "P-02",
+        "US-024",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-023",
+        "US-024",
+        "US-053"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-04 Online payments (Razorpay)"
+      ],
+      "epic_key": "GT-4",
+      "story_points": 8.0,
+      "rank": "0|i000ae:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-37",
+      "issue_id": "10049",
+      "summary": "Member pays the renewal online",
+      "statement": "As a member, I want to pay my renewal online the same way as at sign-up so that I see my new expiry date straight away.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-029.AC1",
+          "text": "Given a member who chose a renewal plan, When they pay on Razorpay with UPI or a card and Razorpay confirms, Then the page shows the new expiry date and a receipt."
+        },
+        {
+          "ac_id": "US-029.AC2",
+          "text": "Given a renewal payment that fails, When the member returns to the app, Then the system shows that the payment did not go through, the expiry date is unchanged and the member can try again."
+        },
+        {
+          "ac_id": "US-029.AC3",
+          "text": "Given a renewal payment not yet confirmed, When the member returns, Then \"payment is being confirmed\" is shown and no second payment is requested."
+        }
+      ],
+      "notes": "Q-006 is open (whether online renewal is wanted); this follows SA-005. Payment rules in US-019 to US-023 apply.",
+      "traceability": "Story US-029 · Epic EPIC-05 · Persona P-01 · Traces FR-028 · MoSCoW Must\nPriority rationale: Needed by US-028 (renewal needs payment). REQ-010 is inferred, confidence low; Q-006 open, SA-005. proposed.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to pay my renewal online the same way as at sign-up so that I see my new expiry date straight away.\n### Acceptance criteria\n- US-029.AC1: Given a member who chose a renewal plan, When they pay on Razorpay with UPI or a card and Razorpay confirms, Then the page shows the new expiry date and a receipt.\n- US-029.AC2: Given a renewal payment that fails, When the member returns to the app, Then the system shows that the payment did not go through, the expiry date is unchanged and the member can try again.\n- US-029.AC3: Given a renewal payment not yet confirmed, When the member returns, Then \"payment is being confirmed\" is shown and no second payment is requested.\n### Notes\nQ-006 is open (whether online renewal is wanted); this follows SA-005. Payment rules in US-019 to US-023 apply.\n### Traceability\nStory US-029 · Epic EPIC-05 · Persona P-01 · Traces FR-028 · MoSCoW Must\nPriority rationale: Needed by US-028 (renewal needs payment). REQ-010 is inferred, confidence low; Q-006 open, SA-005. proposed.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-028",
+        "P-01",
+        "US-029",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-028",
+        "US-029",
+        "US-028"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-05 Member self-service and renewal"
+      ],
+      "epic_key": "GT-5",
+      "story_points": 3.0,
+      "rank": "0|i000an:",
+      "blocks": [
+        "GT-38"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-38",
+      "issue_id": "10050",
+      "summary": "Member renews from their own page",
+      "statement": "As a member, I want to renew from my own page before or after my expiry date so that I do not have to go to the desk.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-028.AC1",
+          "text": "Given a member whose membership expires 20 Jan 2027, When they choose a monthly renewal and the payment is confirmed on 15 Jan 2027, Then the new expiry date is 20 Feb 2027 (per A-003, PD-010)."
+        },
+        {
+          "ac_id": "US-028.AC2",
+          "text": "Given a member whose membership expired on 10 Jan 2027, When they renew monthly and the payment is confirmed on 15 Jan 2027, Then the membership runs from 15 Jan 2027 to 15 Feb 2027."
+        },
+        {
+          "ac_id": "US-028.AC3",
+          "text": "Given a member choosing a plan to renew, When the plan is chosen, Then the screen shows the new expiry date before payment, calculated by the rule above."
+        },
+        {
+          "ac_id": "US-028.AC4",
+          "text": "Given a member who follows the renewal link in a WhatsApp reminder, When they have signed in, Then the renewal screen opens."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-028 · Epic EPIC-05 · Persona P-01 · Traces FR-027 · MoSCoW Must\nPriority rationale: REQ-009 states the feature only (no client priority). proposed: member can renew; REQ-048 goal. Needs US-029.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to renew from my own page before or after my expiry date so that I do not have to go to the desk.\n### Acceptance criteria\n- US-028.AC1: Given a member whose membership expires 20 Jan 2027, When they choose a monthly renewal and the payment is confirmed on 15 Jan 2027, Then the new expiry date is 20 Feb 2027 (per A-003, PD-010).\n- US-028.AC2: Given a member whose membership expired on 10 Jan 2027, When they renew monthly and the payment is confirmed on 15 Jan 2027, Then the membership runs from 15 Jan 2027 to 15 Feb 2027.\n- US-028.AC3: Given a member choosing a plan to renew, When the plan is chosen, Then the screen shows the new expiry date before payment, calculated by the rule above.\n- US-028.AC4: Given a member who follows the renewal link in a WhatsApp reminder, When they have signed in, Then the renewal screen opens.\n### Traceability\nStory US-028 · Epic EPIC-05 · Persona P-01 · Traces FR-027 · MoSCoW Must\nPriority rationale: REQ-009 states the feature only (no client priority). proposed: member can renew; REQ-048 goal. Needs US-029.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-027",
+        "P-01",
+        "US-028",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-027",
+        "US-028",
+        "US-029"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-05 Member self-service and renewal"
+      ],
+      "epic_key": "GT-5",
+      "story_points": 5.0,
+      "rank": "0|i000ao:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-39",
+      "issue_id": "10051",
+      "summary": "Staff and managers list the flagged members of their branch",
+      "statement": "As front-desk staff or a branch manager, I want a list of the flagged members of my own branch so that I know which records to fix.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-053.AC1",
+          "text": "Given a Kothrud staff user, When they open \"Records to fix\", Then they see only Kothrud members flagged \"phone missing\", \"plan or expiry missing\" or \"possible duplicate\" and can filter by flag."
+        },
+        {
+          "ac_id": "US-053.AC2",
+          "text": "Given a Kothrud branch manager, When they open \"Records to fix\", Then they see the same list for Kothrud only."
+        },
+        {
+          "ac_id": "US-053.AC3",
+          "text": "Given a flagged member of another branch, When a Kothrud staff user looks for them in the list, Then they are not listed (per A-018)."
+        }
+      ],
+      "notes": "A flag for \"plan or expiry missing\" is cleared by recording a cash payment (US-024); the app has no function to type in a plan or expiry date directly.",
+      "traceability": "Story US-053 · Epic EPIC-10 · Persona P-02 · Traces FR-051 · MoSCoW Must\nPriority rationale: REQ-038 client: staff will fix records after launch; REQ-039 (inferred) says in the app. proposed: no client priority given. Needs US-052. In the MVP for front-desk staff only (US-053.AC1, AC3); the branch manager case (US-053.AC2) is tested in R2 with US-009. Q-003, A-031, A-038 (assumed load behaviour).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff or a branch manager, I want a list of the flagged members of my own branch so that I know which records to fix.\n### Acceptance criteria\n- US-053.AC1: Given a Kothrud staff user, When they open \"Records to fix\", Then they see only Kothrud members flagged \"phone missing\", \"plan or expiry missing\" or \"possible duplicate\" and can filter by flag.\n- US-053.AC2: Given a Kothrud branch manager, When they open \"Records to fix\", Then they see the same list for Kothrud only.\n- US-053.AC3: Given a flagged member of another branch, When a Kothrud staff user looks for them in the list, Then they are not listed (per A-018).\n### Notes\nA flag for \"plan or expiry missing\" is cleared by recording a cash payment (US-024); the app has no function to type in a plan or expiry date directly.\n### Traceability\nStory US-053 · Epic EPIC-10 · Persona P-02 · Traces FR-051 · MoSCoW Must\nPriority rationale: REQ-038 client: staff will fix records after launch; REQ-039 (inferred) says in the app. proposed: no client priority given. Needs US-052. In the MVP for front-desk staff only (US-053.AC1, AC3); the branch manager case (US-053.AC2) is tested in R2 with US-009. Q-003, A-031, A-038 (assumed load behaviour).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-051",
+        "P-02",
+        "US-053",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-051",
+        "US-053",
+        "US-052",
+        "US-009"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-10 Existing member data load and record fixing"
+      ],
+      "epic_key": "GT-10",
+      "story_points": 3.0,
+      "rank": "0|i000aw:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-40",
+      "issue_id": "10052",
+      "summary": "Staff add a missing phone number",
+      "statement": "As front-desk staff, I want to add a missing phone number to a member so that they can sign in and get reminders.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-054.AC1",
+          "text": "Given a member flagged \"phone missing\", When staff enter a phone number that no other member has, Then the number is saved and the flag is removed."
+        },
+        {
+          "ac_id": "US-054.AC2",
+          "text": "Given a member flagged \"phone missing\", When staff enter a number that already belongs to another member, Then the system refuses, names that member and does not save the number (per A-017)."
+        },
+        {
+          "ac_id": "US-054.AC3",
+          "text": "Given the refusal in US-054.AC2, When the two records are the same person, Then staff can mark the record as a duplicate of the other (see US-055)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-054 · Epic EPIC-10 · Persona P-02 · Traces FR-051 · MoSCoW Must\nPriority rationale: Members with no phone number cannot sign in or be looked up (A-031); REQ-039 (inferred). proposed: no client priority given. Needs US-053. US-054.AC3 points to US-055 (R2).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to add a missing phone number to a member so that they can sign in and get reminders.\n### Acceptance criteria\n- US-054.AC1: Given a member flagged \"phone missing\", When staff enter a phone number that no other member has, Then the number is saved and the flag is removed.\n- US-054.AC2: Given a member flagged \"phone missing\", When staff enter a number that already belongs to another member, Then the system refuses, names that member and does not save the number (per A-017).\n- US-054.AC3: Given the refusal in US-054.AC2, When the two records are the same person, Then staff can mark the record as a duplicate of the other (see US-055).\n### Traceability\nStory US-054 · Epic EPIC-10 · Persona P-02 · Traces FR-051 · MoSCoW Must\nPriority rationale: Members with no phone number cannot sign in or be looked up (A-031); REQ-039 (inferred). proposed: no client priority given. Needs US-053. US-054.AC3 points to US-055 (R2).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-051",
+        "P-02",
+        "US-054",
+        "moscow-must"
+      ],
+      "requirement_ids": [
+        "FR-051",
+        "US-054",
+        "US-053",
+        "US-055"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "must",
+      "priority": "Medium",
+      "fix_versions": [
+        "MVP"
+      ],
+      "components": [
+        "MOD-10 Existing member data load and record fixing"
+      ],
+      "epic_key": "GT-10",
+      "story_points": 3.0,
+      "rank": "0|i000bb:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-41",
+      "issue_id": "10053",
+      "summary": "Member sees payment history",
+      "statement": "As a member, I want to see my payment history so that I can check what I have paid.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-027.AC1",
+          "text": "Given a member with an online payment on 10 Nov 2026 and a cash payment on 10 Dec 2026, When they open payment history, Then the newest payment (10 Dec 2026) is first and each row shows date, plan, amount, method (online or cash) and a receipt."
+        },
+        {
+          "ac_id": "US-027.AC2",
+          "text": "Given a member who has made no payment (for example a trial member), When they open payment history, Then the list is empty with a clear message and no error."
+        },
+        {
+          "ac_id": "US-027.AC3",
+          "text": "Given a payment recorded by staff as cash, When the member opens payment history, Then that payment is listed (per SA-004)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-027 · Epic EPIC-05 · Persona P-01 · Traces FR-026 · MoSCoW Should\nPriority rationale: REQ-008 client: payment history. Not on the client's day-one list (REQ-045).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want to see my payment history so that I can check what I have paid.\n### Acceptance criteria\n- US-027.AC1: Given a member with an online payment on 10 Nov 2026 and a cash payment on 10 Dec 2026, When they open payment history, Then the newest payment (10 Dec 2026) is first and each row shows date, plan, amount, method (online or cash) and a receipt.\n- US-027.AC2: Given a member who has made no payment (for example a trial member), When they open payment history, Then the list is empty with a clear message and no error.\n- US-027.AC3: Given a payment recorded by staff as cash, When the member opens payment history, Then that payment is listed (per SA-004).\n### Traceability\nStory US-027 · Epic EPIC-05 · Persona P-01 · Traces FR-026 · MoSCoW Should\nPriority rationale: REQ-008 client: payment history. Not on the client's day-one list (REQ-045).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-026",
+        "P-01",
+        "US-027",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-026",
+        "US-027"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-05 Member self-service and renewal"
+      ],
+      "epic_key": "GT-5",
+      "story_points": 3.0,
+      "rank": "0|i000bi:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-42",
+      "issue_id": "10054",
+      "summary": "Member receives a simple receipt",
+      "statement": "As a member, I want a receipt after paying so that I have proof of payment.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-023.AC1",
+          "text": "Given a successful online payment, When the member views the receipt in the app, Then it shows member name, branch, plan, amount, payment date, payment method and receipt number (per PD-012)."
+        },
+        {
+          "ac_id": "US-023.AC2",
+          "text": "Given a member who has agreed to WhatsApp messages, When their payment succeeds, Then the same receipt is also sent on WhatsApp."
+        },
+        {
+          "ac_id": "US-023.AC3",
+          "text": "Given a member who has not agreed to WhatsApp messages, When their payment succeeds, Then the receipt is available in the app and none is sent on WhatsApp (per NFR-015)."
+        },
+        {
+          "ac_id": "US-023.AC4",
+          "text": "Given any receipt, When it is shown, Then it is not a GST invoice and carries no GST details."
+        }
+      ],
+      "notes": "Open: Q-013 (receipts); Questions to raise item 5 (receipt in app only for members who have not agreed).",
+      "traceability": "Story US-023 · Epic EPIC-04 · Persona P-01 · Traces FR-022 · MoSCoW Should\nPriority rationale: Receipt: Q-013 open, PD-012. proposed: no client priority given. Receipt references in US-022.AC3, US-027.AC1 and US-029.AC1 complete here.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want a receipt after paying so that I have proof of payment.\n### Acceptance criteria\n- US-023.AC1: Given a successful online payment, When the member views the receipt in the app, Then it shows member name, branch, plan, amount, payment date, payment method and receipt number (per PD-012).\n- US-023.AC2: Given a member who has agreed to WhatsApp messages, When their payment succeeds, Then the same receipt is also sent on WhatsApp.\n- US-023.AC3: Given a member who has not agreed to WhatsApp messages, When their payment succeeds, Then the receipt is available in the app and none is sent on WhatsApp (per NFR-015).\n- US-023.AC4: Given any receipt, When it is shown, Then it is not a GST invoice and carries no GST details.\n### Notes\nOpen: Q-013 (receipts); Questions to raise item 5 (receipt in app only for members who have not agreed).\n### Traceability\nStory US-023 · Epic EPIC-04 · Persona P-01 · Traces FR-022 · MoSCoW Should\nPriority rationale: Receipt: Q-013 open, PD-012. proposed: no client priority given. Receipt references in US-022.AC3, US-027.AC1 and US-029.AC1 complete here.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-022",
+        "P-01",
+        "US-023",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-022",
+        "US-023",
+        "US-022",
+        "US-027",
+        "US-029"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-04 Online payments (Razorpay)"
+      ],
+      "epic_key": "GT-4",
+      "story_points": 5.0,
+      "rank": "0|i000bw:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-43",
+      "issue_id": "10055",
+      "summary": "New and trial members are asked about WhatsApp messages",
+      "statement": "As a new or trial member, I want to be asked whether I agree to WhatsApp messages so that I only get messages I accept.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-043.AC1",
+          "text": "Given a person on the sign-up form, When they complete it, Then they are asked whether they agree to WhatsApp messages and their answer is recorded (per SA-011)."
+        },
+        {
+          "ac_id": "US-043.AC2",
+          "text": "Given a person starting a free trial, When they complete the trial form, Then the same question is asked and recorded."
+        },
+        {
+          "ac_id": "US-043.AC3",
+          "text": "Given a member who answered \"no\", When they later use the app, Then the app works as normal and they get no reminders or receipts on WhatsApp (per NFR-015)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-043 · Epic EPIC-09 · Persona P-01 · Traces FR-042 · MoSCoW Should\nPriority rationale: NFR-015 compliance: needed by US-045 to US-047 and for WhatsApp receipts. proposed: no client priority given. See decision 6.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a new or trial member, I want to be asked whether I agree to WhatsApp messages so that I only get messages I accept.\n### Acceptance criteria\n- US-043.AC1: Given a person on the sign-up form, When they complete it, Then they are asked whether they agree to WhatsApp messages and their answer is recorded (per SA-011).\n- US-043.AC2: Given a person starting a free trial, When they complete the trial form, Then the same question is asked and recorded.\n- US-043.AC3: Given a member who answered \"no\", When they later use the app, Then the app works as normal and they get no reminders or receipts on WhatsApp (per NFR-015).\n### Traceability\nStory US-043 · Epic EPIC-09 · Persona P-01 · Traces FR-042 · MoSCoW Should\nPriority rationale: NFR-015 compliance: needed by US-045 to US-047 and for WhatsApp receipts. proposed: no client priority given. See decision 6.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-042",
+        "P-01",
+        "US-043",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-042",
+        "US-043",
+        "NFR-015",
+        "US-045",
+        "US-047"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 3.0,
+      "rank": "0|i000c2:",
+      "blocks": [
+        "GT-45",
+        "GT-46",
+        "GT-47"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-44",
+      "issue_id": "10056",
+      "summary": "Existing member answers the WhatsApp question at first sign-in",
+      "statement": "As a member loaded from the Excel sheet, I want to be asked about WhatsApp messages when I first sign in so that I can start getting reminders.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-044.AC1",
+          "text": "Given an Excel-loaded member who has not yet answered, When they sign in for the first time, Then the app shows their plan and expiry date and the question \"Do you agree to get reminders and receipts from FitZone on WhatsApp?\" with \"agree\" and \"not now\" choices."
+        },
+        {
+          "ac_id": "US-044.AC2",
+          "text": "Given the question, When the member chooses \"agree\", Then the agreement is recorded and reminders start for them."
+        },
+        {
+          "ac_id": "US-044.AC3",
+          "text": "Given the question, When the member chooses \"not now\", Then the app works as normal, they get no reminders, and the question appears again at their next sign-in (per PD-023)."
+        },
+        {
+          "ac_id": "US-044.AC4",
+          "text": "Given a member who answered \"agree\" earlier, When they sign in again, Then the question is not shown."
+        }
+      ],
+      "notes": "Q-019 is open (existing members' agreement). The sign-in code is sent before agreement (A-035).",
+      "traceability": "Story US-044 · Epic EPIC-09 · Persona P-01 · Traces FR-042 · MoSCoW Should\nPriority rationale: Q-019 open; needed by US-045 for the 1,200 loaded members (PD-023).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member loaded from the Excel sheet, I want to be asked about WhatsApp messages when I first sign in so that I can start getting reminders.\n### Acceptance criteria\n- US-044.AC1: Given an Excel-loaded member who has not yet answered, When they sign in for the first time, Then the app shows their plan and expiry date and the question \"Do you agree to get reminders and receipts from FitZone on WhatsApp?\" with \"agree\" and \"not now\" choices.\n- US-044.AC2: Given the question, When the member chooses \"agree\", Then the agreement is recorded and reminders start for them.\n- US-044.AC3: Given the question, When the member chooses \"not now\", Then the app works as normal, they get no reminders, and the question appears again at their next sign-in (per PD-023).\n- US-044.AC4: Given a member who answered \"agree\" earlier, When they sign in again, Then the question is not shown.\n### Notes\nQ-019 is open (existing members' agreement). The sign-in code is sent before agreement (A-035).\n### Traceability\nStory US-044 · Epic EPIC-09 · Persona P-01 · Traces FR-042 · MoSCoW Should\nPriority rationale: Q-019 open; needed by US-045 for the 1,200 loaded members (PD-023).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-042",
+        "P-01",
+        "US-044",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-042",
+        "US-044",
+        "US-045"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 5.0,
+      "rank": "0|i000cf:",
+      "blocks": [
+        "GT-46"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-45",
+      "issue_id": "10057",
+      "summary": "Reminders go only to eligible members",
+      "statement": "As the gym owner, I want reminders sent only to members who agreed, have a phone number and are not on a trial so that FitZone sends only permitted messages.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-047.AC1",
+          "text": "Given a member with an active membership who has not agreed to WhatsApp messages, When their reminder date comes, Then no reminder is sent (per NFR-015)."
+        },
+        {
+          "ac_id": "US-047.AC2",
+          "text": "Given a member with no phone number, When their reminder date comes, Then no reminder is sent."
+        },
+        {
+          "ac_id": "US-047.AC3",
+          "text": "Given a member on a free trial, When 7 days or 1 day before the trial end comes, Then no reminder is sent (per A-034)."
+        },
+        {
+          "ac_id": "US-047.AC4",
+          "text": "Given a member with an active membership who agreed and has a phone number, When their reminder date comes, Then a reminder is sent."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-047 · Epic EPIC-09 · Persona P-04 · Traces FR-045 · MoSCoW Should\nPriority rationale: NFR-015: only agreed members get reminders; must ship with US-045.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want reminders sent only to members who agreed, have a phone number and are not on a trial so that FitZone sends only permitted messages.\n### Acceptance criteria\n- US-047.AC1: Given a member with an active membership who has not agreed to WhatsApp messages, When their reminder date comes, Then no reminder is sent (per NFR-015).\n- US-047.AC2: Given a member with no phone number, When their reminder date comes, Then no reminder is sent.\n- US-047.AC3: Given a member on a free trial, When 7 days or 1 day before the trial end comes, Then no reminder is sent (per A-034).\n- US-047.AC4: Given a member with an active membership who agreed and has a phone number, When their reminder date comes, Then a reminder is sent.\n### Traceability\nStory US-047 · Epic EPIC-09 · Persona P-04 · Traces FR-045 · MoSCoW Should\nPriority rationale: NFR-015: only agreed members get reminders; must ship with US-045.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-045",
+        "P-04",
+        "US-047",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-045",
+        "US-047",
+        "NFR-015",
+        "US-045"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 5.0,
+      "rank": "0|i000ck:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-46",
+      "issue_id": "10058",
+      "summary": "Member gets a WhatsApp reminder 7 days before expiry",
+      "statement": "As a member, I want a WhatsApp reminder 7 days before my membership expires so that I can renew in time.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-045.AC1",
+          "text": "Given a member who agreed to WhatsApp messages and whose active membership expires on 20 Jan 2027, When the time is 09:00 India time on 13 Jan 2027, Then the member receives a WhatsApp message with their name, the expiry date 20 Jan 2027 and a link to renew (per PD-015)."
+        },
+        {
+          "ac_id": "US-045.AC2",
+          "text": "Given a member who renewed on 12 Jan 2027, so the old expiry date of 20 Jan 2027 no longer applies, When 13 Jan 2027 arrives, Then no reminder for the old expiry date is sent (per A-004)."
+        },
+        {
+          "ac_id": "US-045.AC3",
+          "text": "Given the reminder, When the member opens the link, Then they are taken to sign-in and then to the renewal screen."
+        }
+      ],
+      "notes": "Fixed English template (PD-015).",
+      "traceability": "Story US-045 · Epic EPIC-09 · Persona P-01 · Traces FR-043 · MoSCoW Should\nPriority rationale: REQ-017 client (7-day reminder); REQ-048 goal. Not on the day-one list; Q-020 open. See decision 2.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want a WhatsApp reminder 7 days before my membership expires so that I can renew in time.\n### Acceptance criteria\n- US-045.AC1: Given a member who agreed to WhatsApp messages and whose active membership expires on 20 Jan 2027, When the time is 09:00 India time on 13 Jan 2027, Then the member receives a WhatsApp message with their name, the expiry date 20 Jan 2027 and a link to renew (per PD-015).\n- US-045.AC2: Given a member who renewed on 12 Jan 2027, so the old expiry date of 20 Jan 2027 no longer applies, When 13 Jan 2027 arrives, Then no reminder for the old expiry date is sent (per A-004).\n- US-045.AC3: Given the reminder, When the member opens the link, Then they are taken to sign-in and then to the renewal screen.\n### Notes\nFixed English template (PD-015).\n### Traceability\nStory US-045 · Epic EPIC-09 · Persona P-01 · Traces FR-043 · MoSCoW Should\nPriority rationale: REQ-017 client (7-day reminder); REQ-048 goal. Not on the day-one list; Q-020 open. See decision 2.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-043",
+        "P-01",
+        "US-045",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-043",
+        "US-045"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 3.0,
+      "rank": "0|i000cw:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-47",
+      "issue_id": "10059",
+      "summary": "Member gets a second reminder 1 day before expiry",
+      "statement": "As a member, I want a second reminder the day before my membership expires so that I do not forget.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-046.AC1",
+          "text": "Given a member who agreed to WhatsApp messages and whose membership expires on 20 Jan 2027, When the time is 09:00 India time on 19 Jan 2027, Then the member receives a second WhatsApp reminder with the same content as in US-045."
+        },
+        {
+          "ac_id": "US-046.AC2",
+          "text": "Given a member who renewed on 18 Jan 2027, When 19 Jan 2027 arrives, Then no reminder for the old expiry date is sent (per A-004)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-046 · Epic EPIC-09 · Persona P-01 · Traces FR-044 · MoSCoW Should\nPriority rationale: REQ-018 client (1-day reminder); same as US-045.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a member, I want a second reminder the day before my membership expires so that I do not forget.\n### Acceptance criteria\n- US-046.AC1: Given a member who agreed to WhatsApp messages and whose membership expires on 20 Jan 2027, When the time is 09:00 India time on 19 Jan 2027, Then the member receives a second WhatsApp reminder with the same content as in US-045.\n- US-046.AC2: Given a member who renewed on 18 Jan 2027, When 19 Jan 2027 arrives, Then no reminder for the old expiry date is sent (per A-004).\n### Traceability\nStory US-046 · Epic EPIC-09 · Persona P-01 · Traces FR-044 · MoSCoW Should\nPriority rationale: REQ-018 client (1-day reminder); same as US-045.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-044",
+        "P-01",
+        "US-046",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-044",
+        "US-046",
+        "US-045"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 2.0,
+      "rank": "0|i000d0:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-48",
+      "issue_id": "10060",
+      "summary": "Owner sees all branches together and one by one",
+      "statement": "As the gym owner, I want to see all branches added together and branch by branch so that I can compare them.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-008.AC1",
+          "text": "Given the owner is signed in, When they open the dashboard, Then they see totals for all three branches and can see each branch on its own."
+        },
+        {
+          "ac_id": "US-008.AC2",
+          "text": "Given a signed-in front-desk staff user, When they ask for the all-branches totals, Then the system refuses (only the owner sees all branches, per NFR-013)."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-008 · Epic EPIC-02 · Persona P-04 · Traces FR-008 · MoSCoW Should\nPriority rationale: REQ-042 client: only the owner sees all branches; needed by US-040 to US-042.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to see all branches added together and branch by branch so that I can compare them.\n### Acceptance criteria\n- US-008.AC1: Given the owner is signed in, When they open the dashboard, Then they see totals for all three branches and can see each branch on its own.\n- US-008.AC2: Given a signed-in front-desk staff user, When they ask for the all-branches totals, Then the system refuses (only the owner sees all branches, per NFR-013).\n### Traceability\nStory US-008 · Epic EPIC-02 · Persona P-04 · Traces FR-008 · MoSCoW Should\nPriority rationale: REQ-042 client: only the owner sees all branches; needed by US-040 to US-042.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-008",
+        "P-04",
+        "US-008",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-008",
+        "US-008",
+        "US-040",
+        "US-042"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 2.0,
+      "rank": "0|i000db:",
+      "blocks": [
+        "GT-49",
+        "GT-50",
+        "GT-51"
+      ],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-49",
+      "issue_id": "10061",
+      "summary": "Owner sees active members per branch",
+      "statement": "As the gym owner, I want to see the number of active members per branch so that I know how many people are paying.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-040.AC1",
+          "text": "Given Kothrud has 100 members with a paid membership whose expiry date is today or later and 5 on free trial, When the owner opens the dashboard, Then Kothrud shows 100 active members and the 5 trial members are shown separately (per PD-016)."
+        },
+        {
+          "ac_id": "US-040.AC2",
+          "text": "Given a member with an unpaid sign-up or an expiry date yesterday, When the dashboard counts active members, Then this member is not counted."
+        },
+        {
+          "ac_id": "US-040.AC3",
+          "text": "Given a branch with no members yet, When the owner opens the dashboard, Then the figure shows 0, not an error."
+        }
+      ],
+      "notes": "Dashboard may follow the first release (NFR-008, REQ-046); the first release is sign-up, payment and check-in (NFR-007). NFR-018: readable text and good contrast. Branch manager sees own branch only (US-007).",
+      "traceability": "Story US-040 · Epic EPIC-08 · Persona P-04 · Traces FR-039 · MoSCoW Should\nPriority rationale: REQ-014 client; REQ-046 client: the dashboard may follow a few weeks after launch.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to see the number of active members per branch so that I know how many people are paying.\n### Acceptance criteria\n- US-040.AC1: Given Kothrud has 100 members with a paid membership whose expiry date is today or later and 5 on free trial, When the owner opens the dashboard, Then Kothrud shows 100 active members and the 5 trial members are shown separately (per PD-016).\n- US-040.AC2: Given a member with an unpaid sign-up or an expiry date yesterday, When the dashboard counts active members, Then this member is not counted.\n- US-040.AC3: Given a branch with no members yet, When the owner opens the dashboard, Then the figure shows 0, not an error.\n### Notes\nDashboard may follow the first release (NFR-008, REQ-046); the first release is sign-up, payment and check-in (NFR-007). NFR-018: readable text and good contrast. Branch manager sees own branch only (US-007).\n### Traceability\nStory US-040 · Epic EPIC-08 · Persona P-04 · Traces FR-039 · MoSCoW Should\nPriority rationale: REQ-014 client; REQ-046 client: the dashboard may follow a few weeks after launch.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-039",
+        "P-04",
+        "US-040",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-039",
+        "US-040"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-08 Owner dashboard"
+      ],
+      "epic_key": "GT-8",
+      "story_points": 3.0,
+      "rank": "0|i000de:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-50",
+      "issue_id": "10062",
+      "summary": "Owner sees memberships due to expire this week",
+      "statement": "As the gym owner, I want to see the memberships due to expire this week and not yet renewed so that I can chase renewals.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-041.AC1",
+          "text": "Given today is Wednesday 13 Jan 2027 and an active membership expires on Sunday 17 Jan 2027 and has not been renewed, When the owner opens the dashboard, Then it is counted in \"due this week\" for its branch and in the total (week = Monday to Sunday, per PD-016)."
+        },
+        {
+          "ac_id": "US-041.AC2",
+          "text": "Given a membership expiring 17 Jan 2027 that was renewed on 12 Jan 2027, When the owner opens the dashboard, Then it is not counted as due."
+        },
+        {
+          "ac_id": "US-041.AC3",
+          "text": "Given a membership expiring on Monday 18 Jan 2027, When the owner opens the dashboard on 13 Jan 2027, Then it is not counted in this week."
+        }
+      ],
+      "notes": "Dashboard may follow the first release (NFR-008, REQ-046); the first release is sign-up, payment and check-in (NFR-007).",
+      "traceability": "Story US-041 · Epic EPIC-08 · Persona P-04 · Traces FR-040 · MoSCoW Should\nPriority rationale: REQ-015 client; REQ-046.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to see the memberships due to expire this week and not yet renewed so that I can chase renewals.\n### Acceptance criteria\n- US-041.AC1: Given today is Wednesday 13 Jan 2027 and an active membership expires on Sunday 17 Jan 2027 and has not been renewed, When the owner opens the dashboard, Then it is counted in \"due this week\" for its branch and in the total (week = Monday to Sunday, per PD-016).\n- US-041.AC2: Given a membership expiring 17 Jan 2027 that was renewed on 12 Jan 2027, When the owner opens the dashboard, Then it is not counted as due.\n- US-041.AC3: Given a membership expiring on Monday 18 Jan 2027, When the owner opens the dashboard on 13 Jan 2027, Then it is not counted in this week.\n### Notes\nDashboard may follow the first release (NFR-008, REQ-046); the first release is sign-up, payment and check-in (NFR-007).\n### Traceability\nStory US-041 · Epic EPIC-08 · Persona P-04 · Traces FR-040 · MoSCoW Should\nPriority rationale: REQ-015 client; REQ-046.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-040",
+        "P-04",
+        "US-041",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-040",
+        "US-041"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-08 Owner dashboard"
+      ],
+      "epic_key": "GT-8",
+      "story_points": 3.0,
+      "rank": "0|i000do:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-51",
+      "issue_id": "10063",
+      "summary": "Owner sees revenue per month",
+      "statement": "As the gym owner, I want to see revenue per month, in total and per branch, so that I know how the business is doing.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-042.AC1",
+          "text": "Given online payments and cash payments dated in December 2026, When the owner opens the revenue view, Then the December 2026 figure includes both, in total and per branch (per PD-016, A-007)."
+        },
+        {
+          "ac_id": "US-042.AC2",
+          "text": "Given the current month is January 2027, When the owner opens the view, Then it shows January 2027 and the 12 months before it."
+        },
+        {
+          "ac_id": "US-042.AC3",
+          "text": "Given the revenue view, When the owner looks for an export, Then there is none."
+        }
+      ],
+      "notes": "Dashboard may follow the first release (NFR-008, REQ-046); the first release is sign-up, payment and check-in (NFR-007).",
+      "traceability": "Story US-042 · Epic EPIC-08 · Persona P-04 · Traces FR-041 · MoSCoW Should\nPriority rationale: REQ-016 client; REQ-046.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to see revenue per month, in total and per branch, so that I know how the business is doing.\n### Acceptance criteria\n- US-042.AC1: Given online payments and cash payments dated in December 2026, When the owner opens the revenue view, Then the December 2026 figure includes both, in total and per branch (per PD-016, A-007).\n- US-042.AC2: Given the current month is January 2027, When the owner opens the view, Then it shows January 2027 and the 12 months before it.\n- US-042.AC3: Given the revenue view, When the owner looks for an export, Then there is none.\n### Notes\nDashboard may follow the first release (NFR-008, REQ-046); the first release is sign-up, payment and check-in (NFR-007).\n### Traceability\nStory US-042 · Epic EPIC-08 · Persona P-04 · Traces FR-041 · MoSCoW Should\nPriority rationale: REQ-016 client; REQ-046.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-041",
+        "P-04",
+        "US-042",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-041",
+        "US-042"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-08 Owner dashboard"
+      ],
+      "epic_key": "GT-8",
+      "story_points": 3.0,
+      "rank": "0|i000dq:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-52",
+      "issue_id": "10064",
+      "summary": "Branch manager sees only their own branch",
+      "statement": "As a branch manager, I want to see only my branch's data so that I work with the numbers and members I am responsible for.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-007.AC1",
+          "text": "Given a manager of the Kothrud branch, When they open the dashboard numbers, the member list and a member record, Then they see only data of Kothrud."
+        },
+        {
+          "ac_id": "US-007.AC2",
+          "text": "Given a manager of the Kothrud branch, When they request a member record or branch figures of another branch (for example by typing its address), Then the system refuses and returns no data of the other branch (per NFR-013)."
+        }
+      ],
+      "notes": "\"Member list\" is the manager's own-branch list; lookup of members from other branches is a check-in function for staff (FR-030), not for managers.",
+      "traceability": "Story US-007 · Epic EPIC-02 · Persona P-03 · Traces FR-007 · MoSCoW Should\nPriority rationale: REQ-041 client: manager sees only own branch; the manager's main screens are the dashboard (US-040 to US-042), so it follows them.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a branch manager, I want to see only my branch's data so that I work with the numbers and members I am responsible for.\n### Acceptance criteria\n- US-007.AC1: Given a manager of the Kothrud branch, When they open the dashboard numbers, the member list and a member record, Then they see only data of Kothrud.\n- US-007.AC2: Given a manager of the Kothrud branch, When they request a member record or branch figures of another branch (for example by typing its address), Then the system refuses and returns no data of the other branch (per NFR-013).\n### Notes\n\"Member list\" is the manager's own-branch list; lookup of members from other branches is a check-in function for staff (FR-030), not for managers.\n### Traceability\nStory US-007 · Epic EPIC-02 · Persona P-03 · Traces FR-007 · MoSCoW Should\nPriority rationale: REQ-041 client: manager sees only own branch; the manager's main screens are the dashboard (US-040 to US-042), so it follows them.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-007",
+        "P-03",
+        "US-007",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-007",
+        "US-007",
+        "US-040",
+        "US-042"
+      ],
+      "persona_ids": [
+        "P-03"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 2.0,
+      "rank": "0|i000dz:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-53",
+      "issue_id": "10065",
+      "summary": "Branch manager works within their allowed functions",
+      "statement": "As a branch manager, I want to open my branch's dashboard numbers and member list and fix member records so that my branch's data is correct, without being able to change plans or take payments.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-009.AC1",
+          "text": "Given a manager of Kothrud, When they open the dashboard numbers and the member list, Then both show Kothrud data."
+        },
+        {
+          "ac_id": "US-009.AC2",
+          "text": "Given a manager of Kothrud, When they open a Kothrud member record and fix it, Then the change is saved."
+        },
+        {
+          "ac_id": "US-009.AC3",
+          "text": "Given a signed-in branch manager, When they try to change a plan price, record a cash payment or check a member in, Then the system refuses each of these and the functions are not shown to them."
+        }
+      ],
+      "notes": "Q-018 is open (which functions managers need); the list follows SA-007. The fix-record details are in US-053 to US-055.",
+      "traceability": "Story US-009 · Epic EPIC-02 · Persona P-03 · Traces FR-009 · MoSCoW Should\nPriority rationale: REQ-040 client: a manager per branch; which functions: Q-018 open, SA-007. proposed. Takes over US-053.AC2 (manager's \"Records to fix\").\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a branch manager, I want to open my branch's dashboard numbers and member list and fix member records so that my branch's data is correct, without being able to change plans or take payments.\n### Acceptance criteria\n- US-009.AC1: Given a manager of Kothrud, When they open the dashboard numbers and the member list, Then both show Kothrud data.\n- US-009.AC2: Given a manager of Kothrud, When they open a Kothrud member record and fix it, Then the change is saved.\n- US-009.AC3: Given a signed-in branch manager, When they try to change a plan price, record a cash payment or check a member in, Then the system refuses each of these and the functions are not shown to them.\n### Notes\nQ-018 is open (which functions managers need); the list follows SA-007. The fix-record details are in US-053 to US-055.\n### Traceability\nStory US-009 · Epic EPIC-02 · Persona P-03 · Traces FR-009 · MoSCoW Should\nPriority rationale: REQ-040 client: a manager per branch; which functions: Q-018 open, SA-007. proposed. Takes over US-053.AC2 (manager's \"Records to fix\").\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-009",
+        "P-03",
+        "US-009",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-009",
+        "US-009",
+        "US-053"
+      ],
+      "persona_ids": [
+        "P-03"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-02 Accounts, roles and sign-in"
+      ],
+      "epic_key": "GT-2",
+      "story_points": 3.0,
+      "rank": "0|i000e0:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-54",
+      "issue_id": "10066",
+      "summary": "New member starts a 7-day free trial",
+      "statement": "As a new member, I want to start a 7-day free trial without paying so that I can try the gym before choosing a plan.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-016.AC1",
+          "text": "Given a person with a number that never had a trial, When they enter name, phone number, email and home branch and then the correct WhatsApp code, Then the trial starts at that moment with no payment and the app shows the trial end date and the QR code (per PD-020)."
+        },
+        {
+          "ac_id": "US-016.AC2",
+          "text": "Given a person who enters a wrong or expired code, When they submit it, Then no trial starts and they can ask for a new code."
+        },
+        {
+          "ac_id": "US-016.AC3",
+          "text": "Given a phone number that already belongs to a member, When a person tries to start a trial with it, Then no trial starts and the system tells them to sign in (per A-017)."
+        },
+        {
+          "ac_id": "US-016.AC4",
+          "text": "Given a trial member within their 7 days, When staff scan their QR code at check-in, Then they are checked in like any other member."
+        }
+      ],
+      "notes": "The check-in behaviour itself is in US-032; this story only checks that the trial member has a working QR code. Trial members are shown separately on the dashboard (US-040).",
+      "traceability": "Story US-016 · Epic EPIC-03 · Persona P-01 · Traces FR-015 · MoSCoW Should\nPriority rationale: REQ-033, REQ-035 client: 7-day free trial. Not on the day-one list; the trial is proposed for R2. See decision 3.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a new member, I want to start a 7-day free trial without paying so that I can try the gym before choosing a plan.\n### Acceptance criteria\n- US-016.AC1: Given a person with a number that never had a trial, When they enter name, phone number, email and home branch and then the correct WhatsApp code, Then the trial starts at that moment with no payment and the app shows the trial end date and the QR code (per PD-020).\n- US-016.AC2: Given a person who enters a wrong or expired code, When they submit it, Then no trial starts and they can ask for a new code.\n- US-016.AC3: Given a phone number that already belongs to a member, When a person tries to start a trial with it, Then no trial starts and the system tells them to sign in (per A-017).\n- US-016.AC4: Given a trial member within their 7 days, When staff scan their QR code at check-in, Then they are checked in like any other member.\n### Notes\nThe check-in behaviour itself is in US-032; this story only checks that the trial member has a working QR code. Trial members are shown separately on the dashboard (US-040).\n### Traceability\nStory US-016 · Epic EPIC-03 · Persona P-01 · Traces FR-015 · MoSCoW Should\nPriority rationale: REQ-033, REQ-035 client: 7-day free trial. Not on the day-one list; the trial is proposed for R2. See decision 3.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-015",
+        "P-01",
+        "US-016",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-015",
+        "US-016"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 5.0,
+      "rank": "0|i000e8:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-55",
+      "issue_id": "10067",
+      "summary": "Only one free trial per phone number",
+      "statement": "As the gym owner, I want one free trial per phone number so that trials cannot be repeated.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-017.AC1",
+          "text": "Given a phone number whose trial ended last month, When a person tries to start a trial with the same number, Then the system refuses a second trial and offers to choose a plan and pay (per PD-020)."
+        },
+        {
+          "ac_id": "US-017.AC2",
+          "text": "Given a phone number with an unused trial, When a person starts a trial with it after confirming the code, Then the trial starts (the first one is allowed)."
+        }
+      ],
+      "notes": "NFR-012 applies.",
+      "traceability": "Story US-017 · Epic EPIC-03 · Persona P-01 · Traces FR-016 · MoSCoW Should\nPriority rationale: REQ-034 client: one trial per phone number; ships with US-016. NFR-012.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want one free trial per phone number so that trials cannot be repeated.\n### Acceptance criteria\n- US-017.AC1: Given a phone number whose trial ended last month, When a person tries to start a trial with the same number, Then the system refuses a second trial and offers to choose a plan and pay (per PD-020).\n- US-017.AC2: Given a phone number with an unused trial, When a person starts a trial with it after confirming the code, Then the trial starts (the first one is allowed).\n### Notes\nNFR-012 applies.\n### Traceability\nStory US-017 · Epic EPIC-03 · Persona P-01 · Traces FR-016 · MoSCoW Should\nPriority rationale: REQ-034 client: one trial per phone number; ships with US-016. NFR-012.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-016",
+        "P-01",
+        "US-017",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-016",
+        "US-017",
+        "US-016",
+        "NFR-012"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 2.0,
+      "rank": "0|i000en:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-56",
+      "issue_id": "10068",
+      "summary": "Trial member sees the trial has ended and can pay",
+      "statement": "As a trial member, I want to be shown that my trial has ended and be able to choose a plan and pay online so that I can become a member.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-018.AC1",
+          "text": "Given a trial member whose 7 days ended yesterday, When staff check them in, Then the check-in shows them as expired (see the expiry warning in US-033)."
+        },
+        {
+          "ac_id": "US-018.AC2",
+          "text": "Given the same trial member, When they sign in, Then the app shows that the trial has ended and offers \"Choose a plan and pay\"."
+        },
+        {
+          "ac_id": "US-018.AC3",
+          "text": "Given a trial member whose trial has ended, When no payment has been made, Then nothing is charged automatically and no membership is created (per SA-010)."
+        }
+      ],
+      "notes": "Q-017 is open (what happens when a trial ends); this follows SA-010.",
+      "traceability": "Story US-018 · Epic EPIC-03 · Persona P-01 · Traces FR-017 · MoSCoW Should\nPriority rationale: REQ-033: trial end; Q-017 open, SA-010. proposed.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As a trial member, I want to be shown that my trial has ended and be able to choose a plan and pay online so that I can become a member.\n### Acceptance criteria\n- US-018.AC1: Given a trial member whose 7 days ended yesterday, When staff check them in, Then the check-in shows them as expired (see the expiry warning in US-033).\n- US-018.AC2: Given the same trial member, When they sign in, Then the app shows that the trial has ended and offers \"Choose a plan and pay\".\n- US-018.AC3: Given a trial member whose trial has ended, When no payment has been made, Then nothing is charged automatically and no membership is created (per SA-010).\n### Notes\nQ-017 is open (what happens when a trial ends); this follows SA-010.\n### Traceability\nStory US-018 · Epic EPIC-03 · Persona P-01 · Traces FR-017 · MoSCoW Should\nPriority rationale: REQ-033: trial end; Q-017 open, SA-010. proposed.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-017",
+        "P-01",
+        "US-018",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-017",
+        "US-018"
+      ],
+      "persona_ids": [
+        "P-01"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 3.0,
+      "rank": "0|i000eu:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-57",
+      "issue_id": "10069",
+      "summary": "Owner changes a plan's price",
+      "statement": "As the gym owner, I want to change a plan's price in the app so that new payments use the new price.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-011.AC1",
+          "text": "Given the owner is on the plans screen, When they change the monthly price and save, Then the system tells them the change applies to payments from now on and does not change running memberships (per PD-014)."
+        },
+        {
+          "ac_id": "US-011.AC2",
+          "text": "Given a member paid for the monthly plan yesterday at the old price, When the owner changes the price today, Then that member's payment history and expiry date stay unchanged, and a payment made after the change is charged the new price."
+        },
+        {
+          "ac_id": "US-011.AC3",
+          "text": "Given a signed-in front-desk staff user, When they try to edit a price, Then the system refuses."
+        }
+      ],
+      "notes": "Only the owner changes plans (Q-010 is open; follows SA-008).",
+      "traceability": "Story US-011 · Epic EPIC-03 · Persona P-04 · Traces FR-011 · MoSCoW Should\nPriority rationale: Owner edits prices in the app: Q-010 open, SA-008. proposed: no client priority given. Until then prices are set at set-up (decision 7).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to change a plan's price in the app so that new payments use the new price.\n### Acceptance criteria\n- US-011.AC1: Given the owner is on the plans screen, When they change the monthly price and save, Then the system tells them the change applies to payments from now on and does not change running memberships (per PD-014).\n- US-011.AC2: Given a member paid for the monthly plan yesterday at the old price, When the owner changes the price today, Then that member's payment history and expiry date stay unchanged, and a payment made after the change is charged the new price.\n- US-011.AC3: Given a signed-in front-desk staff user, When they try to edit a price, Then the system refuses.\n### Notes\nOnly the owner changes plans (Q-010 is open; follows SA-008).\n### Traceability\nStory US-011 · Epic EPIC-03 · Persona P-04 · Traces FR-011 · MoSCoW Should\nPriority rationale: Owner edits prices in the app: Q-010 open, SA-008. proposed: no client priority given. Until then prices are set at set-up (decision 7).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-011",
+        "P-04",
+        "US-011",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-011",
+        "US-011"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 3.0,
+      "rank": "0|i000f8:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-58",
+      "issue_id": "10070",
+      "summary": "Staff mark a duplicate and keep one record",
+      "statement": "As front-desk staff, I want to mark a record as a duplicate of another so that each person has one record with their full history.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-055.AC1",
+          "text": "Given two records of the same person, When staff choose the record to keep and mark the other as a duplicate, Then the duplicate no longer appears in lists and lookups (per PD-022)."
+        },
+        {
+          "ac_id": "US-055.AC2",
+          "text": "Given the duplicate had 2 payments and 3 check-ins, When it is marked, Then those payments and check-ins appear on the kept record."
+        },
+        {
+          "ac_id": "US-055.AC3",
+          "text": "Given a duplicate was marked, When staff enter its phone number at check-in, Then the system finds the kept record, if the number is held by the kept record, and does not find the removed record."
+        }
+      ],
+      "notes": "Which phone number the kept record holds is not described in the PRD; AC3 applies only where the kept record holds that number.",
+      "traceability": "Story US-055 · Epic EPIC-10 · Persona P-02 · Traces FR-051 · MoSCoW Should\nPriority rationale: REQ-039 (inferred): staff remove duplicates; duplicates are flagged but do not block check-in. PD-022. proposed. US-054.AC3 points here.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to mark a record as a duplicate of another so that each person has one record with their full history.\n### Acceptance criteria\n- US-055.AC1: Given two records of the same person, When staff choose the record to keep and mark the other as a duplicate, Then the duplicate no longer appears in lists and lookups (per PD-022).\n- US-055.AC2: Given the duplicate had 2 payments and 3 check-ins, When it is marked, Then those payments and check-ins appear on the kept record.\n- US-055.AC3: Given a duplicate was marked, When staff enter its phone number at check-in, Then the system finds the kept record, if the number is held by the kept record, and does not find the removed record.\n### Notes\nWhich phone number the kept record holds is not described in the PRD; AC3 applies only where the kept record holds that number.\n### Traceability\nStory US-055 · Epic EPIC-10 · Persona P-02 · Traces FR-051 · MoSCoW Should\nPriority rationale: REQ-039 (inferred): staff remove duplicates; duplicates are flagged but do not block check-in. PD-022. proposed. US-054.AC3 points here.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-051",
+        "P-02",
+        "US-055",
+        "moscow-should"
+      ],
+      "requirement_ids": [
+        "FR-051",
+        "US-055",
+        "US-054"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "should",
+      "priority": "Medium",
+      "fix_versions": [
+        "R2"
+      ],
+      "components": [
+        "MOD-10 Existing member data load and record fixing"
+      ],
+      "epic_key": "GT-10",
+      "story_points": 3.0,
+      "rank": "0|i000fe:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-59",
+      "issue_id": "10071",
+      "summary": "Staff are warned of a second check-in on the same day",
+      "statement": "As front-desk staff, I want to see when a member was already checked in today so that accidental double scans are not recorded.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-035.AC1",
+          "text": "Given a member checked in at 07:10 today, When staff check them in again at 09:00, Then the screen shows \"already checked in today\" with the time 07:10 and records no new check-in yet (per PD-007)."
+        },
+        {
+          "ac_id": "US-035.AC2",
+          "text": "Given the \"already checked in today\" screen, When staff confirm, Then a second check-in is recorded."
+        },
+        {
+          "ac_id": "US-035.AC3",
+          "text": "Given the same screen, When staff do not confirm, Then no second check-in is recorded."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-035 · Epic EPIC-06 · Persona P-02 · Traces FR-034 · MoSCoW Could\nPriority rationale: PD-007: warning for a second check-in on the same day. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want to see when a member was already checked in today so that accidental double scans are not recorded.\n### Acceptance criteria\n- US-035.AC1: Given a member checked in at 07:10 today, When staff check them in again at 09:00, Then the screen shows \"already checked in today\" with the time 07:10 and records no new check-in yet (per PD-007).\n- US-035.AC2: Given the \"already checked in today\" screen, When staff confirm, Then a second check-in is recorded.\n- US-035.AC3: Given the same screen, When staff do not confirm, Then no second check-in is recorded.\n### Traceability\nStory US-035 · Epic EPIC-06 · Persona P-02 · Traces FR-034 · MoSCoW Could\nPriority rationale: PD-007: warning for a second check-in on the same day. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-034",
+        "P-02",
+        "US-035",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-034",
+        "US-035"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-06 Front-desk check-in (online)"
+      ],
+      "epic_key": "GT-6",
+      "story_points": 3.0,
+      "rank": "0|i000fr:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-60",
+      "issue_id": "10072",
+      "summary": "Owner adds and deactivates a plan",
+      "statement": "As the gym owner, I want to add a plan and deactivate a plan so that the choices offered to new members match what FitZone sells.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-012.AC1",
+          "text": "Given the owner is on the plans screen, When they add a plan with a name and a price, Then the plan appears in the plan list for new sign-ups and renewals."
+        },
+        {
+          "ac_id": "US-012.AC2",
+          "text": "Given the quarterly plan is active, When the owner deactivates it, Then new members can no longer choose it."
+        },
+        {
+          "ac_id": "US-012.AC3",
+          "text": "Given a member with a running quarterly membership, When the owner deactivates the quarterly plan, Then that member's membership continues until its expiry date (per PD-014)."
+        }
+      ],
+      "notes": "The PRD does not say how long an added plan runs; the length of a new plan is not defined and is not decided here (PD-010 covers only monthly, quarterly and yearly).",
+      "traceability": "Story US-012 · Epic EPIC-03 · Persona P-04 · Traces FR-011 · MoSCoW Could\nPriority rationale: Add and deactivate a plan: Q-010 open; A-033 says only three plans. Length of a new plan is not defined. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to add a plan and deactivate a plan so that the choices offered to new members match what FitZone sells.\n### Acceptance criteria\n- US-012.AC1: Given the owner is on the plans screen, When they add a plan with a name and a price, Then the plan appears in the plan list for new sign-ups and renewals.\n- US-012.AC2: Given the quarterly plan is active, When the owner deactivates it, Then new members can no longer choose it.\n- US-012.AC3: Given a member with a running quarterly membership, When the owner deactivates the quarterly plan, Then that member's membership continues until its expiry date (per PD-014).\n### Notes\nThe PRD does not say how long an added plan runs; the length of a new plan is not defined and is not decided here (PD-010 covers only monthly, quarterly and yearly).\n### Traceability\nStory US-012 · Epic EPIC-03 · Persona P-04 · Traces FR-011 · MoSCoW Could\nPriority rationale: Add and deactivate a plan: Q-010 open; A-033 says only three plans. Length of a new plan is not defined. proposed: no client priority given.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-011",
+        "P-04",
+        "US-012",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-011",
+        "US-012"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-03 Plans, member sign-up and free trial"
+      ],
+      "epic_key": "GT-3",
+      "story_points": 3.0,
+      "rank": "0|i000fw:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-61",
+      "issue_id": "10073",
+      "summary": "Tablet keeps a saved member list up to date",
+      "statement": "As front-desk staff, I want the tablet to keep a saved member list so that check-in can work when the internet is down.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-036.AC1",
+          "text": "Given a tablet that is online, When 5 minutes pass, Then the saved list has been refreshed at least once in that time (per PD-019)."
+        },
+        {
+          "ac_id": "US-036.AC2",
+          "text": "Given the saved list, When it is inspected, Then each entry holds only name, phone number, QR identifier, home branch, plan and expiry date (per PD-025)."
+        },
+        {
+          "ac_id": "US-036.AC3",
+          "text": "Given staff sign out of the tablet, When they sign out, Then the saved list is cleared from the tablet (per PD-025)."
+        }
+      ],
+      "notes": "Q-016 is open and blocking; this follows option (b) (SA-001, NFR-010, NFR-017).",
+      "traceability": "Story US-036 · Epic EPIC-07 · Persona P-02 · Traces FR-035 · MoSCoW Could\nPriority rationale: REQ-037 client: offline check-in \"if possible\"; Q-016 open and blocking, default (b).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want the tablet to keep a saved member list so that check-in can work when the internet is down.\n### Acceptance criteria\n- US-036.AC1: Given a tablet that is online, When 5 minutes pass, Then the saved list has been refreshed at least once in that time (per PD-019).\n- US-036.AC2: Given the saved list, When it is inspected, Then each entry holds only name, phone number, QR identifier, home branch, plan and expiry date (per PD-025).\n- US-036.AC3: Given staff sign out of the tablet, When they sign out, Then the saved list is cleared from the tablet (per PD-025).\n### Notes\nQ-016 is open and blocking; this follows option (b) (SA-001, NFR-010, NFR-017).\n### Traceability\nStory US-036 · Epic EPIC-07 · Persona P-02 · Traces FR-035 · MoSCoW Could\nPriority rationale: REQ-037 client: offline check-in \"if possible\"; Q-016 open and blocking, default (b).\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-035",
+        "P-02",
+        "US-036",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-035",
+        "US-036"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-07 Offline check-in"
+      ],
+      "epic_key": "GT-7",
+      "story_points": 3.0,
+      "rank": "0|i000g8:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-62",
+      "issue_id": "10074",
+      "summary": "Staff check members in while the internet is down",
+      "statement": "As front-desk staff, I want check-in to keep working when the internet is down so that members are not held up.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-037.AC1",
+          "text": "Given the internet is down and the saved list is from 18:05, When staff open the check-in screen, Then it shows \"offline: member list as of 18:05\"."
+        },
+        {
+          "ac_id": "US-037.AC2",
+          "text": "Given the internet is down, When staff enter the phone number of a member in the saved list or scan their QR code, Then the member is found and the check-in is recorded on the tablet."
+        },
+        {
+          "ac_id": "US-037.AC3",
+          "text": "Given the internet is down and a member in the saved list expired yesterday, When staff check them in, Then the expiry warning shows from the saved data."
+        }
+      ],
+      "notes": "Q-016 open (SA-001). Outage target: 10 to 15 minutes (NFR-010).",
+      "traceability": "Story US-037 · Epic EPIC-07 · Persona P-02 · Traces FR-036 · MoSCoW Could\nPriority rationale: REQ-037; needs US-036.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want check-in to keep working when the internet is down so that members are not held up.\n### Acceptance criteria\n- US-037.AC1: Given the internet is down and the saved list is from 18:05, When staff open the check-in screen, Then it shows \"offline: member list as of 18:05\".\n- US-037.AC2: Given the internet is down, When staff enter the phone number of a member in the saved list or scan their QR code, Then the member is found and the check-in is recorded on the tablet.\n- US-037.AC3: Given the internet is down and a member in the saved list expired yesterday, When staff check them in, Then the expiry warning shows from the saved data.\n### Notes\nQ-016 open (SA-001). Outage target: 10 to 15 minutes (NFR-010).\n### Traceability\nStory US-037 · Epic EPIC-07 · Persona P-02 · Traces FR-036 · MoSCoW Could\nPriority rationale: REQ-037; needs US-036.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-036",
+        "P-02",
+        "US-037",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-036",
+        "US-037",
+        "US-036"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-07 Offline check-in"
+      ],
+      "epic_key": "GT-7",
+      "story_points": 3.0,
+      "rank": "0|i000gc:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-63",
+      "issue_id": "10075",
+      "summary": "Offline check-ins are sent when the internet returns",
+      "statement": "As front-desk staff, I want check-ins made offline to be sent to the app afterwards so that none is lost.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-038.AC1",
+          "text": "Given 3 check-ins were recorded offline at 18:10, 18:12 and 18:14, When the internet returns, Then the tablet sends them to the app in that order and each appears once with its original time."
+        },
+        {
+          "ac_id": "US-038.AC2",
+          "text": "Given the tablet loses connection again while sending, When the internet returns a second time, Then check-ins already sent are not sent again and unsent ones are sent (none lost, none duplicated)."
+        },
+        {
+          "ac_id": "US-038.AC3",
+          "text": "Given the check-ins have all been sent, When the internet is back, Then the \"offline\" notice goes away."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-038 · Epic EPIC-07 · Persona P-02 · Traces FR-037 · MoSCoW Could\nPriority rationale: REQ-037; needs US-037.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want check-ins made offline to be sent to the app afterwards so that none is lost.\n### Acceptance criteria\n- US-038.AC1: Given 3 check-ins were recorded offline at 18:10, 18:12 and 18:14, When the internet returns, Then the tablet sends them to the app in that order and each appears once with its original time.\n- US-038.AC2: Given the tablet loses connection again while sending, When the internet returns a second time, Then check-ins already sent are not sent again and unsent ones are sent (none lost, none duplicated).\n- US-038.AC3: Given the check-ins have all been sent, When the internet is back, Then the \"offline\" notice goes away.\n### Traceability\nStory US-038 · Epic EPIC-07 · Persona P-02 · Traces FR-037 · MoSCoW Could\nPriority rationale: REQ-037; needs US-037.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-037",
+        "P-02",
+        "US-038",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-037",
+        "US-038",
+        "US-037"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-07 Offline check-in"
+      ],
+      "epic_key": "GT-7",
+      "story_points": 3.0,
+      "rank": "0|i000gn:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-64",
+      "issue_id": "10076",
+      "summary": "Staff are told when a member is not in the saved list while offline",
+      "statement": "As front-desk staff, I want a clear message when someone is not in the saved list while offline so that I know to note them on paper.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-039.AC1",
+          "text": "Given the internet is down and a member signed up 2 minutes ago, When staff enter their phone number, Then the screen says \"not found while offline\" and tells staff to note the person on paper until the internet is back (per A-036)."
+        },
+        {
+          "ac_id": "US-039.AC2",
+          "text": "Given the same screen, When staff dismiss it, Then no check-in is recorded for that number."
+        }
+      ],
+      "notes": "",
+      "traceability": "Story US-039 · Epic EPIC-07 · Persona P-02 · Traces FR-038 · MoSCoW Could\nPriority rationale: REQ-037; A-036 (paper fallback). Needs US-037.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As front-desk staff, I want a clear message when someone is not in the saved list while offline so that I know to note them on paper.\n### Acceptance criteria\n- US-039.AC1: Given the internet is down and a member signed up 2 minutes ago, When staff enter their phone number, Then the screen says \"not found while offline\" and tells staff to note the person on paper until the internet is back (per A-036).\n- US-039.AC2: Given the same screen, When staff dismiss it, Then no check-in is recorded for that number.\n### Traceability\nStory US-039 · Epic EPIC-07 · Persona P-02 · Traces FR-038 · MoSCoW Could\nPriority rationale: REQ-037; A-036 (paper fallback). Needs US-037.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-038",
+        "P-02",
+        "US-039",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-038",
+        "US-039",
+        "US-037"
+      ],
+      "persona_ids": [
+        "P-02"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-07 Offline check-in"
+      ],
+      "epic_key": "GT-7",
+      "story_points": 2.0,
+      "rank": "0|i000gq:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    },
+    {
+      "key": "GT-65",
+      "issue_id": "10077",
+      "summary": "Delivery of each reminder is recorded",
+      "statement": "As the gym owner, I want to know whether each reminder was delivered or failed so that I can see which members did not get it.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "US-049.AC1",
+          "text": "Given a reminder that WhatsApp reports as delivered, When the result arrives, Then the reminder is recorded as \"delivered\"."
+        },
+        {
+          "ac_id": "US-049.AC2",
+          "text": "Given a reminder that WhatsApp reports as failed, When the result arrives, Then the reminder is recorded as \"failed\" and nothing is resent by SMS or any other channel (per PD-021)."
+        }
+      ],
+      "notes": "Where the owner or staff view this record is not described in the PRD; the story only requires it to be recorded.",
+      "traceability": "Story US-049 · Epic EPIC-09 · Persona P-04 · Traces FR-047 · MoSCoW Could\nPriority rationale: PD-021: record delivery of reminders; REQ-019. proposed: no client priority given; needs US-045.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "description_md": "As the gym owner, I want to know whether each reminder was delivered or failed so that I can see which members did not get it.\n### Acceptance criteria\n- US-049.AC1: Given a reminder that WhatsApp reports as delivered, When the result arrives, Then the reminder is recorded as \"delivered\".\n- US-049.AC2: Given a reminder that WhatsApp reports as failed, When the result arrives, Then the reminder is recorded as \"failed\" and nothing is resent by SMS or any other channel (per PD-021).\n### Notes\nWhere the owner or staff view this record is not described in the PRD; the story only requires it to be recorded.\n### Traceability\nStory US-049 · Epic EPIC-09 · Persona P-04 · Traces FR-047 · MoSCoW Could\nPriority rationale: PD-021: record delivery of reminders; REQ-019. proposed: no client priority given; needs US-045.\nApproved at gate G2 on 2026-11-13T12:03:59+00:00.",
+      "labels": [
+        "FR-047",
+        "P-04",
+        "US-049",
+        "moscow-could"
+      ],
+      "requirement_ids": [
+        "FR-047",
+        "US-049",
+        "US-045"
+      ],
+      "persona_ids": [
+        "P-04"
+      ],
+      "moscow": "could",
+      "priority": "Medium",
+      "fix_versions": [
+        "R3"
+      ],
+      "components": [
+        "MOD-09 WhatsApp messaging and expiry reminders"
+      ],
+      "epic_key": "GT-9",
+      "story_points": 2.0,
+      "rank": "0|i000h0:",
+      "blocks": [],
+      "status": "To Do",
+      "approval": "Approved at gate G2 on 2026-11-13T12:03:59+00:00."
+    }
+  ],
+  "excluded": []
+}

@@ -1,0 +1,335 @@
+[
+  {
+    "tool": "tofu_fmt",
+    "passed": true,
+    "skipped": false,
+    "summary": "formatted",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "tofu_validate",
+    "passed": true,
+    "skipped": false,
+    "summary": "valid",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "tflint",
+    "passed": true,
+    "skipped": false,
+    "summary": "0 issues",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "trivy",
+    "passed": true,
+    "skipped": false,
+    "summary": "0 HIGH/CRITICAL",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "checkov",
+    "passed": false,
+    "skipped": false,
+    "summary": "42 findings; 42 severity unreported; coverage reported",
+    "findings": [
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_AWS_37",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/main.tf",
+        "message": "[severity unreported; review required] Ensure Amazon EKS control plane logging is enabled for all log types"
+      },
+      {
+        "rule_id": "CKV_AWS_58",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/main.tf",
+        "message": "[severity unreported; review required] Ensure EKS Cluster has Secrets Encryption Enabled"
+      },
+      {
+        "rule_id": "CKV_AWS_338",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/main.tf",
+        "message": "[severity unreported; review required] Ensure CloudWatch log groups retains logs for at least 1 year"
+      },
+      {
+        "rule_id": "CKV_AWS_133",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-rds/578c95b19abf30b9b1068dd54025ac8e6df3212f/modules/db_instance/main.tf",
+        "message": "[severity unreported; review required] Ensure that RDS instances has backup policy"
+      },
+      {
+        "rule_id": "CKV_AWS_304",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-rds/578c95b19abf30b9b1068dd54025ac8e6df3212f/modules/db_instance/main.tf",
+        "message": "[severity unreported; review required] Ensure Secrets Manager secrets should be rotated within 90 days"
+      },
+      {
+        "rule_id": "CKV_AWS_300",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/main.tf",
+        "message": "[severity unreported; review required] Ensure S3 lifecycle configuration sets period for aborting failed uploads"
+      },
+      {
+        "rule_id": "CKV_AWS_394",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure aws_availability_zones data source pins zone identity so its result set does not silently expand when AWS adds an Availability Zone"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_AWS_394",
+        "severity": "medium",
+        "file": "/envs/prod/core/main.tf",
+        "message": "[severity unreported; review required] Ensure aws_availability_zones data source pins zone identity so its result set does not silently expand when AWS adds an Availability Zone"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/prod/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/prod/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/prod/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/prod/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_AWS_394",
+        "severity": "medium",
+        "file": "/envs/qa/core/main.tf",
+        "message": "[severity unreported; review required] Ensure aws_availability_zones data source pins zone identity so its result set does not silently expand when AWS adds an Availability Zone"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/qa/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/qa/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/qa/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/qa/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_AWS_394",
+        "severity": "medium",
+        "file": "/envs/stg/core/main.tf",
+        "message": "[severity unreported; review required] Ensure aws_availability_zones data source pins zone identity so its result set does not silently expand when AWS adds an Availability Zone"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/stg/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/stg/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/stg/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV_TF_1",
+        "severity": "medium",
+        "file": "/envs/stg/core/main.tf",
+        "message": "[severity unreported; review required] Ensure Terraform module sources use a commit hash"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/modules/eks-managed-node-group/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/modules/self-managed-node-group/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-eks/25c846a384bc66d16cc801d2f851431deb38de5d/node_groups.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/modules/file-system/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/envs/dev/core/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/envs/prod/core/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/envs/qa/core/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_5",
+        "severity": "medium",
+        "file": "/envs/stg/core/main.tf",
+        "message": "[severity unreported; review required] Ensure that Security Groups are attached to another resource"
+      },
+      {
+        "rule_id": "CKV2_AWS_62",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/main.tf",
+        "message": "[severity unreported; review required] Ensure S3 buckets should have event notifications enabled"
+      },
+      {
+        "rule_id": "CKV_AWS_144",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/main.tf",
+        "message": "[severity unreported; review required] Ensure that S3 bucket has cross-region replication enabled"
+      },
+      {
+        "rule_id": "CKV_AWS_145",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/main.tf",
+        "message": "[severity unreported; review required] Ensure that S3 buckets are encrypted with KMS by default"
+      },
+      {
+        "rule_id": "CKV_AWS_21",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/main.tf",
+        "message": "[severity unreported; review required] Ensure all data stored in the S3 bucket have versioning enabled"
+      },
+      {
+        "rule_id": "CKV_AWS_19",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-s3-bucket/65413ddedcd584e8e7601bc72792a827ec773c23/main.tf",
+        "message": "[severity unreported; review required] Ensure all data stored in the S3 bucket is securely encrypted at rest"
+      },
+      {
+        "rule_id": "CKV2_AWS_12",
+        "severity": "medium",
+        "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-vpc/b3abd6df2ecf052451a361ed55b8f06f8742a795/main.tf",
+        "message": "[severity unreported; review required] Ensure the default security group of every VPC restricts all traffic"
+      }
+    ],
+    "outcome": "findings"
+  },
+  {
+    "tool": "actionlint",
+    "passed": true,
+    "skipped": false,
+    "summary": "ok",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "helm_lint",
+    "passed": true,
+    "skipped": false,
+    "summary": "16 validated, 0 invalid, 0 errors",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "kubeconform",
+    "passed": true,
+    "skipped": false,
+    "summary": "32 validated, 0 invalid, 0 errors",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "gitleaks",
+    "passed": true,
+    "skipped": false,
+    "summary": "no secrets",
+    "findings": [],
+    "outcome": "passed"
+  },
+  {
+    "tool": "conftest",
+    "passed": true,
+    "skipped": false,
+    "summary": "policy unit tests pass (plan-time evaluation runs in Atlantis)",
+    "findings": [],
+    "outcome": "passed"
+  }
+]

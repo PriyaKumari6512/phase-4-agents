@@ -1,0 +1,378 @@
+{
+  "schema_version": "1.0.0",
+  "project": "gym-full",
+  "intent_sha256": "4486b94ef85d34884cc8acf7c9fb5ed2c80ec6efa62d99c43766c008f7d4ef87",
+  "source_hashes": {
+    "architecture.md": "a83ea62f2e8d8dab82bdd2f5e282be6def19cc135347f543fe64d3fbbb15e4f9",
+    "phase4/project.json": "34942bac4f5244ef057d2a36144041dd50f900334df42bd087d677ce0f4e16f2",
+    "catalog": "b7136439fa4f021ca149db5272b9672aba1bf50939de4c72afd0afb68d202161"
+  },
+  "infra_repo": "acme/gym-infra",
+  "environments": [
+    "dev",
+    "qa",
+    "stg",
+    "prod"
+  ],
+  "files": [
+    {
+      "path": "repo/.checkov.yaml",
+      "sha256": "7a473881f1c8cf3b2435c4a224cb5ab9a201387d9fa148a27a86ed810ddbc747",
+      "origin": "template",
+      "template_ref": "accepted-risks",
+      "rendered_sha256": "7a473881f1c8cf3b2435c4a224cb5ab9a201387d9fa148a27a86ed810ddbc747"
+    },
+    {
+      "path": "repo/.github/workflows/drift.yml",
+      "sha256": "19564ac2bf6234ecdb61009c10494cfea53a10296ba7a5103282cc822a17aa0c",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "19564ac2bf6234ecdb61009c10494cfea53a10296ba7a5103282cc822a17aa0c"
+    },
+    {
+      "path": "repo/.github/workflows/promote.yml",
+      "sha256": "d8544744895a67b95ae0f63a4dddb105859c8b4a8b4cafb53d9ed85fff736c38",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "d8544744895a67b95ae0f63a4dddb105859c8b4a8b4cafb53d9ed85fff736c38"
+    },
+    {
+      "path": "repo/.trivyignore",
+      "sha256": "e62f29bc68847f7139d6b9ad732513b46e5f5502b8813f8351e8e6b6ddcb3e5e",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "e62f29bc68847f7139d6b9ad732513b46e5f5502b8813f8351e8e6b6ddcb3e5e"
+    },
+    {
+      "path": "repo/CODEOWNERS",
+      "sha256": "341845f36eaf735d1b7db7391e7c59a4330c971e8ba43cd3046ff20bbe7b18c7",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "341845f36eaf735d1b7db7391e7c59a4330c971e8ba43cd3046ff20bbe7b18c7"
+    },
+    {
+      "path": "repo/atlantis.yaml",
+      "sha256": "3b18b4290597e69b805b7fa7bb83e91043df3d34cb905b247d8193dae1927c3c",
+      "origin": "template",
+      "template_ref": null,
+      "rendered_sha256": "3b18b4290597e69b805b7fa7bb83e91043df3d34cb905b247d8193dae1927c3c"
+    },
+    {
+      "path": "repo/docs/BRANCHING.md",
+      "sha256": "08b4dac6ef41d0b6b62af6e8491852f28e9a6cf57bafc0082d43f27ac0253a8b",
+      "origin": "template",
+      "template_ref": "branching",
+      "rendered_sha256": "08b4dac6ef41d0b6b62af6e8491852f28e9a6cf57bafc0082d43f27ac0253a8b"
+    },
+    {
+      "path": "repo/docs/RUNBOOK.md",
+      "sha256": "a1c89703caa82386669ca1e6ad15c90c6976efc5b17057ffe022ad6b4e83ec22",
+      "origin": "template",
+      "template_ref": "runbook",
+      "rendered_sha256": "a1c89703caa82386669ca1e6ad15c90c6976efc5b17057ffe022ad6b4e83ec22"
+    },
+    {
+      "path": "repo/envs/dev/core/images.auto.tfvars.json",
+      "sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a",
+      "origin": "generated",
+      "template_ref": "promotion",
+      "rendered_sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a"
+    },
+    {
+      "path": "repo/envs/dev/core/main.tf",
+      "sha256": "70e926836828a2feadc0b1e37168b8b79bc2fcfd8be8b02129bdece87a80609b",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "70e926836828a2feadc0b1e37168b8b79bc2fcfd8be8b02129bdece87a80609b"
+    },
+    {
+      "path": "repo/envs/prod/core/images.auto.tfvars.json",
+      "sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a",
+      "origin": "generated",
+      "template_ref": "promotion",
+      "rendered_sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a"
+    },
+    {
+      "path": "repo/envs/prod/core/main.tf",
+      "sha256": "3c6ed0407da6d44ae489fe80e3638d1e94732366346b73a1783929cd8a9c5a95",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "3c6ed0407da6d44ae489fe80e3638d1e94732366346b73a1783929cd8a9c5a95"
+    },
+    {
+      "path": "repo/envs/qa/core/images.auto.tfvars.json",
+      "sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a",
+      "origin": "generated",
+      "template_ref": "promotion",
+      "rendered_sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a"
+    },
+    {
+      "path": "repo/envs/qa/core/main.tf",
+      "sha256": "6fc67a5ac91c20d2106b7799c2e259b5d3c1f645f146ca6eed832ffafc6a5f31",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "6fc67a5ac91c20d2106b7799c2e259b5d3c1f645f146ca6eed832ffafc6a5f31"
+    },
+    {
+      "path": "repo/envs/stg/core/images.auto.tfvars.json",
+      "sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a",
+      "origin": "generated",
+      "template_ref": "promotion",
+      "rendered_sha256": "0014c44f9c2aeeb34d487e3c4c0ec1e77140ca264e5634720406822581c6ee5a"
+    },
+    {
+      "path": "repo/envs/stg/core/main.tf",
+      "sha256": "3546c77cb8af4e414ff63be9315b732ab1e4844bdebf85af88f31736af00fcfb",
+      "origin": "module_call",
+      "template_ref": "aws-core",
+      "rendered_sha256": "3546c77cb8af4e414ff63be9315b732ab1e4844bdebf85af88f31736af00fcfb"
+    },
+    {
+      "path": "repo/promotion.json",
+      "sha256": "200eca3ab0f49669288c6f9a625feb00e5d753d77ad2555e0e84597bd73a3d07",
+      "origin": "generated",
+      "template_ref": "promotion",
+      "rendered_sha256": "200eca3ab0f49669288c6f9a625feb00e5d753d77ad2555e0e84597bd73a3d07"
+    },
+    {
+      "path": "repo/scripts/promote.py",
+      "sha256": "0f04d3ee11fd23bf39c78bb498a0aa17859b8a4e97249acf85d7cde0f88416cc",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "0f04d3ee11fd23bf39c78bb498a0aa17859b8a4e97249acf85d7cde0f88416cc"
+    },
+    {
+      "path": "repo/scripts/verify-build.py",
+      "sha256": "91e7902d7cbb4a1d11b0aea77b985cdb953b5a5bff5a4a58186332c491362a25",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "91e7902d7cbb4a1d11b0aea77b985cdb953b5a5bff5a4a58186332c491362a25"
+    },
+    {
+      "path": "repo/scripts/verify-protection.py",
+      "sha256": "958dab99e40f88fe035140190e285a68296d0bc43d46f8cdd9c24d7df21f9489",
+      "origin": "template",
+      "template_ref": "promotion",
+      "rendered_sha256": "958dab99e40f88fe035140190e285a68296d0bc43d46f8cdd9c24d7df21f9489"
+    },
+    {
+      "path": "ci/acme__gym-api/.github/workflows/ci-gym-api.yml",
+      "sha256": "99ef6e76415f22eb20642668c8f4282b46034fa879caf1ac47a85e007b46d95b",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "99ef6e76415f22eb20642668c8f4282b46034fa879caf1ac47a85e007b46d95b"
+    },
+    {
+      "path": "ci/acme__gym-api/.github/workflows/phase4-claude.yml",
+      "sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "32cea760ce6222429f12b30a9623c19e94d92da881ecf0fd70deaecab6b1989c"
+    },
+    {
+      "path": "ci/acme__gym-api/.github/workflows/promote-dev.yml",
+      "sha256": "fdcaa2db8fca284ea0ef7244f07b748f77a3e9bfaa2a393de96cff11b2eacaab",
+      "origin": "template",
+      "template_ref": "ci",
+      "rendered_sha256": "fdcaa2db8fca284ea0ef7244f07b748f77a3e9bfaa2a393de96cff11b2eacaab"
+    }
+  ],
+  "ci_repos": [
+    "acme/gym-api"
+  ],
+  "secrets_refs": [
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/whatsapp-webhook-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/dev/gym-api/database-credentials"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/whatsapp-webhook-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/qa/gym-api/database-credentials"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/whatsapp-webhook-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/stg/gym-api/database-credentials"
+    },
+    {
+      "name": "DATABASE_URL",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/DATABASE_URL"
+    },
+    {
+      "name": "razorpay-api-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/razorpay-api-key"
+    },
+    {
+      "name": "razorpay-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/razorpay-webhook-secret"
+    },
+    {
+      "name": "whatsapp-access-token",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/whatsapp-access-token"
+    },
+    {
+      "name": "whatsapp-webhook-secret",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/whatsapp-webhook-secret"
+    },
+    {
+      "name": "jwt-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/jwt-signing-key"
+    },
+    {
+      "name": "qr-signing-key",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/qr-signing-key"
+    },
+    {
+      "name": "database-credentials",
+      "store": "aws_secrets_manager",
+      "path": "/gym-full/prod/gym-api/database-credentials"
+    }
+  ],
+  "stateful_resources": [
+    "dev:aws-s3:Web app",
+    "dev:aws-rds-postgres:Database",
+    "qa:aws-s3:Web app",
+    "qa:aws-rds-postgres:Database",
+    "stg:aws-s3:Web app",
+    "stg:aws-rds-postgres:Database",
+    "prod:aws-s3:Web app",
+    "prod:aws-rds-postgres:Database"
+  ],
+  "gaps": [
+    "bootstrap: create the remote state bucket 'gym-full-tfstate' (versioned, encrypted) once per account",
+    "public services: set certificate_arn (ACM, HTTPS listener) per environment and point DNS at the load balancer; listener rules route /api/* to Gym API - adjust if the API uses other paths",
+    "Web app: static site on CloudFront; the workflow that uploads its build to the bucket and invalidates the CDN is not generated, and custom DNS/certificate are not set",
+    "alarms: connect the generated CloudWatch alarms to the team's on-call SNS topic (alarm_actions)",
+    "shared container registries are owned only by dev/core state; apply that state before image builds for other environments",
+    "checkov: the catalog accepts these checks as known risks (.checkov.yaml skip-check); review the list and its justification: CKV2_AWS_12, CKV2_AWS_32, CKV2_AWS_42, CKV2_AWS_47, CKV2_AWS_5, CKV2_AWS_62, CKV_AWS_103, CKV_AWS_111, CKV_AWS_133, CKV_AWS_144, CKV_AWS_145, CKV_AWS_150, CKV_AWS_158, CKV_AWS_174, CKV_AWS_19, CKV_AWS_2, CKV_AWS_21, CKV_AWS_300, CKV_AWS_304, CKV_AWS_310, CKV_AWS_338, CKV_AWS_356, CKV_AWS_374, CKV_AWS_394, CKV_AWS_86, CKV_AWS_97, CKV_TF_1",
+    "module terraform-aws-modules/s3-bucket/aws ~> 5.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/ecr/aws ~> 2.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "module terraform-aws-modules/rds/aws ~> 6.0 is a version range, not a verified pin; confirm it with infra_registry_versions",
+    "Configure GitHub Environments: QA Lead for qa; client sign-off for stg; go/no-go plus DevOps Lead for prod. Enforce protected main and required PR reviews. Configure the GitOps GitHub App; bootstrap digest placeholders cannot be deployed."
+  ],
+  "checks_passed": true,
+  "checks_skipped": [],
+  "validation_complete": true,
+  "checks_incomplete": [],
+  "risk_score": 50,
+  "risk_reasons": [
+    "8 stateful resources (databases, caches, buckets)",
+    "public endpoints: Web app, Gym API",
+    "includes prod"
+  ],
+  "generated_at": "2026-11-17T17:49:36Z"
+}

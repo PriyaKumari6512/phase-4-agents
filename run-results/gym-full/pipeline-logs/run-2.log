@@ -1,0 +1,37 @@
+TEST MODE: successful automated reviews authorize gates/publication; these are not human sign-offs.
+agent             gate   state                why
+task-breakdown    P4-G1  RUN                  P4-G1 asked for changes; inputs changed: architecture.md, gates/G3B.approved.json
+infra-pipeline    P4-G4  RUN                  resume retained restore_repair; generation is saved
+sprint-planning   P4-G2  waiting for gate     task-breakdown is not done (P4-G1 asked for changes; inputs changed: architecture.md, gates/G3B.approved.json)
+work-allocation   P4-G3  waiting for gate     sprint-planning is not done (task-breakdown is not done (P4-G1 asked for changes; inputs changed: architecture.md, gates/G3B.approved.json))
+
+>>> running Task Breakdown and Infrastructure in isolated workspaces
+<frozen runpy>:130: RuntimeWarning: 'agent_engine.cli' found in sys.modules after import of package 'agent_engine', but prior to execution of 'agent_engine.cli'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'agent_engine.cli' found in sys.modules after import of package 'agent_engine', but prior to execution of 'agent_engine.cli'; this may result in unpredictable behaviour
+
+[task-breakdown: strong model failed (GT-42: task breakdown still fails checks: no task covers acceptance criteria ['US-023.AC2']); retrying on frontier]
+
+ERROR: run failed: GT-42: task breakdown still fails checks: task T3: give 1 to 3 acceptance criteria; no task covers acceptance criteria ['US-023.AC2']
+
+Status: fail  |  time: 149.2s
+Pass write  task-breakdown   strong anthropic:claude-sonnet-5-5  FAILED
+Pass write  task-breakdown   frontier anthropic:claude-sonnet-5-5  FAILED
+Tokens claude-sonnet-5-5: input=3989343 output=91856 total=4081199
+Report: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/task-breakdown/outputs/gym-full/report.json
+Run history: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/task-breakdown/outputs/gym-full/runs/20261117-231351-1791f7
+Job log: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/task-breakdown/outputs/gym-full/logs/20261117-231351-1791f7.log  |  transcript: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/task-breakdown/logs/deepagent.log  |  app log: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/task-breakdown/logs/app.log
+(agent produced no reply)
+
+[infra-pipeline: strong model failed (Return each file complete; keep every block and fix findings in place. repo/envs/qa/core/main.tf drops: data, data aws_iam_policy_document web_app_cdn_read, data aws_secretsmanager_secret gym_api_database-credentials, data aws_secretsmanager_secret gym_api_database_url, data aws_secretsmanager_secret gym_api_jwt-signing-key, data aws_secretsmanager_secret gym_api_qr-signing-key, data aws_secretsmanager_secret gym_api_razorpay-api-key-id, data aws_secretsmanager_secret gym_api_razorpay-api-key-secret, data aws_secretsmanager_secret gym_api_razorpay-webhook-secret, data aws_secretsmanager_secret gym_api_whatsapp-access-token); retrying on frontier]
+
+ERROR: run failed: Return each file complete; keep every block and fix findings in place. repo/envs/qa/core/main.tf drops: data, data aws_iam_policy_document web_app_cdn_read, data aws_secretsmanager_secret gym_api_database-credentials, data aws_secretsmanager_secret gym_api_database_url, data aws_secretsmanager_secret gym_api_jwt-signing-key, data aws_secretsmanager_secret gym_api_qr-signing-key, data aws_secretsmanager_secret gym_api_razorpay-api-key-id, data aws_secretsmanager_secret gym_api_razorpay-api-key-secret, data aws_secretsmanager_secret gym_api_razorpay-webhook-secret, data aws_secretsmanager_secret gym_api_whatsapp-access-token
+
+Status: fail  |  time: 167.8s
+Pass fix    infra-pipeline   strong anthropic:claude-sonnet-5-5  FAILED
+Pass fix    infra-pipeline   frontier anthropic:claude-sonnet-5-5  FAILED
+Tokens claude-sonnet-5-5: input=155894 output=32020 total=187914
+Report: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/infra-pipeline/outputs/gym-full/report.json
+Run history: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/infra-pipeline/outputs/gym-full/runs/20261117-231351-09babe
+Job log: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/infra-pipeline/outputs/gym-full/logs/20261117-231351-09babe.log  |  transcript: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/infra-pipeline/logs/deepagent.log  |  app log: ~/p/phase-4-agents/logs/parallel/2b03c5d5f24e455fb2e57f01/infra-pipeline/logs/app.log
+STOP: parallel stage merge failed: retained task-breakdown generation inputs or artifacts changed; refusing stale recovery; isolated evidence retained under logs/parallel
+EXIT CODE: 1

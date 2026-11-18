@@ -1,0 +1,32 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gym-api-alerts
+  namespace: gym-full-qa
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: gym-api.rules
+      rules:
+        - alert: GymApiPodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace="gym-full-qa", pod=~"gym-api-.*"}[15m]) > 3
+          for: 5m
+          labels: {severity: warning, project: "gym-full", environment: "qa", team: platform}
+          annotations:
+            summary: "gym-api pods are restarting repeatedly"
+        - alert: GymApiHighErrorRate
+          expr: |
+            sum(rate(http_server_request_duration_seconds_count{service_name="gym-api", http_response_status_code=~"5.."}[5m]))
+              / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name="gym-api"}[5m])), 1e-9) > 0.01
+          for: 10m
+          labels: {severity: critical, project: "gym-full", environment: "qa", team: platform}
+          annotations:
+            summary: "gym-api 5xx rate above 1.0%"
+        - alert: GymApiHighLatencyP95
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="gym-api"}[5m]))) > 0.5
+          for: 10m
+          labels: {severity: warning, project: "gym-full", environment: "qa", team: platform}
+          annotations:
+            summary: "gym-api p95 latency above 0.5s"

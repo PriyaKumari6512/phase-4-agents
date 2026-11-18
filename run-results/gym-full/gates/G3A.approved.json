@@ -1,0 +1,17 @@
+{
+  "gate": "G3A",
+  "project": "gym-full",
+  "decision": "approved",
+  "approver": {
+    "name": "Test Lead",
+    "role": "Test approver (automated test run, not a human sign-off)"
+  },
+  "submitted_by": {
+    "name": "Test upstream agent"
+  },
+  "decided_at": "2026-11-17T17:17:45+00:00",
+  "comment": "Test run approval",
+  "artifacts": {
+    "designs/designs.md": "sha256:4062f1d51da6541ba66c40b6bbe4f8e6d6802d2335d226f3ba0524012075dfbf"
+  }
+}

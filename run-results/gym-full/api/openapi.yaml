@@ -1,0 +1,2668 @@
+openapi: 3.0.3
+info:
+  title: FitZone Gym API
+  version: 1.0.0
+  description: |
+    Contract api-gym-api-v1 of ctr-gym-api (architecture v1). JSON over HTTPS under /api/v1.
+    Sessions are a signed JWT in the HttpOnly cookie gym_session. Dates are India dates (YYYY-MM-DD),
+    timestamps are RFC 3339 UTC, money is whole paise (integer) with currency INR.
+    Release marks (x-release) are MVP, R2 or R3 and follow the LLD interface marks.
+servers:
+  - url: /api/v1
+tags:
+  - name: system
+  - name: reference
+  - name: auth
+  - name: onboarding
+  - name: staff
+  - name: members
+  - name: membership
+  - name: payments
+  - name: checkin
+  - name: import
+  - name: dashboard
+  - name: webhooks
+paths:
+  /health:
+    servers:
+      - url: /
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Liveness and readiness check
+      description: |
+        Used by the load balancer and the deploy smoke test. Unauthenticated.
+        Stories: none (operations).
+      security: []
+      x-release: MVP
+      responses:
+        '200':
+          description: The API and its database connection are working
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /branches:
+    get:
+      tags: [reference]
+      operationId: listBranches
+      summary: List the branches (list_branches)
+      description: |
+        The branch choice at sign-up and trial, and the branch filters of staff screens.
+        Stories: US-001, US-001.AC1, US-009.AC1, US-009.AC11.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Active branches
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Branch'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /plans:
+    get:
+      tags: [reference]
+      operationId: listPlans
+      summary: List active plans (list_plans)
+      description: |
+        Monthly, quarterly and yearly plans with duration and price. Public so a new member sees prices before signing up.
+        Stories: US-011, US-011.AC1, US-011.AC2, US-012.AC1, US-012.AC3.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Active plans in display order
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Plan'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /plans/{plan_id}:
+    patch:
+      tags: [reference]
+      operationId: updatePlan
+      summary: Owner edits a plan (update_plan)
+      description: |
+        Changes the name, duration or price. Applies to future purchases only; payments already made keep their amount (BR-012). Owner only.
+        Stories: US-012, US-012.AC1, US-012.AC2, US-012.AC3, US-012.AC4.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanUpdate'
+      responses:
+        '200':
+          description: The updated plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /plans/{plan_id}/quote:
+    get:
+      tags: [membership]
+      operationId: getPlanQuote
+      summary: Start and expiry dates a plan would give the signed-in member (quote_renewal)
+      description: |
+        Used by the order summary for a new member, by the renewal plan choice (active plan: starts after current expiry, expired plan: starts today) and after a trial. The start date is evaluated again when the payment is confirmed (BR-003).
+        Stories: US-011.AC3, US-011.AC4, US-011.AC5, US-022.AC1, US-022.AC7, US-023.AC2, US-026.AC4.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+        - name: member_id
+          in: query
+          required: false
+          description: Staff only, to preview a desk payment for a member of their branch; a member always gets their own quote
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenewalQuote'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /auth/member-otps:
+    post:
+      tags: [auth]
+      operationId: requestMemberOtp
+      summary: Send a sign-in code by WhatsApp (request_member_otp)
+      description: |
+        Sends a 6-digit code valid 10 minutes to a registered number. At most 3 sends per number per 10 minutes; a new code cancels the earlier one. A number that is not registered gets NOT_REGISTERED with an offer to join or start a trial; a number shared by imported rows gets SHARED_PHONE (ask at the desk). If WhatsApp does not accept the message the answer is WHATSAPP_UNAVAILABLE and the screen offers asking at the front desk.
+        Stories: US-002, US-002.AC1, US-002.AC3, US-002.AC4, US-002.AC6, US-002.AC7, US-003, US-010.AC3.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '202':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Challenge'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /auth/member-sessions:
+    post:
+      tags: [auth]
+      operationId: signInMember
+      summary: Member signs in with the code (sign_in_member)
+      description: |
+        Checks the code (5 wrong tries, then a 15-minute wait) and sets the session cookie (30 days).
+        Stories: US-002, US-002.AC1, US-002.AC2, US-002.AC5, US-003.AC1, US-003.AC2, US-003.AC3, US-003.AC4, US-010.AC3, US-039.AC5.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeConfirm'
+      responses:
+        '200':
+          description: Signed in; the cookie gym_session is set
+          headers:
+            Set-Cookie:
+              description: gym_session, HttpOnly, Secure, SameSite=Strict
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/staff-sessions:
+    post:
+      tags: [auth]
+      operationId: signInStaff
+      summary: Staff, manager or owner signs in (sign_in_staff)
+      description: |
+        Username and password. 10 wrong passwords lock the account for 15 minutes. A deactivated account is refused.
+        Stories: US-004, US-004.AC1, US-004.AC2, US-004.AC3, US-051, US-051.AC1, US-051.AC2, US-052, US-052.AC1, US-052.AC2, US-008.AC5.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffCredentials'
+      responses:
+        '200':
+          description: Signed in; the cookie gym_session is set (12 hours)
+          headers:
+            Set-Cookie:
+              description: gym_session, HttpOnly, Secure, SameSite=Strict
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/session:
+    delete:
+      tags: [auth]
+      operationId: signOut
+      summary: Sign out
+      description: |
+        Clears the session cookie; the R3 offline copy is cleared by the web app at the same time (thr-013).
+        Stories: US-005 (role sessions end cleanly).
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      responses:
+        '204':
+          description: Signed out
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: Who is signed in and what scope they have (resolve_scope)
+      description: |
+        Returns role, branch and member id read from the database, so the web app can show only the menus the role needs.
+        Stories: US-005, US-005.AC1, US-005.AC2, US-005.AC3, US-005.AC4, US-007.AC3, US-006.AC3.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      responses:
+        '200':
+          description: The caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /signups:
+    post:
+      tags: [onboarding]
+      operationId: startSignup
+      summary: New member starts sign-up (start_signup)
+      description: |
+        Name, phone and home branch; sends a code by WhatsApp and creates nothing until the code is confirmed. Only these three fields are accepted, no health data. A number that already has an account gets PHONE_ALREADY_REGISTERED and an offer to sign in.
+        Stories: US-009, US-009.AC1, US-009.AC4, US-009.AC11, US-009.AC12, US-010, US-010.AC1, US-010.AC2, US-001.AC3, US-054.AC1.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupStart'
+      responses:
+        '202':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Challenge'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /signups/confirm:
+    post:
+      tags: [onboarding]
+      operationId: confirmSignup
+      summary: Confirm the code and create the member (confirm_signup)
+      description: |
+        A correct code creates the member, signs them in and leads to the plan choice. A wrong or expired code creates no member.
+        Stories: US-009.AC2, US-009.AC10, US-053, US-053.AC1, US-053.AC2, US-053.AC3, US-053.AC4, US-053.AC5, US-053.AC6, US-003.AC1.
+      security: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeConfirm'
+      responses:
+        '201':
+          description: Member created and signed in
+          headers:
+            Set-Cookie:
+              description: gym_session, HttpOnly, Secure, SameSite=Strict
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /trials:
+    post:
+      tags: [onboarding]
+      operationId: startTrial
+      summary: New person starts a free trial (start_trial)
+      description: |
+        Name, phone and home branch; sends a code. A number that already had a trial or is a loaded member gets TRIAL_NOT_AVAILABLE with an offer of a plan; a number with an account gets PHONE_ALREADY_REGISTERED and an offer to sign in.
+        Stories: US-024, US-024.AC1, US-024.AC4, US-025, US-025.AC1, US-025.AC2, US-025.AC3.
+      security: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupStart'
+      responses:
+        '202':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Challenge'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /trials/confirm:
+    post:
+      tags: [onboarding]
+      operationId: confirmTrial
+      summary: Confirm the code and start the trial (confirm_trial)
+      description: |
+        A correct code creates the member and a 7-day trial period (start day counts as day 1), signs them in and returns the QR data through GET /me/qr. No payment is asked.
+        Stories: US-024.AC1, US-024.AC2, US-024.AC3, US-026, US-026.AC1, US-026.AC2.
+      security: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeConfirm'
+      responses:
+        '201':
+          description: Trial started and member signed in
+          headers:
+            Set-Cookie:
+              description: gym_session, HttpOnly, Secure, SameSite=Strict
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrialSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /staff-users:
+    get:
+      tags: [staff]
+      operationId: listStaffUsers
+      summary: List staff and manager accounts (list_staff_users)
+      description: |
+        Owner only. Never returns password data.
+        Stories: US-008, US-008.AC1, US-052.AC1.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of staff users
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/StaffUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags: [staff]
+      operationId: createStaffUser
+      summary: Owner creates a staff or manager account (create_staff_user)
+      description: |
+        Role front desk or branch manager needs a branch; the account then sees only that branch's data. A taken username creates nothing.
+        Stories: US-008, US-008.AC1, US-008.AC2, US-008.AC4, US-008.AC5, US-006.AC1.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffUserCreate'
+      responses:
+        '201':
+          description: The new account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /staff-users/{user_id}:
+    patch:
+      tags: [staff]
+      operationId: setStaffActive
+      summary: Owner deactivates or reactivates an account (set_staff_active)
+      description: |
+        A deactivated account is refused on its next request (BR-018).
+        Stories: US-008, US-008.AC3.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffActiveUpdate'
+      responses:
+        '200':
+          description: The updated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members:
+    get:
+      tags: [members]
+      operationId: listMembers
+      summary: List members of a branch (list_members)
+      description: |
+        Front desk and managers get their own branch only; the owner may pass branch_id or omit it for all branches. A manager passing another branch gets FORBIDDEN_BRANCH. Archived and anonymised members are not listed.
+        Stories: US-005.AC3, US-006, US-006.AC1, US-006.AC4, US-001.AC2, US-047.AC3, US-039.AC3.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          required: false
+          description: Part of a name
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MemberListItem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members/needs-attention:
+    get:
+      tags: [members]
+      operationId: listNeedsAttention
+      summary: Members with no phone or a shared phone (list_needs_attention)
+      description: |
+        Own branch for front desk and managers, all or one branch for the owner.
+        Stories: US-038, US-038.AC1, US-038.AC2, US-038.AC3, US-038.AC4.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of members with the reason
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/NeedsAttentionItem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members/reminders-off:
+    get:
+      tags: [members]
+      operationId: listRemindersOff
+      summary: Members whose reminders are off (list_reminders_off)
+      description: |
+        Own branch for front desk and managers, all or one branch for the owner.
+        Stories: US-047, US-047.AC1.
+      security:
+        - cookieAuth: []
+      x-release: R3
+      parameters:
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MemberListItem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members/{member_id}:
+    get:
+      tags: [members]
+      operationId: getMember
+      summary: Get one member (get_member)
+      description: |
+        A member sees only their own record; front desk and managers see members of their own branch; the owner sees all. Another branch gives FORBIDDEN_BRANCH.
+        Stories: US-001.AC2, US-006.AC4, US-005.AC1, US-039.AC3, US-040.AC4.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+      responses:
+        '200':
+          description: The member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [members]
+      operationId: updateMember
+      summary: Edit name, phone or home branch (update_member)
+      description: |
+        Front desk and managers for members of their own branch, the owner for all. A phone number used by another member is refused with PHONE_IN_USE and the message names that member by name only. An edit cannot make a number shared.
+        Stories: US-039, US-039.AC1, US-039.AC2, US-039.AC3, US-039.AC4, US-039.AC5, US-038.AC4.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberUpdate'
+      responses:
+        '200':
+          description: The updated member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members/{member_id}/archive:
+    post:
+      tags: [members]
+      operationId: archiveMember
+      summary: Remove a duplicate member by archiving (archive_member)
+      description: |
+        Removes the member from search, check-in, counts and reminders; keeps payments and check-ins; never merges.
+        Stories: US-040, US-040.AC1, US-040.AC2, US-040.AC3, US-040.AC4, US-040.AC5, US-043.AC4.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The archived member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /members/{member_id}/anonymise:
+    post:
+      tags: [members]
+      operationId: anonymiseMember
+      summary: Owner anonymises a member on a deletion request (anonymise_member)
+      description: |
+        Removes name and phone, keeps amounts, dates and check-in rows (QA-011). Owner only. The PRD describes no screen for it; the owner's request is the trigger.
+        Stories: US-036 (deletion on request, NFR-017 note), US-040 (not the same as archive).
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Anonymised
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /members/{member_id}/qr-regenerations:
+    post:
+      tags: [members]
+      operationId: regenerateQr
+      summary: Replace a member's QR code (regenerate_qr_token, regenerate_qr)
+      description: |
+        Raises the member's QR version so the old code stops working at once. Front desk and managers for their branch, the owner for all. Writes an audit event.
+        Stories: US-021, US-029.AC2, US-021.AC2.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '201':
+          description: Done; the member's next view of their QR shows the new code
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [member_id, replaced_at]
+                properties:
+                  member_id:
+                    type: string
+                    format: uuid
+                  replaced_at:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /members/{member_id}/reminders-enabled:
+    put:
+      tags: [members]
+      operationId: setRemindersEnabled
+      summary: Switch a member's reminders on or off (set_reminders_enabled)
+      description: |
+        Front desk and managers for their branch, the owner for all. Switching on again is R3; the stop is R2.
+        Stories: US-046, US-046.AC1, US-047, US-047.AC2, US-047.AC3.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: The updated member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members/{member_id}/reminders:
+    get:
+      tags: [members]
+      operationId: getReminderStatus
+      summary: Reminder status of a member (get_reminder_status)
+      description: |
+        Shows sent, skipped, retrying or failed for the member's reminders (failed marking is R3). Staff of the member's branch and the owner.
+        Stories: US-044, US-044.AC2, US-044.AC3, US-047.AC3.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of reminders, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Reminder'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /members/{member_id}/membership:
+    get:
+      tags: [membership]
+      operationId: getMemberMembership
+      summary: Membership view of a member for staff (get_membership_view)
+      description: |
+        Plan, status (active, expired, trial, none), expiry date and days left, scoped to the caller's branch.
+        Stories: US-016.AC1, US-031.AC1, US-006.AC4.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+      responses:
+        '200':
+          description: The membership view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipView'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /members/{member_id}/payments:
+    get:
+      tags: [payments]
+      operationId: listMemberPayments
+      summary: Payment history of a member for staff (list_payments)
+      description: |
+        Newest first; desk payments marked "at the desk"; cancelled desk payments stay listed marked cancelled with their reason (ASM-025). Staff of the member's branch and the owner.
+        Stories: US-016.AC4, US-014.AC7, US-015, US-015.AC3, US-040.AC4, US-006.AC2.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of payments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /me/membership:
+    get:
+      tags: [membership]
+      operationId: getMyMembership
+      summary: The signed-in member's plan, status and expiry (get_membership_view)
+      description: |
+        Plan name and duration, status Active, Expired or Free trial, expiry date and days left (0 on the expiry day, expired the day after).
+        Stories: US-018, US-018.AC1, US-018.AC2, US-018.AC3, US-019, US-019.AC1, US-019.AC2, US-019.AC3, US-013.AC3, US-013.AC4, US-013.AC5, US-013.AC6, US-014.AC6, US-022.AC4, US-023.AC1, US-023.AC4, US-026.AC3.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      responses:
+        '200':
+          description: The membership view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipView'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /me/qr:
+    get:
+      tags: [membership]
+      operationId: getMyQr
+      summary: The signed-in member's QR token (get_my_qr)
+      description: |
+        Returns the signed token as text for the browser to draw as a QR image. The same token every time until staff replace it. Shown on the home page, after payment and after trial start.
+        Stories: US-021, US-021.AC1, US-021.AC2, US-013.AC7, US-024.AC2.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      responses:
+        '200':
+          description: The QR text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrToken'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /me/payments:
+    get:
+      tags: [payments]
+      operationId: listMyPayments
+      summary: The signed-in member's payment history (list_payments)
+      description: |
+        Newest first with date, amount, plan and method (online or at the desk).
+        Stories: US-020, US-020.AC1, US-022.AC3, US-012.AC2.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of payments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /payment-orders:
+    post:
+      tags: [payments]
+      operationId: createPaymentOrder
+      summary: Member starts an online payment (create_online_order)
+      description: |
+        The server creates the Razorpay order from the stored plan price; the browser sends only a plan id (and optionally the branch screen it is on). Returns the order id and public key for Razorpay Checkout. The membership starts only after a verified confirmation. Used for a first purchase, a renewal and a retry after a failure. The Idempotency-Key header makes a repeated tap return the same order.
+        Stories: US-013, US-013.AC1, US-014.AC3, US-014.AC9, US-022, US-023, US-026.AC4, US-001.AC5, US-015.AC1.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentOrderCreate'
+      responses:
+        '201':
+          description: The order to pay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOrderCreated'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /payment-orders/{order_id}:
+    get:
+      tags: [payments]
+      operationId: getPaymentOrderStatus
+      summary: Status of an online payment (get_order_status)
+      description: |
+        Polled by the payment result screen: created ("We are checking your payment"), paid (with the new expiry date), failed (declined) or abandoned. The member can read only their own orders.
+        Stories: US-013.AC2, US-013.AC4, US-014, US-014.AC1, US-014.AC2, US-014.AC4, US-014.AC5, US-014.AC8, US-022.AC2, US-023.AC3.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The order status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOrderStatus'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /desk-payments:
+    post:
+      tags: [payments]
+      operationId: recordDeskPayment
+      summary: Staff record a cash or UPI payment taken at the desk (record_desk_payment)
+      description: |
+        Front desk for members of their own branch, the owner for any member. Applies the same period rule as an online renewal. The screen first shows the plan price and resulting expiry from GET /plans/{plan_id}/quote with the member_id query parameter. Idempotency-Key prevents a double entry. Depends on open question Q-005 (ASM-002).
+        Stories: US-016, US-016.AC1, US-016.AC2, US-016.AC3, US-016.AC4, US-016.AC5, US-031.AC4.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeskPaymentCreate'
+      responses:
+        '201':
+          description: The payment and the new expiry date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeskPaymentResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /payments/{payment_id}/cancellation:
+    post:
+      tags: [payments]
+      operationId: cancelDeskPayment
+      summary: Manager or owner cancels a wrong desk payment (cancel_desk_payment)
+      description: |
+        Needs a reason. Only the manager of the member's home branch or the owner; front desk has no cancel. Only a desk payment whose period is the member's latest can be cancelled; the expiry returns to the earlier value, the payment stays in the history marked cancelled and is left out of revenue. Writes an audit event.
+        Stories: US-017, US-017.AC1, US-017.AC2, US-017.AC3, US-017.AC5.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: payment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        '200':
+          description: The cancelled payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /payments/{payment_id}/receipt:
+    get:
+      tags: [payments]
+      operationId: getReceipt
+      summary: Simple receipt of a payment (get_receipt)
+      description: |
+        Member name, plan, amount, date and payment reference; not a GST invoice (ASM-008). A member sees only their own; staff see those of their branch.
+        Stories: US-020, US-020.AC2, US-020.AC3.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: payment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /webhooks/razorpay:
+    post:
+      tags: [webhooks]
+      operationId: receiveRazorpayWebhook
+      summary: Razorpay payment events (handle_razorpay_event, verify_webhook)
+      description: |
+        Called by Razorpay, not by the web app. The HMAC signature in X-Razorpay-Signature is checked before any change; a wrong signature gives 401 INVALID_SIGNATURE and changes nothing. The event is stored (by event id) before 200 is returned; a repeated event or payment id does nothing. Amount and order id must match the stored order. Only the order id, payment id and amount are kept.
+        Stories: US-013.AC2, US-013.AC4, US-014.AC1, US-014.AC4, US-014.AC5, US-015, US-015.AC1, US-015.AC2, US-015.AC4.
+      security:
+        - razorpaySignature: []
+      x-release: MVP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Razorpay event body, parsed for event name, order id, payment id and amount only
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stored (also returned for a duplicate)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /webhooks/whatsapp:
+    get:
+      tags: [webhooks]
+      operationId: verifyWhatsappWebhook
+      summary: WhatsApp webhook set-up check
+      description: |
+        Answers the provider's one-time verification with the configured verify token.
+        Stories: US-045 (channel set-up, Q-019).
+      security: []
+      x-release: R2
+      parameters:
+        - name: hub.mode
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hub.verify_token
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The challenge text
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      tags: [webhooks]
+      operationId: receiveWhatsappWebhook
+      summary: WhatsApp replies and delivery status (handle_inbound)
+      description: |
+        Called by WhatsApp. The signature in X-Hub-Signature-256 is checked first. A reply that matches a stop word switches that sender's reminders off (only the sender's own phone is matched). Delivery statuses update the message. Idempotent on the provider event id; the reply text is not stored.
+        Stories: US-046, US-046.AC2, US-044.AC2, US-044.AC3, US-045.AC1.
+      security:
+        - whatsappSignature: []
+      x-release: R2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: WhatsApp event body, parsed for sender, message id, status and reply meaning only
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stored (also returned for a duplicate)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /checkin-lookups:
+    get:
+      tags: [checkin]
+      operationId: lookupMember
+      summary: Find a member to check in by phone, QR or name (lookup)
+      description: |
+        kind=phone returns all non-archived matches (several for a shared number, staff choose by name); kind=qr accepts a token only when its signature and version are valid; kind=name is a part-of-name search, one page. Each match shows name, plan, derived status and expiry date; an expired or no-plan member carries the warning flag. An empty result is the "member not found" screen (HTTP 200 with no items) so staff are offered a free trial or sign-up. Front desk and the owner look up any member; a manager only their branch.
+        Stories: US-028, US-028.AC1, US-028.AC2, US-028.AC3, US-028.AC4, US-029, US-029.AC1, US-029.AC2, US-030, US-030.AC1, US-030.AC2, US-030.AC3, US-031.AC1, US-031.AC5, US-032, US-032.AC1, US-032.AC2, US-032.AC3, US-032.AC4, US-026.AC1, US-026.AC2, US-036.AC4.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [phone, qr, name]
+        - name: q
+          in: query
+          required: true
+          description: Phone number (+91 and 10 digits), QR token text, or part of a name (at least 2 letters)
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 400
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of matches (empty when no member is found)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LookupMatch'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /checkins:
+    post:
+      tags: [checkin]
+      operationId: recordCheckin
+      summary: Record a check-in (record_checkin)
+      description: |
+        Front desk only. Stores member, the staff user's branch, time, staff user and result: valid, trial, expired, or entered while expired (when enter_anyway is true for an expired or no-plan member). Members of other branches are accepted. A repeated client_id returns the stored check-in. Writes an audit event for entered while expired. No record is made for a member who is not found.
+        Stories: US-033, US-033.AC1, US-033.AC2, US-033.AC3, US-033.AC4, US-033.AC5, US-031.AC2, US-001.AC6, US-023 (trial check-in), US-026.AC1.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckinCreate'
+      responses:
+        '201':
+          description: The stored check-in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checkin'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    get:
+      tags: [checkin]
+      operationId: listCheckins
+      summary: List check-ins by scope (list_checkins)
+      description: |
+        Front desk and managers get the check-ins made at their own branch (name and result, not the member's home branch); the owner may pass branch_id or omit it for all. Dates are India dates, inclusive.
+        Stories: US-006.AC2, US-033.AC1, US-035.AC1, US-040.AC4.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - name: from_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of check-ins, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CheckinListItem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /checkins/snapshot:
+    get:
+      tags: [checkin]
+      operationId: getSnapshot
+      summary: Offline snapshot of members for the tablet (get_snapshot)
+      description: |
+        Members changed since a time, with derived status, expiry date and the SHA-256 of the current QR token (never the token). Refreshed every 5 minutes while online; usable offline while at most 20 minutes old. Staff only, no payments in it. Pages up to 500 rows.
+        Stories: US-034, US-034.AC1, US-034.AC2, US-034.AC3, US-035.AC2.
+      security:
+        - cookieAuth: []
+      x-release: R3
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: Return only members changed after this time; omit for the full list
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Page'
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 500
+      responses:
+        '200':
+          description: One page of snapshot rows and the ids removed since
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items, removed_member_ids, generated_at]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SnapshotMember'
+                      removed_member_ids:
+                        type: array
+                        items:
+                          type: string
+                          format: uuid
+                      generated_at:
+                        type: string
+                        format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /checkins/offline-uploads:
+    post:
+      tags: [checkin]
+      operationId: uploadOfflineCheckins
+      summary: Send check-ins made offline (upload_offline_checkins)
+      description: |
+        Each item carries a client id and its original time; an item whose client id is already stored is counted but not stored again.
+        Stories: US-035, US-035.AC1.
+      security:
+        - cookieAuth: []
+      x-release: R3
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    $ref: '#/components/schemas/OfflineCheckin'
+      responses:
+        '200':
+          description: How many items were stored and how many were already stored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stored, already_stored]
+                properties:
+                  stored:
+                    type: integer
+                  already_stored:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /import-batches:
+    get:
+      tags: [import]
+      operationId: listImportBatches
+      summary: List import batches
+      description: |
+        Lets the owner and staff find the batch whose report to open. Owner and managers and front desk read the reports (own branch lists only).
+        Stories: US-037, US-038.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of batches, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ImportBatch'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /import-batches/{batch_id}/report:
+    get:
+      tags: [import]
+      operationId: getImportReport
+      summary: Load report (get_import_report)
+      description: |
+        Counts of rows loaded, rows without a phone number and rows sharing a phone number, and per-branch lists of the members concerned (own branch for front desk and managers, all for the owner).
+        Stories: US-036.AC1, US-036.AC2, US-036.AC3, US-037, US-037.AC1, US-037.AC2, US-037.AC3, US-038.
+      security:
+        - cookieAuth: []
+      x-release: MVP
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: The report with one page of member lines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReport'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /dashboard/active-members:
+    get:
+      tags: [dashboard]
+      operationId: getActiveMembers
+      summary: Active members per branch (get_active_members)
+      description: |
+        Non-archived members with a paid (not trial) period with expiry on or after today, by home branch. A manager gets only their branch; the owner gets all, or one with branch_id. 0 is shown when none.
+        Stories: US-048, US-048.AC1, US-048.AC2, US-048.AC3, US-048.AC4, US-007.AC1, US-007.AC2, US-007.AC3, US-006.AC3, US-040.AC3.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Counts per branch
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BranchCount'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /dashboard/renewals-due:
+    get:
+      tags: [dashboard]
+      operationId: getRenewalsDue
+      summary: Renewals due this week (get_renewals_due)
+      description: |
+        Paid periods whose latest expiry is from today to 6 days ahead, with counts per branch and the list of members and expiry dates. Manager: own branch; owner: all or one.
+        Stories: US-049, US-049.AC1, US-049.AC2, US-049.AC3, US-049.AC4, US-049.AC5, US-049.AC6, US-049.AC7.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Counts and one page of the list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items, counts]
+                    properties:
+                      counts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BranchCount'
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RenewalDueItem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /dashboard/revenue:
+    get:
+      tags: [dashboard]
+      operationId: getRevenue
+      summary: Revenue per month per branch (get_revenue)
+      description: |
+        Recorded (not failed, not cancelled) online and desk payments in each India calendar month, by the member's home branch. A manager sees only their branch. 0 for a month with no payments. On screen only, there is no export.
+        Stories: US-050, US-050.AC1, US-050.AC2, US-050.AC3, US-050.AC4, US-050.AC5, US-015, US-017.AC1.
+      security:
+        - cookieAuth: []
+      x-release: R2
+      parameters:
+        - name: from_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        - name: to_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        - name: branch_id
+          in: query
+          required: false
+          description: Owner only
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One row per branch and month
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RevenueRow'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: gym_session
+      description: Signed JWT in an HttpOnly, Secure, SameSite=Strict cookie; role and branch are read from the database on every request
+    razorpaySignature:
+      type: apiKey
+      in: header
+      name: X-Razorpay-Signature
+      description: HMAC-SHA256 of the raw body with RAZORPAY_WEBHOOK_SECRET
+    whatsappSignature:
+      type: apiKey
+      in: header
+      name: X-Hub-Signature-256
+      description: HMAC-SHA256 of the raw body with WHATSAPP_APP_SECRET
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    PlanId:
+      name: plan_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MemberId:
+      name: member_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Request id; the server makes one when absent and returns it in the same header
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: A repeated request with the same key returns the first result
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 64
+  responses:
+    BadRequest:
+      description: Wrong or expired code (OTP_INVALID, OTP_EXPIRED)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthenticated:
+      description: No valid session, wrong credentials or wrong webhook signature (UNAUTHENTICATED, INVALID_CREDENTIALS, INVALID_SIGNATURE)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Role or branch not allowed (FORBIDDEN, FORBIDDEN_BRANCH, ACCOUNT_DEACTIVATED)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Record not found (NOT_FOUND, MEMBER_NOT_FOUND, PLAN_NOT_FOUND, NOT_REGISTERED)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Rule conflict (PHONE_ALREADY_REGISTERED, TRIAL_NOT_AVAILABLE, SHARED_PHONE, PHONE_IN_USE, USERNAME_TAKEN, PAYMENT_NOT_CANCELLABLE)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Input missing or malformed (VALIDATION_ERROR); the message names the field
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Too many tries or sends (OTP_LOCKED, OTP_RATE_LIMITED, ACCOUNT_LOCKED)
+      headers:
+        Retry-After:
+          description: Seconds to wait
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unavailable:
+      description: A dependency is down (WHATSAPP_UNAVAILABLE, PAYMENT_UNAVAILABLE) or the database is not reachable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [code, message, timestamp, correlation_id]
+      properties:
+        code:
+          type: string
+          example: OTP_INVALID
+        message:
+          type: string
+          description: Plain English; never personal data of someone other than the caller (exception PHONE_IN_USE names the other member)
+        timestamp:
+          type: string
+          format: date-time
+        correlation_id:
+          type: string
+          format: uuid
+    PageMeta:
+      type: object
+      required: [page, page_size, total]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+    Branch:
+      type: object
+      required: [id, name, code]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+    Plan:
+      type: object
+      required: [id, name, months, price_paise, currency, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        months:
+          type: integer
+        price_paise:
+          type: integer
+        currency:
+          type: string
+          enum: [INR]
+        active:
+          type: boolean
+    PlanUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        months:
+          type: integer
+          minimum: 1
+          maximum: 36
+        price_paise:
+          type: integer
+          minimum: 1
+    OtpRequest:
+      type: object
+      required: [phone, purpose]
+      properties:
+        phone:
+          type: string
+          pattern: '^\+91[6-9][0-9]{9}$'
+        purpose:
+          type: string
+          enum: [signin]
+    Challenge:
+      type: object
+      required: [challenge_id, expires_at]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+    CodeConfirm:
+      type: object
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+    StaffCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          maxLength: 40
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          maxLength: 128
+    Session:
+      type: object
+      required: [user, expires_at]
+      properties:
+        user:
+          $ref: '#/components/schemas/CurrentUser'
+        expires_at:
+          type: string
+          format: date-time
+    TrialSession:
+      allOf:
+        - $ref: '#/components/schemas/Session'
+        - type: object
+          required: [trial_end_date]
+          properties:
+            trial_end_date:
+              type: string
+              format: date
+    CurrentUser:
+      type: object
+      required: [id, role, display_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [member, front_desk, branch_manager, owner]
+        display_name:
+          type: string
+        branch_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Home branch for a member, assigned branch for staff and managers, null for the owner
+        member_id:
+          type: string
+          format: uuid
+          nullable: true
+    SignupStart:
+      type: object
+      required: [name, phone, branch_id]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        phone:
+          type: string
+          pattern: '^\+91[6-9][0-9]{9}$'
+        branch_id:
+          type: string
+          format: uuid
+    StaffUser:
+      type: object
+      required: [id, username, display_name, role, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [front_desk, branch_manager, owner]
+        branch_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [active, deactivated]
+        created_at:
+          type: string
+          format: date-time
+    StaffUserCreate:
+      type: object
+      required: [username, display_name, role, initial_password]
+      properties:
+        username:
+          type: string
+          pattern: '^[a-z0-9._-]{3,40}$'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        role:
+          type: string
+          enum: [front_desk, branch_manager]
+        branch_id:
+          type: string
+          format: uuid
+        initial_password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 8
+          maxLength: 128
+    StaffActiveUpdate:
+      type: object
+      required: [active]
+      properties:
+        active:
+          type: boolean
+    Member:
+      type: object
+      required: [id, name, home_branch_id, source, status, reminders_enabled, phone_shared, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        home_branch_id:
+          type: string
+          format: uuid
+        home_branch_name:
+          type: string
+          description: Computed from the branch
+        source:
+          type: string
+          enum: [signup, trial, import]
+        status:
+          type: string
+          enum: [active, archived, anonymised]
+        reminders_enabled:
+          type: boolean
+        phone_shared:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    MemberListItem:
+      type: object
+      required: [id, name, home_branch_id, membership_status, reminders_enabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        home_branch_id:
+          type: string
+          format: uuid
+        membership_status:
+          type: string
+          enum: [active, trial, expired, none]
+          description: Derived from the latest period and today (India date)
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+        reminders_enabled:
+          type: boolean
+    NeedsAttentionItem:
+      allOf:
+        - $ref: '#/components/schemas/MemberListItem'
+        - type: object
+          required: [reason]
+          properties:
+            reason:
+              type: string
+              enum: [no_phone, shared_phone]
+    MemberUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        phone:
+          type: string
+          pattern: '^\+91[6-9][0-9]{9}$'
+        home_branch_id:
+          type: string
+          format: uuid
+    MembershipView:
+      type: object
+      required: [status, days_left]
+      properties:
+        status:
+          type: string
+          enum: [active, trial, expired, none]
+        plan_name:
+          type: string
+          nullable: true
+        plan_months:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+        days_left:
+          type: integer
+          description: 0 on the expiry date, negative after it
+    RenewalQuote:
+      type: object
+      required: [plan_id, price_paise, start_date, expiry_date]
+      properties:
+        plan_id:
+          type: string
+          format: uuid
+        price_paise:
+          type: integer
+        start_date:
+          type: string
+          format: date
+        expiry_date:
+          type: string
+          format: date
+    QrToken:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Signed token text to draw as a QR image
+    PaymentOrderCreate:
+      type: object
+      required: [plan_id]
+      properties:
+        plan_id:
+          type: string
+          format: uuid
+        branch_id:
+          type: string
+          format: uuid
+          description: The branch screen the member is on; defaults to the home branch
+    PaymentOrderCreated:
+      type: object
+      required: [order_id, razorpay_order_id, razorpay_key_id, amount_paise, currency]
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        razorpay_order_id:
+          type: string
+        razorpay_key_id:
+          type: string
+          description: Public key id only
+        amount_paise:
+          type: integer
+        currency:
+          type: string
+          enum: [INR]
+    PaymentOrderStatus:
+      type: object
+      required: [order_id, status]
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [created, paid, failed, abandoned]
+        plan_id:
+          type: string
+          format: uuid
+        plan_name:
+          type: string
+        new_expiry_date:
+          type: string
+          format: date
+          nullable: true
+          description: Set when status is paid
+        failure_reason:
+          type: string
+          nullable: true
+    DeskPaymentCreate:
+      type: object
+      required: [member_id, plan_id, method]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        method:
+          type: string
+          enum: [cash, upi]
+    DeskPaymentResult:
+      type: object
+      required: [payment, new_start_date, new_expiry_date]
+      properties:
+        payment:
+          $ref: '#/components/schemas/Payment'
+        new_start_date:
+          type: string
+          format: date
+        new_expiry_date:
+          type: string
+          format: date
+    Payment:
+      type: object
+      required: [id, member_id, plan_id, amount_paise, currency, channel, method, branch_id, status, paid_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        plan_name:
+          type: string
+        amount_paise:
+          type: integer
+        currency:
+          type: string
+          enum: [INR]
+        channel:
+          type: string
+          enum: [online, desk]
+        method:
+          type: string
+          enum: [upi, card, cash]
+        branch_id:
+          type: string
+          format: uuid
+        razorpay_payment_id:
+          type: string
+          nullable: true
+          description: Razorpay reference for online payments
+        status:
+          type: string
+          enum: [recorded, cancelled]
+        cancel_reason:
+          type: string
+          nullable: true
+        paid_at:
+          type: string
+          format: date-time
+    Receipt:
+      type: object
+      required: [payment_id, member_name, plan_name, amount_paise, currency, paid_at]
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+        member_name:
+          type: string
+        plan_name:
+          type: string
+        amount_paise:
+          type: integer
+        currency:
+          type: string
+          enum: [INR]
+        paid_at:
+          type: string
+          format: date-time
+        reference:
+          type: string
+          nullable: true
+          description: Razorpay payment id, or the payment id for a desk payment
+    WebhookAck:
+      type: object
+      required: [received]
+      properties:
+        received:
+          type: boolean
+    LookupMatch:
+      type: object
+      required: [member_id, name, membership_status, warning]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        home_branch_name:
+          type: string
+        plan_name:
+          type: string
+          nullable: true
+        membership_status:
+          type: string
+          enum: [active, trial, expired, none]
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+        warning:
+          type: boolean
+          description: True when the member is expired or has no plan
+    CheckinCreate:
+      type: object
+      required: [member_id]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        enter_anyway:
+          type: boolean
+          default: false
+          description: Staff chose to let an expired or no-plan member in
+        client_id:
+          type: string
+          maxLength: 64
+    Checkin:
+      type: object
+      required: [id, member_id, branch_id, staff_user_id, checked_in_at, result, offline]
+      properties:
+        id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        branch_id:
+          type: string
+          format: uuid
+        staff_user_id:
+          type: string
+          format: uuid
+        checked_in_at:
+          type: string
+          format: date-time
+        result:
+          type: string
+          enum: [valid, trial, expired, entered_expired]
+        offline:
+          type: boolean
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+          description: Shown with the expired warning
+    CheckinListItem:
+      type: object
+      required: [id, member_name, branch_id, checked_in_at, staff_username, result]
+      properties:
+        id:
+          type: string
+          format: uuid
+        member_name:
+          type: string
+        branch_id:
+          type: string
+          format: uuid
+        checked_in_at:
+          type: string
+          format: date-time
+        staff_username:
+          type: string
+        result:
+          type: string
+          enum: [valid, trial, expired, entered_expired]
+    OfflineCheckin:
+      type: object
+      required: [member_id, client_id, checked_in_at, result]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          maxLength: 64
+        checked_in_at:
+          type: string
+          format: date-time
+        result:
+          type: string
+          enum: [valid, trial, expired, entered_expired]
+    SnapshotMember:
+      type: object
+      required: [member_id, name, membership_status, qr_token_sha256]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        membership_status:
+          type: string
+          enum: [active, trial, expired, none]
+        plan_name:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+        qr_token_sha256:
+          type: string
+          description: SHA-256 of the current token, hex
+    ImportBatch:
+      type: object
+      required: [id, file_name, rows_total, rows_loaded, rows_without_phone, rows_sharing_phone, completed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        rows_total:
+          type: integer
+        rows_loaded:
+          type: integer
+        rows_without_phone:
+          type: integer
+        rows_sharing_phone:
+          type: integer
+        rows_unmatched_plan:
+          type: integer
+        completed_at:
+          type: string
+          format: date-time
+    ImportReport:
+      allOf:
+        - $ref: '#/components/schemas/ImportBatch'
+        - type: object
+          required: [lines, page, page_size, total]
+          properties:
+            page:
+              type: integer
+            page_size:
+              type: integer
+            total:
+              type: integer
+            lines:
+              type: array
+              items:
+                $ref: '#/components/schemas/NeedsAttentionItem'
+    Reminder:
+      type: object
+      required: [id, kind, expiry_date, due_date, status, attempts]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [7d, 1d, trial1d]
+        expiry_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [due, sent, skipped, retrying, failed]
+        skip_reason:
+          type: string
+          nullable: true
+        attempts:
+          type: integer
+    BranchCount:
+      type: object
+      required: [branch_id, branch_name, count]
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        branch_name:
+          type: string
+        count:
+          type: integer
+    RenewalDueItem:
+      type: object
+      required: [member_id, name, branch_id, expiry_date]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        branch_id:
+          type: string
+          format: uuid
+        expiry_date:
+          type: string
+          format: date
+    RevenueRow:
+      type: object
+      required: [branch_id, branch_name, month, amount_paise, currency]
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        branch_name:
+          type: string
+        month:
+          type: string
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        amount_paise:
+          type: integer
+        online_paise:
+          type: integer
+        desk_paise:
+          type: integer
+        currency:
+          type: string
+          enum: [INR]

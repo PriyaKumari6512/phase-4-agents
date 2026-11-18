@@ -1,0 +1,21 @@
+{
+  "gate": "P4-G4",
+  "project": "gym-full",
+  "decision": "approved",
+  "approver": {
+    "name": "Orchestrator (automated test approval)",
+    "role": "NOT a human sign-off",
+    "automation": "phase4-env-test-mode"
+  },
+  "submitted_by": {
+    "name": "infra-pipeline agent"
+  },
+  "decided_at": "2026-11-17T17:53:21+00:00",
+  "comment": "Automated test approval by the orchestrator (PHASE4_AUTO_APPROVE_FOR_TESTING), not a human review. Validator: success.",
+  "artifacts": {
+    "infra/intent.json": "sha256:4486b94ef85d34884cc8acf7c9fb5ed2c80ec6efa62d99c43766c008f7d4ef87",
+    "infra/manifest.json": "sha256:656ac2b8787f6ec22944c26400b8312dada0155529fc61ada9d3197acc531121",
+    "infra/checks.json": "sha256:f93d57d8e16f22ceae36920bc18115fdd2015175170fa7592f18f2a5a34a5863",
+    "infra/PR.md": "sha256:98c2ea6dc0bda8167ebcbb18567cd0ce612cb042353fbfb587c76d30747a8773"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "job_id": "20261117-233441-ebfb78",
+  "agent": "work-allocation",
+  "project": "gym-full",
+  "request": 1,
+  "request_text": "Assign sprint 1.",
+  "invocation_id": "6ad6279d6dbc4ced9aa6880c",
+  "passes": [
+    {
+      "kind": "write",
+      "agent": "work-allocation",
+      "model_tier": "fast",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "ok": true
+    },
+    {
+      "kind": "verify",
+      "agent": "work-allocation/validator",
+      "model_tier": "fast",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "ok": true,
+      "satisfied": true
+    }
+  ],
+  "agent_reply": "Assignment plan ready for Engineering Manager review.",
+  "loops": 1,
+  "status": "success",
+  "verified": true,
+  "verdict": {
+    "satisfied": true,
+    "status_so_far": "success",
+    "gaps": [],
+    "summary": "Deterministic assignment checks passed; 14 tasks unassigned: GT-11-T03, GT-11-T04, GT-12-T01, GT-12-T03, GT-13-T01, GT-13-T02, GT-13-T03, GT-14-T01, GT-14-T02, GT-14-T03, GT-14-T04, GT-14-T05, GT-18-T02, GT-18-T03"
+  },
+  "stage_budget": {
+    "model_calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "elapsed_seconds": 0.331,
+    "stopped": null,
+    "max_calls": 16,
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 64000,
+    "timeout_seconds": 1800.0,
+    "token_limit_scope": "Provider-reported tokens; concurrent in-flight calls may overshoot. Missing usage cannot be charged."
+  },
+  "elapsed_seconds": 0.1,
+  "tokens": {},
+  "finished_at": "2026-11-17T18:04:41+00:00",
+  "files": {
+    "created": [
+      "allocation/assignments.json",
+      "allocation/assignments.md",
+      "allocation/problem.json"
+    ],
+    "changed": [],
+    "deleted": []
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "job_id": "20261117-231351-09babe",
+  "agent": "infra-pipeline",
+  "project": "gym-full",
+  "request": 2,
+  "request_text": "Set up the infrastructure and pipelines from the approved architecture.",
+  "verification_resumed_from": "20261117-230354-3c4ec5",
+  "recovery_action": "repair",
+  "invocation_id": "9d60a75b8b6b42f09b24ac56",
+  "passes": [
+    {
+      "kind": "fix",
+      "agent": "infra-pipeline",
+      "model_tier": "strong",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": false,
+      "error": "Return each file complete; keep every block and fix findings in place. repo/envs/qa/core/main.tf drops: data, data aws_iam_policy_document web_app_cdn_read, data aws_secretsmanager_secret gym_api_database-credentials, data aws_secretsmanager_secret gym_api_database_url, data aws_secretsmanager_secret gym_api_jwt-signing-key, data aws_secretsmanager_secret gym_api_qr-signing-key, data aws_secretsmanager_secret gym_api_razorpay-api-key-id, data aws_secretsmanager_secret gym_api_razorpay-api-key-secret, data aws_secretsmanager_secret gym_api_razorpay-webhook-secret, data aws_secretsmanager_secret gym_api_whatsapp-access-token"
+    },
+    {
+      "kind": "fix",
+      "agent": "infra-pipeline",
+      "model_tier": "frontier",
+      "model": "anthropic:claude-sonnet-5-5",
+      "ok": false,
+      "error": "Return each file complete; keep every block and fix findings in place. repo/envs/qa/core/main.tf drops: data, data aws_iam_policy_document web_app_cdn_read, data aws_secretsmanager_secret gym_api_database-credentials, data aws_secretsmanager_secret gym_api_database_url, data aws_secretsmanager_secret gym_api_jwt-signing-key, data aws_secretsmanager_secret gym_api_qr-signing-key, data aws_secretsmanager_secret gym_api_razorpay-api-key-id, data aws_secretsmanager_secret gym_api_razorpay-api-key-secret, data aws_secretsmanager_secret gym_api_razorpay-webhook-secret, data aws_secretsmanager_secret gym_api_whatsapp-access-token"
+    }
+  ],
+  "agent_reply": null,
+  "status": "fail",
+  "error": "Return each file complete; keep every block and fix findings in place. repo/envs/qa/core/main.tf drops: data, data aws_iam_policy_document web_app_cdn_read, data aws_secretsmanager_secret gym_api_database-credentials, data aws_secretsmanager_secret gym_api_database_url, data aws_secretsmanager_secret gym_api_jwt-signing-key, data aws_secretsmanager_secret gym_api_qr-signing-key, data aws_secretsmanager_secret gym_api_razorpay-api-key-id, data aws_secretsmanager_secret gym_api_razorpay-api-key-secret, data aws_secretsmanager_secret gym_api_razorpay-webhook-secret, data aws_secretsmanager_secret gym_api_whatsapp-access-token",
+  "stage_budget": {
+    "model_calls": 4,
+    "input_tokens": 155894,
+    "output_tokens": 32020,
+    "elapsed_seconds": 167.891,
+    "stopped": "Task Breakdown pass failed; further background mutations refused",
+    "max_calls": 16,
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 64000,
+    "timeout_seconds": 1800.0,
+    "token_limit_scope": "Provider-reported tokens; concurrent in-flight calls may overshoot. Missing usage cannot be charged."
+  },
+  "elapsed_seconds": 167.8,
+  "tokens": {
+    "claude-sonnet-5-5": {
+      "output_token_details": {
+        "reasoning": 1745
+      },
+      "total_tokens": 187914,
+      "input_token_details": {
+        "ephemeral_1h_input_tokens": 0,
+        "cache_read": 0,
+        "cache_creation": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "output_tokens": 32020,
+      "input_tokens": 155894
+    }
+  },
+  "finished_at": "2026-11-17T17:46:39+00:00",
+  "files": {
+    "created": [],
+    "changed": [],
+    "deleted": []
+  }
+}

@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: gym-full-dev
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/acme/gym-infra.git
+        revision: HEAD
+        directories:
+          - path: gitops/apps/*/dev
+  template:
+    metadata:
+      name: '{{index .path.segments 2}}-dev'
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/acme/gym-infra.git
+          targetRevision: HEAD
+          path: gitops/charts/app
+          helm:
+            valueFiles:
+              - '../../apps/{{index .path.segments 2}}/dev/values.yaml'
+        - repoURL: https://github.com/acme/gym-infra.git
+          targetRevision: HEAD
+          path: 'gitops/apps/{{index .path.segments 2}}/dev'
+          directory:
+            exclude: values.yaml
+      destination:
+        name: gym-full-dev
+        namespace: gym-full-dev
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

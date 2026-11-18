@@ -1,0 +1,483 @@
+{
+  "sprint_index": 1,
+  "sprint": "gym-full Sprint 1",
+  "window": [
+    "2026-11-23",
+    "2026-12-06"
+  ],
+  "tasks": [
+    {
+      "task_id": "GT-11-T01",
+      "story_id": "GT-11",
+      "title": "Add branch and member home-branch columns and check-in branch/time columns",
+      "type": "feature",
+      "description": "Add the branch table (ent-branch, owned by cmp-branch-directory) seeded with the owner-supplied branch names. Make the home branch on the member record (ent-member) required with a foreign key to branch. Make branch and timestamp on the check-in table (ent-checkin) required with foreign keys. Use an additive Alembic migration.",
+      "repo": "acme/gym-api",
+      "discipline": "DB",
+      "hours": 4.0,
+      "skills": [
+        "postgres",
+        "data-modeling"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN a member row is inserted without a home branch id, THE SYSTEM SHALL reject it with a database constraint error.",
+        "WHEN a check-in row is inserted without branch id or time, THE SYSTEM SHALL reject it with a database constraint error.",
+        "WHEN the migration runs on an empty database, THE SYSTEM SHALL contain one branch row for each branch name supplied by the client."
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "DB discipline; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-11-T02",
+      "story_id": "GT-11",
+      "title": "Add GET /branches and enforce home branch in member creation and check-in storage",
+      "type": "feature",
+      "description": "Implement GET /branches in cmp-branch-directory (public, paginated) and a branch-existence check used by other modules. Make signup start and confirm (POST /signups, POST /signups/confirm) require a valid branch_id, return 422 VALIDATION_ERROR naming the home branch when missing, and store it as the member's home branch. Ensure the check-in record written by POST /checkins stores the signed-in staff user's branch and the server timestamp, even for members of another home branch.",
+      "repo": "acme/gym-api",
+      "discipline": "BE",
+      "hours": 10.0,
+      "skills": [
+        "backend-python",
+        "api-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "GIVEN a person signs up with the Kothrud branch id and a correct code, WHEN the member is created, THEN GET /members/{id} returns Kothrud as home_branch_name.",
+        "GIVEN a signup request without branch_id, WHEN it is submitted, THEN the API returns 422 VALIDATION_ERROR asking for a home branch and creates no member.",
+        "GIVEN a Kothrud member and staff at another branch, WHEN staff record a check-in at 18:30 on 12 Jan 2027 India time, THEN the stored check-in holds the member id, the other branch id and that date and time."
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-11-T03",
+      "story_id": "GT-11",
+      "title": "Add required home-branch selector to the Join screen",
+      "type": "ui",
+      "description": "On the Join screen in cmp-web-member, load the branch list from GET /branches and show a labelled, required home-branch choice. Block submission and show a clear message asking for a home branch when none is chosen. Send the chosen branch_id in the sign-up request.",
+      "repo": "acme/gym-web",
+      "discipline": "FE",
+      "hours": 5.0,
+      "skills": [
+        "frontend-react",
+        "ux-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "GIVEN the Join screen, WHEN it loads, THEN a labelled home-branch field lists every branch returned by GET /branches.",
+        "WHEN the person submits without choosing a branch, THEN the screen shows a message asking for a home branch and sends no request."
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-11-T04",
+      "story_id": "GT-11",
+      "title": "Automate tests for home branch and check-in branch records",
+      "type": "test",
+      "description": "Write API/integration tests for the story's acceptance criteria. Cover signing up with a chosen branch, signing up without one, and a check-in at another branch on a fixed date and time. Add one end-to-end test of the Join screen refusing a missing branch.",
+      "repo": "acme/gym-api",
+      "discipline": "QA",
+      "hours": 6.0,
+      "skills": [
+        "qa-automation"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "Tests assert that a member created with Kothrud shows Kothrud as home branch.",
+        "Tests assert that a member signed up without a branch is refused and not created.",
+        "Tests assert that a cross-branch check-in at 18:30 on 12 Jan 2027 is stored with the member, the checking branch, date and time."
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-12-T01",
+      "story_id": "GT-12",
+      "title": "Add a single English text catalogue in ctr-web and route all screen text through it",
+      "type": "ui",
+      "description": "Create one English text catalogue in ctr-web (a key-to-text map with a small lookup function) and replace hard-coded strings in the member, front-desk and admin/manager screens with catalogue lookups. Map API error codes (for example OTP_INVALID, PHONE_ALREADY_REGISTERED, FORBIDDEN_BRANCH) to catalogue texts so error messages are English and editable in one place. Keep the lookup by key so another language could be added later without changing screens.",
+      "repo": "acme/gym-web",
+      "discipline": "FE",
+      "hours": 14.0,
+      "skills": [
+        "frontend-react",
+        "ux-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN any member, staff, manager or owner screen is rendered THE SYSTEM SHALL show only text that comes from the catalogue, with no hard-coded user-facing strings in components",
+        "WHEN a text in the catalogue is changed and the screens are reloaded THE SYSTEM SHALL show the new text with no other code change",
+        "WHEN the API returns an error code THE SYSTEM SHALL show the English catalogue text mapped to that code"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-12-T02",
+      "story_id": "GT-12",
+      "title": "Add a single English message store in ctr-gym-api for API errors and WhatsApp templates",
+      "type": "feature",
+      "description": "Create one message module in ctr-gym-api holding the English text of every API error message and the text parameters of WhatsApp messages (sign-in code, reminders), keyed by error code or template name. Make the error response builder and cmp-whatsapp-adapter read from it instead of inline strings. Keep message text out of logs, per the architecture.",
+      "repo": "acme/gym-api",
+      "discipline": "BE",
+      "hours": 10.0,
+      "skills": [
+        "backend-python",
+        "api-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN the API returns an error response THE SYSTEM SHALL take its message from the message store, in English",
+        "WHEN a WhatsApp message is built THE SYSTEM SHALL take its text from the message store, in English",
+        "WHEN a text in the store is changed THE SYSTEM SHALL use the new text on the next request with no other code change"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-12-T03",
+      "story_id": "GT-12",
+      "title": "Add automated tests that prove English text and single-place text changes",
+      "type": "test",
+      "description": "Write tests for the web app and API. Web: render each screen group and check that visible text equals catalogue text, and that changing a catalogue entry changes the rendered text. API: trigger error codes and WhatsApp message building and check English text comes from the message store, and that changing a store entry changes the output.",
+      "repo": "acme/gym-web",
+      "discipline": "QA",
+      "hours": 8.0,
+      "skills": [
+        "qa-automation"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN the screens and API error and message paths are exercised THE SYSTEM SHALL show English text taken from the stores in 100% of the checked cases",
+        "WHEN one catalogue or store entry is overridden in a test THE SYSTEM SHALL show the overridden text in every place that uses it"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-13-T01",
+      "story_id": "GT-13",
+      "title": "Enforce role checks on API endpoints and return role in GET /auth/me",
+      "type": "feature",
+      "description": "In cmp-identity-access add a role-check dependency for FastAPI routes covering the four roles (member, front_desk, branch_manager, owner). Apply it to the owner-only plan edit (PATCH /plans/{plan_id}) and the staff-only check-in endpoints (GET /checkin-lookups, POST /checkins), and refuse other roles with 403 FORBIDDEN. Ensure GET /auth/me returns role and branch read from the database, never from the request body or token claims. Add unit tests for each role against these routes.",
+      "repo": "acme/gym-api",
+      "discipline": "BE",
+      "hours": 10.0,
+      "skills": [
+        "auth-security",
+        "backend-python"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN a front_desk user calls PATCH /plans/{plan_id} THE SYSTEM SHALL return 403 FORBIDDEN and leave the plan unchanged",
+        "WHEN a member calls GET /checkin-lookups or POST /checkins THE SYSTEM SHALL return 403 FORBIDDEN and store no check-in",
+        "WHEN GET /auth/me is called THE SYSTEM SHALL return the role read from the database, not from the token"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "sensitive skill: auth-security; backend of a story other stories depend on; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-13-T02",
+      "story_id": "GT-13",
+      "title": "Show role-specific menu and guard routes in the web app",
+      "type": "ui",
+      "description": "In ctr-web build the navigation menu from the role returned by GET /auth/me. The front-desk menu shows check-in, desk payment and records to fix, and hides plans and staff accounts. Add route guards in cmp-web-frontdesk and cmp-web-admin so a typed address for a screen outside the role does not render it and shows a not-allowed message, and handle 403 responses the same way.",
+      "repo": "acme/gym-web",
+      "discipline": "FE",
+      "hours": 10.0,
+      "skills": [
+        "frontend-react",
+        "auth-security"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "GIVEN a signed-in front_desk user WHEN the menu is shown THEN it lists only check-in, desk payment and records to fix, with no plans or staff accounts entries",
+        "GIVEN a front_desk user WHEN they open the plans screen address directly THEN no plan-editing form is rendered and a not-allowed message is shown",
+        "GIVEN a member WHEN they open the check-in screen address directly THEN the check-in screen is not rendered"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "sensitive skill: auth-security; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-13-T03",
+      "story_id": "GT-13",
+      "title": "Automate role-based access tests for GT-13 acceptance criteria",
+      "type": "test",
+      "description": "Write API integration tests that sign in as a member, front_desk, branch_manager and owner and call the owner-only and staff-only endpoints, asserting 403 for disallowed roles and success for allowed ones. Add an end-to-end browser test that checks the front-desk menu and the direct-address refusals for the plans screen and the check-in screen.",
+      "repo": "acme/gym-api",
+      "discipline": "QA",
+      "hours": 8.0,
+      "skills": [
+        "qa-automation",
+        "auth-security"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN front_desk calls the plan edit endpoint THE TESTS SHALL assert 403 and an unchanged plan",
+        "WHEN a member opens the check-in endpoint or screen THE TESTS SHALL assert refusal",
+        "WHEN front_desk signs in THE TESTS SHALL assert the menu contains no plans or staff entries"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "sensitive skill: auth-security; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-14-T01",
+      "story_id": "GT-14",
+      "title": "Add staff_user table migration for staff and manager accounts",
+      "type": "feature",
+      "description": "Add an Alembic migration for ent-staff-user owned by cmp-identity-access: unique username, display name, role (front_desk, branch_manager, owner), branch reference to ent-branch, Argon2id password hash, active flag, failed-attempt and locked-until columns, created_at. Check constraint: front_desk and branch_manager require a branch. Migration is additive. If the base schema or sign-in story already creates this table, only the missing columns are added.",
+      "repo": "acme/gym-api",
+      "discipline": "DB",
+      "hours": 4.0,
+      "skills": [
+        "postgres",
+        "data-modeling"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN the migration runs on an empty database THE SYSTEM SHALL create staff_user with a unique index on username",
+        "WHEN a row with role front_desk or branch_manager and no branch is inserted THE SYSTEM SHALL reject it"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "DB discipline; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-14-T02",
+      "story_id": "GT-14",
+      "title": "Add owner-only staff-user endpoints: list, create, set active",
+      "type": "feature",
+      "description": "In cmp-identity-access implement GET /staff-users, POST /staff-users (listStaffUsers, createStaffUser) and PATCH /staff-users/{user_id} (setStaffActive) per api-gym-api-v1. Creation hashes the initial password with Argon2id, requires a branch for front_desk and branch_manager, and returns USERNAME_TAKEN (409) for a duplicate username. Every endpoint requires the owner role, otherwise 403 FORBIDDEN. Write an audit event for create and deactivate. Never return password data.",
+      "repo": "acme/gym-api",
+      "discipline": "BE",
+      "hours": 12.0,
+      "skills": [
+        "backend-python",
+        "api-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN the owner POSTs role front_desk with the Kothrud branch id THE SYSTEM SHALL return 201 with that branch_id and status active",
+        "WHEN a front-desk, manager or member session calls any of the three endpoints THE SYSTEM SHALL return 403 and change nothing",
+        "WHEN the owner POSTs a username that already exists THE SYSTEM SHALL return 409 USERNAME_TAKEN and create no account"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "backend of a story other stories depend on; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-14-T03",
+      "story_id": "GT-14",
+      "title": "Refuse sign-in and live sessions of deactivated staff accounts",
+      "type": "feature",
+      "description": "In cmp-identity-access make sign_in_staff (POST /auth/staff-sessions) refuse a deactivated account, and make the per-request session check read the account's active flag from the database so an existing session stops working at once. Return 403 ACCOUNT_DEACTIVATED. Sign-in itself belongs to the sign-in story; this task adds only the deactivation checks and assumes that code exists.",
+      "repo": "acme/gym-api",
+      "discipline": "BE",
+      "hours": 5.0,
+      "skills": [
+        "backend-python",
+        "auth-security"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN a deactivated user submits correct credentials THE SYSTEM SHALL return 403 ACCOUNT_DEACTIVATED and set no cookie",
+        "WHEN the owner deactivates a user with an open session THE SYSTEM SHALL refuse that user's next request"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "sensitive skill: auth-security; backend of a story other stories depend on; sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-14-T04",
+      "story_id": "GT-14",
+      "title": "Build owner Staff accounts screen: list, add, deactivate",
+      "type": "ui",
+      "description": "In cmp-web-admin add the Staff screen listing accounts with role, branch and status, an add form (username, display name, role, branch selected from the branch list, initial password) and a deactivate action with confirmation. Show a message asking for another username on USERNAME_TAKEN. Show the Staff menu only when /auth/me returns role owner, and show an access-refused message if the API returns 403. Every field has a label.",
+      "repo": "acme/gym-web",
+      "discipline": "FE",
+      "hours": 12.0,
+      "skills": [
+        "frontend-react",
+        "ux-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN the owner submits the add form with valid values THE SYSTEM SHALL show the new account in the list",
+        "WHEN the owner confirms Deactivate THE SYSTEM SHALL show that account as deactivated",
+        "WHEN a front-desk user opens the staff URL THE SYSTEM SHALL show an access-refused message and no account data"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "sensitive security, payments, infrastructure or architecture area"
+    },
+    {
+      "task_id": "GT-14-T05",
+      "story_id": "GT-14",
+      "title": "Automate end-to-end tests of staff account creation, deactivation and access refusal",
+      "type": "test",
+      "description": "Write API and integration tests against staging for GT-14: the owner creates a front-desk account for Kothrud and that user signs in tied to Kothrud only; the owner creates a branch manager account that signs in as manager of its branch; the owner deactivates an account and sign-in then fails; a front-desk user gets 403 on all staff-user endpoints. Add a browser test for the Staff screen refusal.",
+      "repo": "acme/gym-api",
+      "discipline": "QA",
+      "hours": 8.0,
+      "skills": [
+        "qa-automation"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "Each of US-006.AC1 to US-006.AC4 has at least one automated test that passes in CI",
+        "WHEN a front-desk user calls GET /staff-users THE SYSTEM SHALL return 403"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-18-T01",
+      "story_id": "GT-18",
+      "title": "Add public GET /plans endpoint returning active plans",
+      "type": "feature",
+      "description": "Implement list_plans in cmp-plan-catalog behind GET /api/v1/plans (public, paginated) returning id, name, months, price_paise, currency and active for active plans in display order. The list does not depend on branch, so every caller gets the same plans and prices. Plans are read from the ent-plan table owned by cmp-plan-catalog; seeding of the three plans is not part of this task.",
+      "repo": "acme/gym-api",
+      "discipline": "BE",
+      "hours": 5.0,
+      "skills": [
+        "backend-python",
+        "api-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN an unauthenticated client calls GET /plans THE SYSTEM SHALL return 200 with the active monthly, quarterly and yearly plans, each with price_paise and currency INR",
+        "WHEN GET /plans is called with different or no branch context THE SYSTEM SHALL return identical plans and prices",
+        "WHEN page_size is above 100 or page is below 1 THE SYSTEM SHALL return 422 VALIDATION_ERROR"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "backend of a story other stories depend on"
+    },
+    {
+      "task_id": "GT-18-T02",
+      "story_id": "GT-18",
+      "title": "Build the plan choice screen in the sign-up flow",
+      "type": "ui",
+      "description": "In cmp-web-member add the Plan choice screen shown after the code check, calling GET /plans and listing each plan with name, duration and price formatted in rupees from price_paise. Show large buttons, a loading state and a plain error message with retry. The screen shows no branch-specific content, and each plan is selectable to continue to the order summary.",
+      "repo": "acme/gym-web",
+      "discipline": "FE",
+      "hours": 6.0,
+      "skills": [
+        "frontend-react",
+        "ux-design"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "WHEN a person reaches Plan choice THE SYSTEM SHALL list the monthly, quarterly and yearly plans each with its price in rupees",
+        "WHEN the plans request fails THE SYSTEM SHALL show a plain message and a retry button",
+        "WHEN the screen is opened on a phone THE SYSTEM SHALL need no sideways scrolling"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    },
+    {
+      "task_id": "GT-18-T03",
+      "story_id": "GT-18",
+      "title": "Automate tests for plan list acceptance criteria",
+      "type": "test",
+      "description": "Write API integration tests for GET /plans and an end-to-end test of the Plan choice screen. Cover the plan list with prices, and that two members with different home branches see identical plans and prices.",
+      "repo": "acme/gym-api",
+      "discipline": "QA",
+      "hours": 4.0,
+      "skills": [
+        "qa-automation"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "GIVEN seeded plans WHEN the plan list is requested THE SYSTEM SHALL return monthly, quarterly and yearly with prices",
+        "GIVEN members of two different home branches WHEN each opens Plan choice THE SYSTEM SHALL show the same plans and prices"
+      ],
+      "ai_candidate": false,
+      "hard_rule_failed": "file scope missing or more than 4 files"
+    }
+  ],
+  "team": [
+    {
+      "worker_id": "m-alice",
+      "name": "Alice",
+      "role": "backend",
+      "available_hours": 48.0,
+      "skills": [
+        "api-design",
+        "backend-python",
+        "postgres",
+        "qa-automation"
+      ]
+    },
+    {
+      "worker_id": "m-bob",
+      "name": "Bob",
+      "role": "frontend",
+      "available_hours": 48.0,
+      "skills": [
+        "docs",
+        "frontend-css",
+        "frontend-react",
+        "qa-automation"
+      ]
+    },
+    {
+      "worker_id": "m-carol",
+      "name": "Carol",
+      "role": "fullstack",
+      "available_hours": 48.0,
+      "skills": [
+        "backend-python",
+        "data-modeling",
+        "docs",
+        "frontend-react",
+        "observability",
+        "postgres"
+      ]
+    },
+    {
+      "worker_id": "m-dave",
+      "name": "Dave",
+      "role": "devops",
+      "available_hours": 24.0,
+      "skills": [
+        "backend-python",
+        "devops-ci",
+        "kubernetes",
+        "observability",
+        "terraform"
+      ]
+    }
+  ],
+  "ai_agents": [
+    {
+      "agent_id": "claude-code",
+      "provider": "claude_code_action",
+      "skills": [
+        "backend-python",
+        "qa-automation",
+        "docs",
+        "frontend-react"
+      ],
+      "max_concurrent_tasks": 3,
+      "max_task_hours": 4.0,
+      "enabled": true
+    },
+    {
+      "agent_id": "copilot",
+      "provider": "copilot_cloud_agent",
+      "skills": [
+        "backend-python",
+        "frontend-react",
+        "qa-automation",
+        "docs"
+      ],
+      "max_concurrent_tasks": 3,
+      "max_task_hours": 4.0,
+      "enabled": true
+    }
+  ],
+  "ci_ready_repos": [],
+  "skill_gaps": [
+    "auth-security",
+    "ux-design"
+  ],
+  "capacity_shortfall": {}
+}

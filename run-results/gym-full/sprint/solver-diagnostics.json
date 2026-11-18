@@ -1,0 +1,181 @@
+{
+  "status": "OPTIMAL",
+  "wall_time_s": 0.148,
+  "objective": 605036.0,
+  "best_bound": 605036.0,
+  "required_story_ids": [
+    "GT-11",
+    "GT-12",
+    "GT-13",
+    "GT-14",
+    "GT-15",
+    "GT-16",
+    "GT-17",
+    "GT-18",
+    "GT-19",
+    "GT-20",
+    "GT-21",
+    "GT-22",
+    "GT-23",
+    "GT-24",
+    "GT-25",
+    "GT-26",
+    "GT-27",
+    "GT-28",
+    "GT-29",
+    "GT-30",
+    "GT-31",
+    "GT-32",
+    "GT-33",
+    "GT-34",
+    "GT-35",
+    "GT-36",
+    "GT-37",
+    "GT-38",
+    "GT-39",
+    "GT-40"
+  ],
+  "required_points_scaled": 1110,
+  "capacity_points_scaled": 1722,
+  "scale": 10,
+  "aggregate_deficit_points": 0.0,
+  "aggregate_bound_proves_infeasible": false,
+  "conflicting_assumptions": [],
+  "conflict_note": "Solver assumption core is sufficient, not necessarily minimal or the only cause.",
+  "dependency_edges": [
+    [
+      "GT-13",
+      "GT-14"
+    ],
+    [
+      "GT-14",
+      "GT-15"
+    ],
+    [
+      "GT-16",
+      "GT-17"
+    ],
+    [
+      "GT-49",
+      "GT-53"
+    ],
+    [
+      "GT-43",
+      "GT-45"
+    ],
+    [
+      "GT-43",
+      "GT-46"
+    ],
+    [
+      "GT-44",
+      "GT-46"
+    ],
+    [
+      "GT-43",
+      "GT-47"
+    ],
+    [
+      "GT-16",
+      "GT-19"
+    ],
+    [
+      "GT-18",
+      "GT-20"
+    ],
+    [
+      "GT-19",
+      "GT-20"
+    ],
+    [
+      "GT-54",
+      "GT-55"
+    ],
+    [
+      "GT-38",
+      "GT-22"
+    ],
+    [
+      "GT-22",
+      "GT-23"
+    ],
+    [
+      "GT-23",
+      "GT-24"
+    ],
+    [
+      "GT-23",
+      "GT-25"
+    ],
+    [
+      "GT-35",
+      "GT-36"
+    ],
+    [
+      "GT-38",
+      "GT-36"
+    ],
+    [
+      "GT-41",
+      "GT-42"
+    ],
+    [
+      "GT-17",
+      "GT-26"
+    ],
+    [
+      "GT-26",
+      "GT-27"
+    ],
+    [
+      "GT-17",
+      "GT-38"
+    ],
+    [
+      "GT-37",
+      "GT-38"
+    ],
+    [
+      "GT-17",
+      "GT-28"
+    ],
+    [
+      "GT-15",
+      "GT-32"
+    ],
+    [
+      "GT-28",
+      "GT-34"
+    ],
+    [
+      "GT-21",
+      "GT-30"
+    ],
+    [
+      "GT-29",
+      "GT-30"
+    ],
+    [
+      "GT-30",
+      "GT-31"
+    ],
+    [
+      "GT-48",
+      "GT-49"
+    ],
+    [
+      "GT-48",
+      "GT-50"
+    ],
+    [
+      "GT-48",
+      "GT-51"
+    ]
+  ],
+  "limitations": "Bounds are necessary, not sufficient. Dependencies allow the same sprint; no task-duration critical path is inferred. UNKNOWN is not infeasibility.",
+  "backlog_sha256": "4a529df72d56d88d00542f4b85ee55f859f7930495a2d77efece350e2acbdb2a",
+  "settings_sha256": "34942bac4f5244ef057d2a36144041dd50f900334df42bd087d677ce0f4e16f2",
+  "generated_at": "2026-11-17 18:04:26+00:00",
+  "as_of": "2026-11-17",
+  "candidates": []
+}
